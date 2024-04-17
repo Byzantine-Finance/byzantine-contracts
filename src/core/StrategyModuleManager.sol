@@ -68,6 +68,26 @@ contract StrategyModuleManager is IStrategyModuleManager, Ownable {
         return (podAddr, address(stratMod));
     }
 
+    /**
+     * @notice Stakes Native ETH for a new beacon chain validator on the sender's StrategyModule.
+     * Also creates an EigenPod for the sender if they don't have one already.
+     * @param pubkey The 48 bytes public key of the beacon chain validator.
+     * @param signature The validator's signature of the deposit data.
+     * @param depositDataRoot The root/hash of the deposit data for the validator's deposit.
+     */
+    function stakeNativeETH(
+        bytes calldata pubkey, 
+        bytes calldata signature, 
+        bytes32 depositDataRoot
+    ) external payable {
+        IStrategyModule stratMod = ownerToStratMod[msg.sender];
+        if (address(stratMod) == address(0)) {
+            //deploy a StrategyModule if the sender doesn't have one already
+            stratMod = _deployStratMod();
+        }
+        stratMod.callEigenPodManager{value: msg.value}(abi.encodeWithSignature("stake(bytes,bytes,bytes32)", pubkey, signature, depositDataRoot));
+    }
+
     /* ============== VIEW FUNCTIONS ============== */
 
     /**

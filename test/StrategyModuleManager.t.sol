@@ -4,6 +4,7 @@ pragma solidity ^0.8.12;
 import "@openzeppelin/contracts/utils/Create2.sol";
 import "./eigenlayer-helper/EigenLayerDeployer.t.sol";
 import "eigenlayer-contracts/interfaces/IEigenPod.sol";
+import "./utils/ProofParsing.sol";
 
 import "../src/core/StrategyModuleManager.sol";
 import "../src/core/StrategyModule.sol";
@@ -11,7 +12,7 @@ import "../src/core/StrategyModule.sol";
 import "../src/interfaces/IStrategyModule.sol";
 import "../src/interfaces/IStrategyModuleManager.sol";
 
-contract StrategyModuleManagerTest is EigenLayerDeployer {
+contract StrategyModuleManagerTest is ProofParsing, EigenLayerDeployer {
 
     StrategyModuleManager public strategyModuleManager;
 
@@ -29,7 +30,7 @@ contract StrategyModuleManagerTest is EigenLayerDeployer {
         
     }
 
-    function testStratModManagerOwner() public {
+    function testStratModManagerOwner() public view {
         assertEq(strategyModuleManager.owner(), address(this));
     }
 
@@ -87,6 +88,41 @@ contract StrategyModuleManagerTest is EigenLayerDeployer {
     function testCreatePodDirectly() public {
         strategyModuleManager.createPod();
         assertEq(strategyModuleManager.numStratMods(), 1);
+    }
+
+    function testNativeStacking() public {
+        // File generated with the Obol LaunchPad
+        setJSON("./test/test-data/alice-eigenPod-deposit-data.json");
+
+        bytes memory pubkey = getDVPubKey();
+        bytes memory signature = getDVSignature();
+        bytes32 depositDataRoot = getDVDepositDataRoot();
+        //console.logBytes(pubkey);
+        //console.logBytes(signature);
+        //console.logBytes32(depositDataRoot);
+
+        vm.deal(alice, 40 ether);
+        vm.prank(alice);
+        strategyModuleManager.stakeNativeETH{value: 32 ether}(pubkey, signature, depositDataRoot);
+
+        assertEq(alice.balance, 8 ether);
+    }
+
+    function testFail_Not32ETHDeposited() public {
+        // File generated with the Obol LaunchPad
+        setJSON("./test/test-data/alice-eigenPod-deposit-data.json");
+
+        bytes memory pubkey = getDVPubKey();
+        bytes memory signature = getDVSignature();
+        bytes32 depositDataRoot = getDVDepositDataRoot();
+        //console.logBytes(pubkey);
+        //console.logBytes(signature);
+        //console.logBytes32(depositDataRoot);
+
+        vm.deal(alice, 40 ether);
+        vm.prank(alice);
+        strategyModuleManager.stakeNativeETH{value: 31 ether}(pubkey, signature, depositDataRoot);
+
     }
 
 }

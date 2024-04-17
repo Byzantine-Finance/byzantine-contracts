@@ -19,6 +19,15 @@ interface IStrategyModuleManager {
     function createPod() external returns (address, address);
 
     /**
+     * @notice Stakes Native ETH for a new beacon chain validator on the sender's StrategyModule.
+     * Also creates an EigenPod for the sender if they don't have one already.
+     * @param pubkey The 48 bytes public key of the beacon chain validator.
+     * @param signature The validator's signature of the deposit data.
+     * @param depositDataRoot The root/hash of the deposit data for the validator's deposit.
+     */
+    function stakeNativeETH(bytes calldata pubkey, bytes calldata signature, bytes32 depositDataRoot) external payable;
+
+    /**
      * @dev Error when sender already has StrategyModule.
      */
     error AlreadyHasStrategyModule();
