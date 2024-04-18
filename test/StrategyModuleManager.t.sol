@@ -4,6 +4,7 @@ pragma solidity ^0.8.12;
 import "@openzeppelin/contracts/utils/Create2.sol";
 import "./eigenlayer-helper/EigenLayerDeployer.t.sol";
 import "eigenlayer-contracts/interfaces/IEigenPod.sol";
+import "eigenlayer-contracts/libraries/BeaconChainProofs.sol";
 import "./utils/ProofParsing.sol";
 
 import "../src/core/StrategyModuleManager.sol";
@@ -13,6 +14,7 @@ import "../src/interfaces/IStrategyModule.sol";
 import "../src/interfaces/IStrategyModuleManager.sol";
 
 contract StrategyModuleManagerTest is ProofParsing, EigenLayerDeployer {
+    using BeaconChainProofs for *;
 
     StrategyModuleManager public strategyModuleManager;
 
@@ -123,6 +125,71 @@ contract StrategyModuleManagerTest is ProofParsing, EigenLayerDeployer {
         vm.prank(alice);
         strategyModuleManager.stakeNativeETH{value: 31 ether}(pubkey, signature, depositDataRoot);
 
+    }
+
+    // That test reverts because the `withdrawal_credential_proof` file generated with the Byzantine API
+    // doesn't point to the correct EigenPod (alice's EigenPod which is locally deployed)
+    function test_RevertWhen_WrongWithdrawalCredentials() public {
+
+        // Read required data from example files
+
+        // File generated with the Obol LaunchPad
+        setJSON("./test/test-data/alice-eigenPod-deposit-data.json");
+        bytes memory pubkey = getDVPubKey();
+        bytes memory signature = getDVSignature();
+        bytes32 depositDataRoot = getDVDepositDataRoot();
+
+        // File generated with the Byzantine API
+        setJSON("./test/test-data/withdrawal_credential_proof_1634654.json");
+
+        BeaconChainProofs.StateRootProof memory stateRootProofStruct = _getStateRootProof();
+
+        uint40[] memory validatorIndices = new uint40[](1);
+        validatorIndices[0] = uint40(getValidatorIndex());
+
+        bytes32[][] memory validatorFieldsArray = new bytes32[][](1);
+        validatorFieldsArray[0] = getValidatorFields();
+
+        bytes[] memory proofsArray = new bytes[](1);
+        proofsArray[0] = abi.encodePacked(getWithdrawalCredentialProof());
+
+        uint64 timestamp = 0;
+        vm.warp(timestamp);
+
+        vm.deal(alice, 40 ether);
+        vm.startPrank(alice);
+
+        // Create a pod and stake ETH
+        strategyModuleManager.createPod();
+        strategyModuleManager.stakeNativeETH{value: 32 ether}(pubkey, signature, depositDataRoot);
+
+        // Deposit received on the Beacon Chain
+        cheats.warp(timestamp += 16 hours);
+
+        //set the oracle block root
+        _setOracleBlockRoot();
+
+        // Verify the proof
+        IStrategyModule stratMod = strategyModuleManager.ownerToStratMod(alice);
+        cheats.expectRevert(
+            bytes("EigenPod.verifyCorrectWithdrawalCredentials: Proof is not for this EigenPod")
+        );
+        stratMod.verifyWithdrawalCredentials(stateRootProofStruct, validatorIndices, proofsArray, validatorFieldsArray);
+
+        vm.stopPrank();
+
+    }
+
+    // TODO: Test the `VerifyWithdrawalCredential` function when the proof is correct
+
+    function _getStateRootProof() internal returns (BeaconChainProofs.StateRootProof memory) {
+        return BeaconChainProofs.StateRootProof(getBeaconStateRoot(), abi.encodePacked(getStateRootProof()));
+    }
+
+    function _setOracleBlockRoot() internal {
+        bytes32 latestBlockRoot = getLatestBlockRoot();
+        //set beaconStateRoot
+        beaconChainOracle.setOracleBlockRootAtTimestamp(latestBlockRoot);
     }
 
 }

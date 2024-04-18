@@ -25,6 +25,7 @@ import "eigenlayer-contracts/permissions/PauserRegistry.sol";
 
 import "../mocks/EmptyContract.sol";
 import "../mocks/ETHDepositMock.sol";
+import "../mocks/BeaconChainOracleMock.sol";
 
 import "forge-std/Test.sol";
 
@@ -51,6 +52,7 @@ contract EigenLayerDeployer is Test {
     StrategyBase public eigenStrat;
     StrategyBase public baseStrategyImplementation;
     EmptyContract public emptyContract;
+    BeaconChainOracleMock public beaconChainOracle;
 
     mapping(uint256 => IStrategy) public strategies;
 
@@ -184,6 +186,8 @@ contract EigenLayerDeployer is Test {
             slasher,
             delegation
         );
+
+        beaconChainOracle = new BeaconChainOracleMock();
         DelayedWithdrawalRouter delayedWithdrawalRouterImplementation = new DelayedWithdrawalRouter(eigenPodManager);
 
         // Third, upgrade the proxy contracts to use the correct implementation contracts and initialize them.
@@ -226,7 +230,7 @@ contract EigenLayerDeployer is Test {
             address(eigenPodManagerImplementation),
             abi.encodeWithSelector(
                 EigenPodManager.initialize.selector,
-                beaconChainOracleAddress,
+                beaconChainOracle,
                 eigenLayerReputedMultisig,
                 eigenLayerPauserReg,
                 0 /*initialPausedStatus*/
