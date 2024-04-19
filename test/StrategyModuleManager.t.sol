@@ -93,15 +93,9 @@ contract StrategyModuleManagerTest is ProofParsing, EigenLayerDeployer {
     }
 
     function testNativeStacking() public {
-        // File generated with the Obol LaunchPad
-        setJSON("./test/test-data/alice-eigenPod-deposit-data.json");
-
-        bytes memory pubkey = getDVPubKey();
-        bytes memory signature = getDVSignature();
-        bytes32 depositDataRoot = getDVDepositDataRoot();
-        //console.logBytes(pubkey);
-        //console.logBytes(signature);
-        //console.logBytes32(depositDataRoot);
+        // Get the validator deposit data
+        (bytes memory pubkey, bytes memory signature, bytes32 depositDataRoot) = 
+            _getDepositData(abi.encodePacked("./test/test-data/alice-eigenPod-deposit-data.json"));
 
         vm.deal(alice, 40 ether);
         vm.prank(alice);
@@ -111,15 +105,9 @@ contract StrategyModuleManagerTest is ProofParsing, EigenLayerDeployer {
     }
 
     function testFail_Not32ETHDeposited() public {
-        // File generated with the Obol LaunchPad
-        setJSON("./test/test-data/alice-eigenPod-deposit-data.json");
-
-        bytes memory pubkey = getDVPubKey();
-        bytes memory signature = getDVSignature();
-        bytes32 depositDataRoot = getDVDepositDataRoot();
-        //console.logBytes(pubkey);
-        //console.logBytes(signature);
-        //console.logBytes32(depositDataRoot);
+        // Get the validator deposit data
+        (bytes memory pubkey, bytes memory signature, bytes32 depositDataRoot) = 
+            _getDepositData(abi.encodePacked("./test/test-data/alice-eigenPod-deposit-data.json"));
 
         vm.deal(alice, 40 ether);
         vm.prank(alice);
@@ -133,25 +121,20 @@ contract StrategyModuleManagerTest is ProofParsing, EigenLayerDeployer {
 
         // Read required data from example files
 
-        // File generated with the Obol LaunchPad
-        setJSON("./test/test-data/alice-eigenPod-deposit-data.json");
-        bytes memory pubkey = getDVPubKey();
-        bytes memory signature = getDVSignature();
-        bytes32 depositDataRoot = getDVDepositDataRoot();
+        // Get the validator deposit data
+        (bytes memory pubkey, bytes memory signature, bytes32 depositDataRoot) = 
+            _getDepositData(abi.encodePacked("./test/test-data/alice-eigenPod-deposit-data.json"));
 
-        // File generated with the Byzantine API
-        setJSON("./test/test-data/withdrawal_credential_proof_1634654.json");
+        // Get the validator fields proof
+        (
+            BeaconChainProofs.StateRootProof memory stateRootProofStruct,
+            uint40[] memory validatorIndices,
+            bytes[] memory proofsArray,
+            bytes32[][] memory validatorFieldsArray
+        ) = 
+            _getValidatorFieldsProof(abi.encodePacked("./test/test-data/withdrawal_credential_proof_1634654.json"));
 
-        BeaconChainProofs.StateRootProof memory stateRootProofStruct = _getStateRootProof();
-
-        uint40[] memory validatorIndices = new uint40[](1);
-        validatorIndices[0] = uint40(getValidatorIndex());
-
-        bytes32[][] memory validatorFieldsArray = new bytes32[][](1);
-        validatorFieldsArray[0] = getValidatorFields();
-
-        bytes[] memory proofsArray = new bytes[](1);
-        proofsArray[0] = abi.encodePacked(getWithdrawalCredentialProof());
+        // Start the test
 
         uint64 timestamp = 0;
         vm.warp(timestamp);
@@ -181,6 +164,106 @@ contract StrategyModuleManagerTest is ProofParsing, EigenLayerDeployer {
     }
 
     // TODO: Test the `VerifyWithdrawalCredential` function when the proof is correct
+
+    // This test revert because we are trying to update the balance of a Pod whose validator
+    // hasn't been activated by calling `verifyWithdrawalCredentials`
+    function test_RevertWhen_UpdatePodBalanceForInactiveValidator() public {
+
+        // Read required data from example files
+
+        // Get the validator deposit data
+        (bytes memory pubkey, bytes memory signature, bytes32 depositDataRoot) = 
+            _getDepositData(abi.encodePacked("./test/test-data/alice-eigenPod-deposit-data.json"));
+
+        // Get the validator fields proof
+        (
+            BeaconChainProofs.StateRootProof memory stateRootProofStruct,
+            uint40[] memory validatorIndices,
+            bytes[] memory proofsArray,
+            bytes32[][] memory validatorFieldsArray
+        ) = 
+            _getValidatorFieldsProof(abi.encodePacked("./test/test-data/balance_update_proof_1634654.json"));
+
+
+        // Start the test
+
+        uint64 timestamp = 0;
+        vm.warp(timestamp);
+
+        vm.deal(alice, 40 ether);
+        vm.startPrank(alice);
+
+        // Create a pod and stake ETH
+        strategyModuleManager.createPod();
+        strategyModuleManager.stakeNativeETH{value: 32 ether}(pubkey, signature, depositDataRoot);
+
+        // Deposit received on the Beacon Chain
+        cheats.warp(timestamp += 16 hours);
+
+        //set the oracle block root
+        _setOracleBlockRoot();
+
+        // Verify the proof
+        IStrategyModule stratMod = strategyModuleManager.ownerToStratMod(alice);
+        cheats.expectRevert(
+            bytes("EigenPod.verifyBalanceUpdate: Validator not active")
+        );
+        stratMod.verifyBalanceUpdates(stateRootProofStruct, validatorIndices, proofsArray, validatorFieldsArray);
+
+        vm.stopPrank();
+
+    }
+
+    // TODO: Test the `verifyBalanceUpdates` function when the proof is correct 
+    //       and the validator is ACTIVE (has called `verifyWithdrawalCredentials` function)
+
+
+    //--------------------------------------------------------------------------------------
+    //------------------------------  INTERNAL FUNCTIONS  ----------------------------------
+    //--------------------------------------------------------------------------------------
+
+    function _getDepositData(
+        bytes memory depositFilePath
+    ) internal returns (
+        bytes memory pubkey,
+        bytes memory signature,
+        bytes32 depositDataRoot
+    ) {
+        // File generated with the Obol LaunchPad
+        setJSON(string(depositFilePath));
+
+        pubkey = getDVPubKey();
+        signature = getDVSignature();
+        depositDataRoot = getDVDepositDataRoot();
+        //console.logBytes(pubkey);
+        //console.logBytes(signature);
+        //console.logBytes32(depositDataRoot);
+    }
+
+    function _getValidatorFieldsProof(
+        bytes memory proofFilePath
+    ) internal returns (
+        BeaconChainProofs.StateRootProof memory,
+        uint40[] memory,
+        bytes[] memory,
+        bytes32[][] memory
+    ) {
+        // File generated with the Byzantine API
+        setJSON(string(proofFilePath));
+
+        BeaconChainProofs.StateRootProof memory stateRootProofStruct = _getStateRootProof();
+
+        uint40[] memory validatorIndices = new uint40[](1);
+        validatorIndices[0] = uint40(getValidatorIndex());
+
+        bytes32[][] memory validatorFieldsArray = new bytes32[][](1);
+        validatorFieldsArray[0] = getValidatorFields();
+
+        bytes[] memory proofsArray = new bytes[](1);
+        proofsArray[0] = abi.encodePacked(getWithdrawalCredentialProof());
+
+        return (stateRootProofStruct, validatorIndices, proofsArray, validatorFieldsArray);
+    }
 
     function _getStateRootProof() internal returns (BeaconChainProofs.StateRootProof memory) {
         return BeaconChainProofs.StateRootProof(getBeaconStateRoot(), abi.encodePacked(getStateRootProof()));
