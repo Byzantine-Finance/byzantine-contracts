@@ -16,6 +16,7 @@ interface IStrategyModule {
    * the stratModOwner are pointed to the EigenPod of this contract. It also verifies the effective balance of the DV.
    * It verifies the provided proof of the ETH DV against the beacon chain state root, marks the validator as 'active'
    * in EigenLayer, and credits the restaked ETH in Eigenlayer.
+   * @param proofTimestamp is the exact timestamp where the proof was generated
    * @param stateRootProof proves a `beaconStateRoot` against a block root fetched from the oracle
    * @param validatorIndices is the list of indices of the validators being proven, refer to consensus specs
    * @param validatorFieldsProofs proofs against the `beaconStateRoot` for each validator in `validatorFields`
@@ -29,6 +30,7 @@ interface IStrategyModule {
    * It entails to re-generate a proof every 4.5 hours.
    */
   function verifyWithdrawalCredentials(
+    uint64 proofTimestamp,
     BeaconChainProofs.StateRootProof calldata stateRootProof,
     uint40[] calldata validatorIndices,
     bytes[] calldata validatorFieldsProofs,
@@ -39,6 +41,7 @@ interface IStrategyModule {
   /**
    * @notice This function records an update (either increase or decrease) in a validator's balance which is active,
    * (which has already called `verifyWithdrawalCredentials`).
+   * @param proofTimestamp is the exact timestamp where the proof was generated
    * @param stateRootProof proves a `beaconStateRoot` against a block root fetched from the oracle
    * @param validatorIndices is the list of indices of the validators being proven, refer to consensus specs 
    * @param validatorFieldsProofs proofs against the `beaconStateRoot` for each validator in `validatorFields`
@@ -52,6 +55,7 @@ interface IStrategyModule {
    * It entails to re-generate a proof every 4.5 hours.
    */
   function verifyBalanceUpdates(
+      uint64 proofTimestamp,
       BeaconChainProofs.StateRootProof calldata stateRootProof,
       uint40[] calldata validatorIndices,
       bytes[] calldata validatorFieldsProofs,

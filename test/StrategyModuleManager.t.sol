@@ -157,7 +157,7 @@ contract StrategyModuleManagerTest is ProofParsing, EigenLayerDeployer {
         cheats.expectRevert(
             bytes("EigenPod.verifyCorrectWithdrawalCredentials: Proof is not for this EigenPod")
         );
-        stratMod.verifyWithdrawalCredentials(stateRootProofStruct, validatorIndices, proofsArray, validatorFieldsArray);
+        stratMod.verifyWithdrawalCredentials(timestamp, stateRootProofStruct, validatorIndices, proofsArray, validatorFieldsArray);
 
         vm.stopPrank();
 
@@ -208,7 +208,7 @@ contract StrategyModuleManagerTest is ProofParsing, EigenLayerDeployer {
         cheats.expectRevert(
             bytes("EigenPod.verifyBalanceUpdate: Validator not active")
         );
-        stratMod.verifyBalanceUpdates(stateRootProofStruct, validatorIndices, proofsArray, validatorFieldsArray);
+        stratMod.verifyBalanceUpdates(timestamp, stateRootProofStruct, validatorIndices, proofsArray, validatorFieldsArray);
 
         vm.stopPrank();
 
