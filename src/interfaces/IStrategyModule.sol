@@ -6,10 +6,38 @@ import "eigenlayer-contracts/libraries/BeaconChainProofs.sol";
 interface IStrategyModule {
 
   /**
+   * @notice Returns the owner of this StrategyModule
+   */
+  function stratModOwner() external view returns (address);
+
+  /**
    * @notice Call the EigenPodManager contract
    * @param data to call contract 
    */
   function callEigenPodManager(bytes calldata data) external payable returns (bytes memory);
+
+  /**
+   * @notice Creates an EigenPod for the strategy module.
+   * @dev Function will revert if not called by the StrategyModule owner.
+   * @dev Function will revert if the StrategyModule already has an EigenPod.
+   * @dev Returns EigenPod address
+   */
+  function createPod() external returns (address);
+
+  /**
+   * @notice Stakes Native ETH for a new beacon chain validator on the sender's StrategyModule.
+   * Also creates an EigenPod for the StrategyModule if it doesn't have one already.
+   * @param pubkey The 48 bytes public key of the beacon chain validator.
+   * @param signature The validator's signature of the deposit data.
+   * @param depositDataRoot The root/hash of the deposit data for the validator's deposit.
+   * @dev Function will revert if the sender is not the StrategyModule's owner.
+   */
+  function stakeNativeETH(
+    bytes calldata pubkey, 
+    bytes calldata signature, 
+    bytes32 depositDataRoot
+  ) 
+    external payable; 
 
   /**
    * @notice This function verifies that the withdrawal credentials of the Distributed Validator(s) owned by
@@ -65,11 +93,11 @@ interface IStrategyModule {
 
   
   /// @dev Error when unauthorized call to a function callable only by the StrategyModuleManager.
-  error CallableOnlyByStrategyModuleManager();
+  error OnlyStrategyModuleManager();
 
   
   /// @dev Error when unauthorized call to a function callable only by the StrategyModuleOwner.
-  error CallableOnlyByStrategyModuleOwner();
+  error OnlyStrategyModuleOwner();
 
   
   /// @dev Returned on failed Eigen Layer contracts call

@@ -12,8 +12,6 @@ import "../interfaces/IStrategyModule.sol";
 import "../interfaces/IStrategyModuleManager.sol";
 
 // TODO: Emit events to notify what happened
-// TODO: Find a solution to create a StrategyModule when one creates EigenPod or stakeNativeETH and doesn't own StrategyModule
-// ==> Benefits only one signature 
 // TODO: Deploy a StrategyModule with CREATE2 to determine the address of the EigenPod for the operators
 
 contract StrategyModuleManager is IStrategyModuleManager, Ownable {
@@ -53,49 +51,25 @@ contract StrategyModuleManager is IStrategyModuleManager, Ownable {
      */
     function createStratMod() external returns (address) {
         // Deploy a StrategyModule
-        IStrategyModule stratmod = _deployStratMod();
+        IStrategyModule stratMod = _deployStratMod();
 
-        return address(stratmod);
+        return address(stratMod);
     }
 
     /**
-     * @notice Creates an EigenPod for the specified strategy module.
-     * @param stratModIndex The index of the StrategyModules owner to create a Pod.
-     * @dev Function will revert if the `stratModIndex` is out of bounds (i.e greater than the number of StrategyModules the sender has).
-     * @dev Function will revert if the `msg.sender` already has an EigenPod.
-     * @dev Returns EigenPod address
-     */
-    function createPod(uint256 stratModIndex) external checkStratModOwnerAndIndex(stratModIndex) returns (address) {
-
-        IStrategyModule stratMod = ownerToStratMods[msg.sender][stratModIndex];
-
-        // deploy a pod if the Strategy Module doesn't have one already
-        bytes memory retData = stratMod.callEigenPodManager(abi.encodeWithSignature("createPod()"));
-        // decode the return data
-        address podAddr  = abi.decode(retData, (address));
-
-        return (podAddr);
-    }
-
-    /**
-     * @notice Stakes Native ETH for a new beacon chain validator on the sender's StrategyModule.
-     * Also creates an EigenPod for the StrategyModule if it doesn't have one already.
-     * @param stratModIndex The index of the StrategyModule's sender to restake Native ETH.
+     * @notice Create a StrategyModule for the sender and then stake native ETH for a new beacon chain validator
+     * on that newly created StrategyModule. Also creates an EigenPod for the StrategyModule.
      * @param pubkey The 48 bytes public key of the beacon chain validator.
      * @param signature The validator's signature of the deposit data.
      * @param depositDataRoot The root/hash of the deposit data for the validator's deposit.
-     * @dev Function will revert if `stratModAddr` is not a StrategyModule contract.
-     * @dev Function will revert if the sender is not the StrategyModule's owner.
+     * @dev Function will revert if not exactly 32 ETH are sent with the transaction.
      */
-    function stakeNativeETH(
-        uint256 stratModIndex,
+    function createStratModAndStakeNativeETH(
         bytes calldata pubkey, 
-        bytes calldata signature, 
+        bytes calldata signature,
         bytes32 depositDataRoot
-    ) external payable checkStratModOwnerAndIndex(stratModIndex) {
-
-        IStrategyModule stratMod = ownerToStratMods[msg.sender][stratModIndex];
-
+    ) external payable {
+        IStrategyModule stratMod = _deployStratMod();
         stratMod.callEigenPodManager{value: msg.value}(abi.encodeWithSignature("stake(bytes,bytes,bytes32)", pubkey, signature, depositDataRoot));
     }
 

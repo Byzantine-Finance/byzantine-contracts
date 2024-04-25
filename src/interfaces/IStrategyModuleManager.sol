@@ -13,25 +13,19 @@ interface IStrategyModuleManager {
     function createStratMod() external returns (address);
 
     /**
-     * @notice Creates an EigenPod for the specified strategy module.
-     * @param stratModIndex The index of the StrategyModules owner to create a Pod.
-     * @dev Function will revert if the `stratModIndex` is out of bounds (i.e greater than the number of StrategyModules the sender has).
-     * @dev Function will revert if the `msg.sender` already has an EigenPod.
-     * @dev Returns EigenPod address
-     */
-    function createPod(uint256 stratModIndex) external returns (address);
-
-    /**
-     * @notice Stakes Native ETH for a new beacon chain validator on the sender's StrategyModule.
-     * Also creates an EigenPod for the StrategyModule if it doesn't have one already.
-     * @param stratModIndex The index of the StrategyModule's sender to restake Native ETH.
+     * @notice Create a StrategyModule for the sender and then stake native ETH for a new beacon chain validator
+     * on that newly created StrategyModule. Also creates an EigenPod for the StrategyModule.
      * @param pubkey The 48 bytes public key of the beacon chain validator.
      * @param signature The validator's signature of the deposit data.
      * @param depositDataRoot The root/hash of the deposit data for the validator's deposit.
-     * @dev Function will revert if `stratModAddr` is not a StrategyModule contract.
-     * @dev Function will revert if the sender is not the StrategyModule's owner.
+     * @dev Function will revert if not exactly 32 ETH are sent with the transaction.
      */
-    function stakeNativeETH(uint256 stratModIndex, bytes calldata pubkey, bytes calldata signature, bytes32 depositDataRoot) external payable;
+    function createStratModAndStakeNativeETH(
+        bytes calldata pubkey, 
+        bytes calldata signature, 
+        bytes32 depositDataRoot
+    ) 
+        external payable;
 
     /**
      * @notice Returns the addresses of the `stratModOwner`'s StrategyModules

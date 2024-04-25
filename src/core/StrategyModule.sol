@@ -31,12 +31,12 @@ contract StrategyModule is IStrategyModule {
     /* ============== MODIFIERS ============== */
 
     modifier onlyStratModManager() {
-        if (msg.sender != address(stratModManager)) revert CallableOnlyByStrategyModuleManager();
+        if (msg.sender != address(stratModManager)) revert OnlyStrategyModuleManager();
         _;
     }
 
     modifier onlyStratModOwner() {
-        if (msg.sender != stratModOwner) revert CallableOnlyByStrategyModuleOwner();
+        if (msg.sender != stratModOwner) revert OnlyStrategyModuleOwner();
         _;
     }
 
@@ -53,6 +53,32 @@ contract StrategyModule is IStrategyModule {
     }
 
     /* ============== EXTERNAL FUNCTIONS ============== */
+
+    /**
+     * @notice Creates an EigenPod for the strategy module.
+     * @dev Function will revert if not called by the StrategyModule owner.
+     * @dev Function will revert if the StrategyModule already has an EigenPod.
+     * @dev Returns EigenPod address
+     */
+    function createPod() external onlyStratModOwner returns (address) {
+        return eigenPodManager.createPod();
+    }
+
+    /**
+     * @notice Stakes Native ETH for a new beacon chain validator on the sender's StrategyModule.
+     * Also creates an EigenPod for the StrategyModule if it doesn't have one already.
+     * @param pubkey The 48 bytes public key of the beacon chain validator.
+     * @param signature The validator's signature of the deposit data.
+     * @param depositDataRoot The root/hash of the deposit data for the validator's deposit.
+     * @dev Function will revert if the sender is not the StrategyModule's owner.
+     */
+    function stakeNativeETH(
+        bytes calldata pubkey, 
+        bytes calldata signature,
+        bytes32 depositDataRoot
+    ) external payable onlyStratModOwner {
+        eigenPodManager.stake{value: msg.value}(pubkey, signature, depositDataRoot);
+    }
 
     /**
      * @notice Call the EigenPodManager contract
