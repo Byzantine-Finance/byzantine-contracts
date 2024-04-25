@@ -40,11 +40,9 @@ contract StrategyModuleManagerTest is ProofParsing, EigenLayerDeployer {
 
         // Alice creates a StrategyModule
         vm.prank(alice);
-        address stratModAddrAlice = strategyModuleManager.createStratMod();
+        address stratModAddrAlice1 = strategyModuleManager.createStratMod();
         assertEq(strategyModuleManager.numStratMods(), 1);
-
-        address stratModOwnerAlice = StrategyModule(stratModAddrAlice).stratModOwner();
-        assertEq(stratModOwnerAlice, alice);
+        assertEq(StrategyModule(stratModAddrAlice1).stratModOwner(), alice);
 
         // Bob creates a StrategyModule
         vm.prank(bob);
@@ -53,43 +51,97 @@ contract StrategyModuleManagerTest is ProofParsing, EigenLayerDeployer {
 
         address stratModOwnerBob = StrategyModule(stratModAddrBob).stratModOwner();
         assertEq(stratModOwnerBob, bob);
+
+        // Alice creates a second StrategyModule
+        vm.prank(alice);
+        address stratModAddrAlice2 = strategyModuleManager.createStratMod();
+        assertEq(strategyModuleManager.numStratMods(), 3);
+        assertEq(StrategyModule(stratModAddrAlice2).stratModOwner(), alice);
+
+        // Get Alice StrategyModules
+        IStrategyModule[] memory aliceStratMods = strategyModuleManager.getStratMods(alice);
+        assertEq(aliceStratMods.length, 2);
+        assertEq(address(aliceStratMods[0]), stratModAddrAlice1);
+        assertEq(address(aliceStratMods[1]), stratModAddrAlice2);
+        
+        // Get Bob StrategyModules
+        IStrategyModule[] memory bobStratMods = strategyModuleManager.getStratMods(bob);
+        assertEq(bobStratMods.length, 1);
+        assertEq(address(bobStratMods[0]), stratModAddrBob);
     }
 
-    function test_RevertWhen_AlreadyHasStratMod() public {
-        vm.startPrank(address(0x123));
-        // Create a first StrategyModule
+    function test_RevertWhen_createPodForNonValidStratModIndex() public {
+        // Alice creates a StrategyModule
+        vm.startPrank(alice);
         strategyModuleManager.createStratMod();
-        vm.expectRevert(IStrategyModuleManager.AlreadyHasStrategyModule.selector);
-        // Create a second StrategyModule
+        // Alice creates an EigenPod for a non valid index
+        uint256 nonValidIndex = 1;
+        vm.expectRevert(abi.encodeWithSignature("InvalidStratModIndex(uint256)", nonValidIndex));
+        strategyModuleManager.createPod(nonValidIndex);
+        vm.stopPrank();
+
+        // Bob creates two StrategyModules
+        vm.startPrank(bob);
         strategyModuleManager.createStratMod();
+        strategyModuleManager.createStratMod();
+        // Bob creates an EigenPod for a non valid index
+        nonValidIndex = 10;
+        vm.expectRevert(abi.encodeWithSignature("InvalidStratModIndex(uint256)", nonValidIndex));
+        strategyModuleManager.createPod(nonValidIndex);
         vm.stopPrank();
     }
 
-    function testPreCalculationStratModAddr() public {
-        vm.startPrank(alice);
-        // Pre-calculate alice's StrategyModule address
-        IStrategyModule stratMod = strategyModuleManager.getStratMod(alice);
-        address exeptedStratModAddr = address(stratMod);
-        // Alice deploys a StrategyModule
-        address stratModAddr = strategyModuleManager.createStratMod();
-        assertEq(stratModAddr, exeptedStratModAddr);
+    function test_CreatePods() public {
+        vm.startPrank(bob);
+        // Bob creates two StrategyModules
+        address stratMod1 = strategyModuleManager.createStratMod();
+        address stratMod2 = strategyModuleManager.createStratMod();
+
+        // Bob creates an EigenPod in its both StrategyModules
+        address stratMod1Pod = strategyModuleManager.createPod(0);
+        assertEq(stratMod1Pod, address(strategyModuleManager.getPod(stratMod1)));
+        address stratMod2Pod = strategyModuleManager.createPod(1);
+        assertEq(stratMod2Pod, address(strategyModuleManager.getPod(stratMod2)));
+
         vm.stopPrank();
     }
 
-    function testCreatePodAndPrecalculateItsAddress() public {
+    function test_RevertWhen_CreateTwoPodsForSameStratMod() public {
+        vm.startPrank(bob);
+        address stratMod1 = strategyModuleManager.createStratMod();
+        strategyModuleManager.createPod(0);
+        vm.expectRevert(abi.encodeWithSignature("CallFailed(bytes)", abi.encodeWithSignature("createPod()")));
+        strategyModuleManager.createPod(0);
+    }
+
+    function test_HasPod() public {
+        vm.startPrank(bob);
+        address stratMod1 = strategyModuleManager.createStratMod();
+        assertEq(strategyModuleManager.hasPod(bob, 0), false);
+        strategyModuleManager.createPod(0);
+        assertEq(strategyModuleManager.hasPod(bob, 0), true);
+    }
+
+    function test_RevertWhen_notStratModOwnerCreatesPod() public {
+        // Alice creates a StrategyModule
+        vm.prank(alice);
+        address stratModAddrAlice = strategyModuleManager.createStratMod();
+
+        // The contract try to create a pod for Alice's StrategyModule
+        vm.expectRevert(abi.encodeWithSignature("DoNotHaveStratMod(address)", address(this)));
+        strategyModuleManager.createPod(10);
+    }
+
+    function testCreateStratModAndPrecalculatePodAddress() public {
         vm.startPrank(alice);
+        // Alice create a StrategyModule
+        address stratMod = strategyModuleManager.createStratMod();
         // Pre-calculate alice's EigenPod address
-        IEigenPod expectedEigenPod = strategyModuleManager.getPod(alice);
+        IEigenPod expectedEigenPod = strategyModuleManager.getPod(stratMod);
         // Alice deploys an EigenPod
-        (address eigenPod,) = strategyModuleManager.createPod();
+        address eigenPod = strategyModuleManager.createPod(0);
         assertEq(eigenPod, address(expectedEigenPod));
         vm.stopPrank();
-    }
-
-    // Verify is the action to directly create an EigenPod also creates a StrategyModule
-    function testCreatePodDirectly() public {
-        strategyModuleManager.createPod();
-        assertEq(strategyModuleManager.numStratMods(), 1);
     }
 
     function testNativeStacking() public {
@@ -97,11 +149,14 @@ contract StrategyModuleManagerTest is ProofParsing, EigenLayerDeployer {
         (bytes memory pubkey, bytes memory signature, bytes32 depositDataRoot) = 
             _getDepositData(abi.encodePacked("./test/test-data/alice-eigenPod-deposit-data.json"));
 
+        // Alice create StrategyModule and stake 32 ETH
         vm.deal(alice, 40 ether);
-        vm.prank(alice);
-        strategyModuleManager.stakeNativeETH{value: 32 ether}(pubkey, signature, depositDataRoot);
+        vm.startPrank(alice);
+        strategyModuleManager.createStratMod();
+        strategyModuleManager.stakeNativeETH{value: 32 ether}(0, pubkey, signature, depositDataRoot);
 
         assertEq(alice.balance, 8 ether);
+        vm.stopPrank();
     }
 
     function testFail_Not32ETHDeposited() public {
@@ -109,9 +164,11 @@ contract StrategyModuleManagerTest is ProofParsing, EigenLayerDeployer {
         (bytes memory pubkey, bytes memory signature, bytes32 depositDataRoot) = 
             _getDepositData(abi.encodePacked("./test/test-data/alice-eigenPod-deposit-data.json"));
 
+        // Alice create StrategyModule and stake 31 ETH
         vm.deal(alice, 40 ether);
         vm.prank(alice);
-        strategyModuleManager.stakeNativeETH{value: 31 ether}(pubkey, signature, depositDataRoot);
+        strategyModuleManager.createStratMod();
+        strategyModuleManager.stakeNativeETH{value: 31 ether}(0, pubkey, signature, depositDataRoot);
 
     }
 
@@ -143,8 +200,9 @@ contract StrategyModuleManagerTest is ProofParsing, EigenLayerDeployer {
         vm.startPrank(alice);
 
         // Create a pod and stake ETH
-        strategyModuleManager.createPod();
-        strategyModuleManager.stakeNativeETH{value: 32 ether}(pubkey, signature, depositDataRoot);
+        strategyModuleManager.createStratMod();
+        strategyModuleManager.createPod(0);
+        strategyModuleManager.stakeNativeETH{value: 32 ether}(0, pubkey, signature, depositDataRoot);
 
         // Deposit received on the Beacon Chain
         cheats.warp(timestamp += 16 hours);
@@ -153,7 +211,7 @@ contract StrategyModuleManagerTest is ProofParsing, EigenLayerDeployer {
         _setOracleBlockRoot();
 
         // Verify the proof
-        IStrategyModule stratMod = strategyModuleManager.ownerToStratMod(alice);
+        IStrategyModule stratMod = strategyModuleManager.getStratModByIndex(alice, 0);
         cheats.expectRevert(
             bytes("EigenPod.verifyCorrectWithdrawalCredentials: Proof is not for this EigenPod")
         );
@@ -194,8 +252,9 @@ contract StrategyModuleManagerTest is ProofParsing, EigenLayerDeployer {
         vm.startPrank(alice);
 
         // Create a pod and stake ETH
-        strategyModuleManager.createPod();
-        strategyModuleManager.stakeNativeETH{value: 32 ether}(pubkey, signature, depositDataRoot);
+        strategyModuleManager.createStratMod();
+        strategyModuleManager.createPod(0);
+        strategyModuleManager.stakeNativeETH{value: 32 ether}(0, pubkey, signature, depositDataRoot);
 
         // Deposit received on the Beacon Chain
         cheats.warp(timestamp += 16 hours);
@@ -204,7 +263,7 @@ contract StrategyModuleManagerTest is ProofParsing, EigenLayerDeployer {
         _setOracleBlockRoot();
 
         // Verify the proof
-        IStrategyModule stratMod = strategyModuleManager.ownerToStratMod(alice);
+        IStrategyModule stratMod = strategyModuleManager.getStratModByIndex(alice, 0);
         cheats.expectRevert(
             bytes("EigenPod.verifyBalanceUpdate: Validator not active")
         );
