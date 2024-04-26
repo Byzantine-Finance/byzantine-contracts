@@ -25,7 +25,7 @@ interface IStrategyModuleManager {
         bytes calldata signature, 
         bytes32 depositDataRoot
     ) 
-        external payable;
+        external payable returns (address);
 
     /**
      * @notice Returns the addresses of the `stratModOwner`'s StrategyModules
@@ -60,6 +60,20 @@ interface IStrategyModuleManager {
      * @param stratModIndex The index of the `stratModOwner` StrategyModules you want to know if it has an EigenPod.
      */
     function hasPod(address stratModOwner, uint256 stratModIndex) external view returns (bool);
+
+    /**
+     * @notice Specify which `stratModOwner`'s StrategyModules are delegated.
+     * @param stratModOwner The address of the StrategyModules' owner.
+     * @dev Revert if the `stratModOwner` doesn't have any StrategyModule.
+     */
+    function isStratModDelegated(address stratModOwner) external view returns (bool[] memory);
+
+    /**
+     * @notice Specify to which operators `stratModOwner`'s StrategyModules are delegated to.
+     * @param stratModOwner The address of the StrategyModules' owner.
+     * @dev Revert if the `stratModOwner` doesn't have any StrategyModule.
+     */
+    function stratModDelegateTo(address stratModOwner) external view returns (address[] memory);
 
     /// @dev Returned when a specific address doesn't have a StrategyModule
     error DoNotHaveStratMod(address);

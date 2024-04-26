@@ -91,6 +91,17 @@ interface IStrategyModule {
   )
     external;
 
+  /**
+     * @notice The caller delegate its Strategy Module's stake to an Eigen Layer operator.
+     * @notice /!\ Delegation is all-or-nothing: when a Staker delegates to an Operator, they delegate ALL their stake.
+     * @param operator The account teh STrategy Module is delegating its assets to for use in serving applications built on EigenLayer.
+     * @dev The operator must not have set a delegation approver, everyone can delegate to it without permission.
+     * @dev Ensures that:
+     *          1) the `staker` is not already delegated to an operator
+     *          2) the `operator` has indeed registered as an operator in EigenLayer
+     */
+    function delegateTo(address operator) external;
+
   
   /// @dev Error when unauthorized call to a function callable only by the StrategyModuleManager.
   error OnlyStrategyModuleManager();

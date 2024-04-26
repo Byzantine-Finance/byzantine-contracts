@@ -3,6 +3,8 @@ pragma solidity ^0.8.20;
 
 import "eigenlayer-contracts/interfaces/IEigenPodManager.sol";
 import "eigenlayer-contracts/interfaces/IEigenPod.sol";
+import "eigenlayer-contracts/interfaces/IDelegationManager.sol";
+import "eigenlayer-contracts/interfaces/ISignatureUtils.sol";
 import "eigenlayer-contracts/libraries/BeaconChainProofs.sol";
 
 import "../interfaces/IStrategyModuleManager.sol";
@@ -19,9 +21,12 @@ contract StrategyModule is IStrategyModule {
     /// @notice The single StrategyModuleManager for Byzantine
     IStrategyModuleManager public immutable stratModManager;
 
-    /// @notice address of EigenLayerPod Manager
+    /// @notice EigenLayer's EigenPodManager contract
     /// @dev this is the pod manager transparent proxy
     IEigenPodManager public immutable eigenPodManager;
+
+    /// @notice EigenLayer's DelegationManager contract
+    IDelegationManager public immutable delegationManager;
 
     /* ============== STATE VARIABLES ============== */
 
@@ -45,10 +50,12 @@ contract StrategyModule is IStrategyModule {
     constructor(
         address _stratModManagerAddr,
         address _eigenPodManagerAddr,
+        address _delegationManagerAddr,
         address _stratModOwner
     ) {
         stratModManager = IStrategyModuleManager(_stratModManagerAddr);
         eigenPodManager = IEigenPodManager(_eigenPodManagerAddr);
+        delegationManager = IDelegationManager(_delegationManagerAddr);
         stratModOwner = _stratModOwner;
     }
 
@@ -160,6 +167,23 @@ contract StrategyModule is IStrategyModule {
             validatorFields
         );
 
+    }
+
+    /**
+     * @notice The caller delegate its Strategy Module's stake to an Eigen Layer operator.
+     * @notice /!\ Delegation is all-or-nothing: when a Staker delegates to an Operator, they delegate ALL their stake.
+     * @param operator The account teh STrategy Module is delegating its assets to for use in serving applications built on EigenLayer.
+     * @dev The operator must not have set a delegation approver, everyone can delegate to it without permission.
+     * @dev Ensures that:
+     *          1) the `staker` is not already delegated to an operator
+     *          2) the `operator` has indeed registered as an operator in EigenLayer
+     */
+    function delegateTo(address operator) external onlyStratModOwner {
+
+        // Create an empty delegation approver signature
+        ISignatureUtils.SignatureWithExpiry memory emptySignatureAndExpiry;
+
+        delegationManager.delegateTo(operator, emptySignatureAndExpiry, bytes32(0));
     }
 
     /* ============== INTERNAL FUNCTIONS ============== */

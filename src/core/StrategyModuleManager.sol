@@ -5,6 +5,7 @@ import "@openzeppelin/contracts/utils/Create2.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "eigenlayer-contracts/interfaces/IEigenPodManager.sol";
 import "eigenlayer-contracts/interfaces/IEigenPod.sol";
+import "eigenlayer-contracts/interfaces/IDelegationManager.sol";
 
 import "./StrategyModule.sol";
 
@@ -13,6 +14,8 @@ import "../interfaces/IStrategyModuleManager.sol";
 
 // TODO: Emit events to notify what happened
 // TODO: Deploy a StrategyModule with CREATE2 to determine the address of the EigenPod for the operators
+// TODO: Implement the possibility to delegate to an operator on behalf of the StrategyModule owner -> delegationManager.delegateToBySignature
+//       Create a function in StrategyModule to have a signature from the StrategyModule (function callable only by stratModOwner)
 
 contract StrategyModuleManager is IStrategyModuleManager, Ownable {
 
@@ -20,6 +23,9 @@ contract StrategyModuleManager is IStrategyModuleManager, Ownable {
 
     /// @notice EigenLayer's EigenPodManager contract
     IEigenPodManager public immutable eigenPodManager;
+
+    /// @notice EigenLayer's DelegationManager contract
+    IDelegationManager public immutable delegationManager;
 
     /// @notice StratMod owner to deployed StratMod address
     mapping(address => IStrategyModule[]) public ownerToStratMods;
@@ -30,9 +36,11 @@ contract StrategyModuleManager is IStrategyModuleManager, Ownable {
     /* =============== CONSTRUCTOR =============== */
 
     constructor(
-        IEigenPodManager _eigenPodManager
+        IEigenPodManager _eigenPodManager,
+        IDelegationManager _delegationManager
     ) {
         eigenPodManager = _eigenPodManager;
+        delegationManager = _delegationManager;
     }
 
     /* ================== MODIFIERS ================== */
@@ -68,9 +76,10 @@ contract StrategyModuleManager is IStrategyModuleManager, Ownable {
         bytes calldata pubkey, 
         bytes calldata signature,
         bytes32 depositDataRoot
-    ) external payable {
+    ) external payable returns (address) {
         IStrategyModule stratMod = _deployStratMod();
         stratMod.callEigenPodManager{value: msg.value}(abi.encodeWithSignature("stake(bytes,bytes,bytes32)", pubkey, signature, depositDataRoot));
+        return address(stratMod);
     }
 
     /* ============== VIEW FUNCTIONS ============== */
@@ -128,6 +137,40 @@ contract StrategyModuleManager is IStrategyModuleManager, Ownable {
         return eigenPodManager.hasPod(address(ownerToStratMods[stratModOwner][stratModIndex]));
     }
 
+    /**
+     * @notice Specify which `stratModOwner`'s StrategyModules are delegated.
+     * @param stratModOwner The address of the StrategyModules' owner.
+     * @dev Revert if the `stratModOwner` doesn't have any StrategyModule.
+     */
+    function isStratModDelegated(address stratModOwner) public view returns (bool[] memory) {
+        IStrategyModule[] memory stratMods = getStratMods(stratModOwner);
+        bool[] memory stratModsDelegated = new bool[](stratMods.length);
+        for (uint256 i = 0; i < stratMods.length;) {
+            stratModsDelegated[i] = delegationManager.isDelegated(address(stratMods[i]));
+            unchecked {
+                ++i;
+            }
+        }
+        return stratModsDelegated;
+    }
+
+    /**
+     * @notice Specify to which operators `stratModOwner`'s StrategyModules are delegated to.
+     * @param stratModOwner The address of the StrategyModules' owner.
+     * @dev Revert if the `stratModOwner` doesn't have any StrategyModule.
+     */
+    function stratModDelegateTo(address stratModOwner) public view returns (address[] memory) {
+        IStrategyModule[] memory stratMods = getStratMods(stratModOwner);
+        address[] memory stratModsDelegateTo = new address[](stratMods.length);
+        for (uint256 i = 0; i < stratMods.length;) {
+            stratModsDelegateTo[i] = delegationManager.delegatedTo(address(stratMods[i]));
+            unchecked {
+                ++i;
+            }
+        }
+        return stratModsDelegateTo;
+    }
+
     /* ============== INTERNAL FUNCTIONS ============== */
 
     function _deployStratMod() internal returns (IStrategyModule) {
@@ -135,7 +178,12 @@ contract StrategyModuleManager is IStrategyModuleManager, Ownable {
         // create the stratMod
         IStrategyModule stratMod = IStrategyModule(
             address(
-                new StrategyModule(address(this), address(eigenPodManager), msg.sender)
+                new StrategyModule(
+                    address(this),
+                    address(eigenPodManager),
+                    address(delegationManager),
+                    msg.sender
+                )
             )
         );
 

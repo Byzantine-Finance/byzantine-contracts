@@ -4,6 +4,8 @@ pragma solidity ^0.8.12;
 import "@openzeppelin/contracts/utils/Create2.sol";
 import "./eigenlayer-helper/EigenLayerDeployer.t.sol";
 import "eigenlayer-contracts/interfaces/IEigenPod.sol";
+import "eigenlayer-contracts/interfaces/IDelegationManager.sol";
+import "eigenlayer-contracts/interfaces/IStrategy.sol";
 import "eigenlayer-contracts/libraries/BeaconChainProofs.sol";
 import "./utils/ProofParsing.sol";
 
@@ -18,8 +20,12 @@ contract StrategyModuleManagerTest is ProofParsing, EigenLayerDeployer {
 
     StrategyModuleManager public strategyModuleManager;
 
+    /// @notice Canonical, virtual beacon chain ETH strategy
+    IStrategy public constant beaconChainETHStrategy = IStrategy(0xbeaC0eeEeeeeEEeEeEEEEeeEEeEeeeEeeEEBEaC0);
+
     address alice = address(0x123456789);
     address bob = address(0x1011121314);
+    address ELOperator1 = address(0x1516171819);
 
     function setUp() public override {
         // deploy locally EigenLayer contracts
@@ -27,7 +33,8 @@ contract StrategyModuleManagerTest is ProofParsing, EigenLayerDeployer {
 
         // deploy StrategyModuleManager
         strategyModuleManager = new StrategyModuleManager(
-            eigenPodManager
+            eigenPodManager,
+            delegation
         );
         
     }
@@ -273,6 +280,54 @@ contract StrategyModuleManagerTest is ProofParsing, EigenLayerDeployer {
     // TODO: Test the `verifyBalanceUpdates` function when the proof is correct 
     //       and the validator is ACTIVE (has called `verifyWithdrawalCredentials` function)
 
+    // The operator shares for the beacon chain strategy hasn't been updated because alice didn't verify the withdrawal credentials
+    // of its validator (DV)
+    function testDelegateTo() public {
+
+        // Create the operator details for the operator to delegate to
+        IDelegationManager.OperatorDetails memory operatorDetails = IDelegationManager.OperatorDetails({
+            earningsReceiver: ELOperator1,
+            delegationApprover: address(0),
+            stakerOptOutWindowBlocks: 0
+        });
+
+        _registerAsOperator(ELOperator1, operatorDetails);
+
+        // Create a restaking strategy: only beacon chain ETH Strategy
+        IStrategy[] memory strategies = new IStrategy[](1);
+        strategies[0] = beaconChainETHStrategy;
+
+        // Get the operator shares before delegation
+        uint256[] memory operatorSharesBefore = delegation.getOperatorShares(ELOperator1, strategies);
+        assertEq(operatorSharesBefore[0], 0);
+        
+        // Alice stake 32 ETH
+        vm.deal(alice, 40 ether);
+        vm.startPrank(alice);
+        // Get the validator deposit data
+        (bytes memory pubkey, bytes memory signature, bytes32 depositDataRoot) = 
+            _getDepositData(abi.encodePacked("./test/test-data/alice-eigenPod-deposit-data.json"));
+        address stratModAddr = strategyModuleManager.createStratModAndStakeNativeETH{value: 32 ether}(pubkey, signature, depositDataRoot);
+        // Alice delegate its staked ETH to the ELOperator1
+        IStrategyModule(stratModAddr).delegateTo(ELOperator1);
+        vm.stopPrank();
+
+        // Verify if alice's strategy module is registered as a delegator
+        bool[] memory stratModsDelegated = strategyModuleManager.isStratModDelegated(alice);
+        assertTrue(stratModsDelegated[0], "testDelegateTo: Alice's Strategy Module  didn't delegate to ELOperator1 correctly");
+        // Verify if Alice delegated to the correct operator
+        address[] memory stratModsDelegateTo = strategyModuleManager.stratModDelegateTo(alice);
+        assertEq(stratModsDelegateTo[0], ELOperator1);
+
+        // Operator shares didn't increase because alice didn't verify its withdrawal credentials -> podOwnerShares[stratModAddr] = 0
+        uint256[] memory operatorSharesAfter = delegation.getOperatorShares(ELOperator1, strategies);
+        //console.log("operatorSharesAfter", operatorSharesAfter[0]);
+        //assertEq(operatorSharesBefore[0], 0);
+
+    }
+
+    // TODO: Verify the operator shares increase correctly when staker has verified correctly its withdrawal credentials
+    // TODO: Delegate to differents operators by creating new strategy modules -> necessary to not put the 32ETH in the same DV
 
     //--------------------------------------------------------------------------------------
     //------------------------------  INTERNAL FUNCTIONS  ----------------------------------
@@ -329,6 +384,24 @@ contract StrategyModuleManagerTest is ProofParsing, EigenLayerDeployer {
         bytes32 latestBlockRoot = getLatestBlockRoot();
         //set beaconStateRoot
         beaconChainOracle.setOracleBlockRootAtTimestamp(latestBlockRoot);
+    }
+
+    function _registerAsOperator(
+        address operator,
+        IDelegationManager.OperatorDetails memory operatorDetails
+    ) internal {
+        string memory emptyStringForMetadataURI;
+
+        vm.startPrank(operator);
+        delegation.registerAsOperator(operatorDetails, emptyStringForMetadataURI);
+        vm.stopPrank();
+
+        assertTrue(delegation.isOperator(operator), "_registerAsOperator: failed to resgister `operator` as an EL operator");
+        assertTrue(
+            keccak256(abi.encode(delegation.operatorDetails(operator))) == keccak256(abi.encode(operatorDetails)),
+            "_registerAsOperator: operatorDetails not set appropriately"
+        );
+        assertTrue(delegation.isDelegated(operator), "_registerAsOperator: operator doesn't delegate itself");
     }
 
 }
