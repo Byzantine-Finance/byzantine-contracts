@@ -66,15 +66,15 @@ contract StrategyModuleManagerTest is ProofParsing, EigenLayerDeployer {
         assertEq(StrategyModule(stratModAddrAlice2).stratModOwner(), alice);
 
         // Get Alice StrategyModules
-        IStrategyModule[] memory aliceStratMods = strategyModuleManager.getStratMods(alice);
+        address[] memory aliceStratMods = strategyModuleManager.getStratMods(alice);
         assertEq(aliceStratMods.length, 2);
-        assertEq(address(aliceStratMods[0]), stratModAddrAlice1);
-        assertEq(address(aliceStratMods[1]), stratModAddrAlice2);
+        assertEq(aliceStratMods[0], stratModAddrAlice1);
+        assertEq(aliceStratMods[1], stratModAddrAlice2);
         
         // Get Bob StrategyModules
-        IStrategyModule[] memory bobStratMods = strategyModuleManager.getStratMods(bob);
+        address[] memory bobStratMods = strategyModuleManager.getStratMods(bob);
         assertEq(bobStratMods.length, 1);
-        assertEq(address(bobStratMods[0]), stratModAddrBob);
+        assertEq(bobStratMods[0], stratModAddrBob);
     }
 
     function test_RevertWhen_notStratModOwnercreatesPod() public {
@@ -96,9 +96,9 @@ contract StrategyModuleManagerTest is ProofParsing, EigenLayerDeployer {
 
         // Bob creates an EigenPod in its both StrategyModules
         address stratMod1Pod = IStrategyModule(stratMod1).createPod();
-        assertEq(stratMod1Pod, address(strategyModuleManager.getPod(stratMod1)));
+        assertEq(stratMod1Pod, strategyModuleManager.getPodByStratModAddr(stratMod1));
         address stratMod2Pod = IStrategyModule(stratMod2).createPod();
-        assertEq(stratMod2Pod, address(strategyModuleManager.getPod(stratMod2)));
+        assertEq(stratMod2Pod, strategyModuleManager.getPodByStratModAddr(stratMod2));
 
         vm.stopPrank();
     }
@@ -124,11 +124,32 @@ contract StrategyModuleManagerTest is ProofParsing, EigenLayerDeployer {
         // Alice create a StrategyModule
         address stratMod = strategyModuleManager.createStratMod();
         // Pre-calculate alice's EigenPod address
-        IEigenPod expectedEigenPod = strategyModuleManager.getPod(stratMod);
+        address expectedEigenPod = strategyModuleManager.getPodByStratModAddr(stratMod);
         // Alice deploys an EigenPod
         address eigenPod = IStrategyModule(stratMod).createPod();
-        assertEq(eigenPod, address(expectedEigenPod));
+        assertEq(eigenPod, expectedEigenPod);
         vm.stopPrank();
+    }
+
+    function testPrecalculatePodAddress() public {
+        // Alice already has a StrategyModule
+        vm.prank(alice);
+        strategyModuleManager.createStratMod();
+        // And we want to know the Pod address of its second one without having to create it
+        address computedPod = strategyModuleManager.computePodAddr(alice);
+        vm.prank(alice);
+        address secondStratMod = strategyModuleManager.createStratMod();
+        address realPod = strategyModuleManager.getPodByStratModAddr(secondStratMod);
+        assertEq(strategyModuleManager.getStratModNumber(alice), 2);
+        assertEq(realPod, computedPod);
+
+        // Bob want to know the Pod address of its first StrategyModule without having to create it
+        address computedBobPod = strategyModuleManager.computePodAddr(bob);
+        vm.prank(bob);
+        address firstStratMod = strategyModuleManager.createStratMod();
+        address realBobPod = strategyModuleManager.getPodByStratModAddr(firstStratMod);
+        assertEq(realBobPod, computedBobPod);
+
     }
 
     function testNativeStacking() public {
@@ -174,8 +195,8 @@ contract StrategyModuleManagerTest is ProofParsing, EigenLayerDeployer {
         assertEq(strategyModuleManager.numStratMods(), 1);
 
         // Verify StrategyModule ownership
-        IStrategyModule stratModAddr = strategyModuleManager.getStratModByIndex(alice, 0);
-        assertEq(stratModAddr.stratModOwner(), alice);
+        address stratModAddr = strategyModuleManager.getStratModByIndex(alice, 0);
+        assertEq(IStrategyModule(stratModAddr).stratModOwner(), alice);
     }
 
     // That test reverts because the `withdrawal_credential_proof` file generated with the Byzantine API
@@ -313,10 +334,10 @@ contract StrategyModuleManagerTest is ProofParsing, EigenLayerDeployer {
         vm.stopPrank();
 
         // Verify if alice's strategy module is registered as a delegator
-        bool[] memory stratModsDelegated = strategyModuleManager.isStratModDelegated(alice);
+        bool[] memory stratModsDelegated = strategyModuleManager.isDelegated(alice);
         assertTrue(stratModsDelegated[0], "testDelegateTo: Alice's Strategy Module  didn't delegate to ELOperator1 correctly");
         // Verify if Alice delegated to the correct operator
-        address[] memory stratModsDelegateTo = strategyModuleManager.stratModDelegateTo(alice);
+        address[] memory stratModsDelegateTo = strategyModuleManager.delegateTo(alice);
         assertEq(stratModsDelegateTo[0], ELOperator1);
 
         // Operator shares didn't increase because alice didn't verify its withdrawal credentials -> podOwnerShares[stratModAddr] = 0

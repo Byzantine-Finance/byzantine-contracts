@@ -28,17 +28,38 @@ interface IStrategyModuleManager {
         external payable returns (address);
 
     /**
+     * @notice Returns the number of StrategyModules owned by an address.
+     * @param stratModOwner The address you want to know the number of Strategy Modules it owns.
+     */
+    function getStratModNumber(address stratModOwner) external view returns (uint256);
+
+    /**
+     * @notice Pre-calculate the address of a new StrategyModule `stratModOwner` will deploy.
+     * @dev The salt will be the address of the creator (`stratModOwner`) and the index of the new StrategyModule in creator's portfolio.
+     * @param stratModOwner The address of the future StrategyModule owner.
+     */
+    function computeStratModAddr(address stratModOwner) external view returns (address);
+
+    /**
+     * @notice Pre-calculate the address of a new EigenPod `stratModOwner` will deploy (via a new StrategyModule).
+     * @dev The pod will be deployed on a new StrategyModule owned by `stratModOwner`.
+     * @param stratModOwner The address of the future StrategyModule owner.
+     */
+    function computePodAddr(address stratModOwner) external view returns (address);
+
+    /**
      * @notice Returns the addresses of the `stratModOwner`'s StrategyModules
      * @param stratModOwner The address you want to know the Strategy Modules it owns.
      */      
-    function getStratMods(address stratModOwner) external view returns (IStrategyModule[] memory);
+    function getStratMods(address stratModOwner) external view returns (address[] memory);
 
     /**
-     * @notice Returns the StrategyModule of an address by its index.
+     * @notice Returns the StrategyModule address of an owner by its index.
      * @param stratModOwner The address of the StrategyModule's owner.
      * @param stratModIndex The index of the StrategyModule.
+     * @dev Revert if owner doesn't have StrategyModule or if index is invalid.
      */
-    function getStratModByIndex(address stratModOwner, uint256 stratModIndex) external view returns (IStrategyModule);
+    function getStratModByIndex(address stratModOwner, uint256 stratModIndex) external view returns (address);
     
     /**
      * @notice Returns 'true' if the `stratModOwner` has created at least one StrategyModule, and 'false' otherwise.
@@ -50,14 +71,15 @@ interface IStrategyModuleManager {
      * @notice Returns the address of the `stratMod`'s EigenPod (whether it is deployed yet or not).
      * @param stratMod The address of the StrategyModule contract you want to know the EigenPod address.
      * @dev If the `stratMod` is not an instance of a StrategyModule contract, the function will all the same 
-     * returns the EigenPod of the input address.
-     */      
-    function getPod(address stratMod) external view returns (IEigenPod);
+     * returns the EigenPod of the input address. So use that function carefully.
+     */     
+    function getPodByStratModAddr(address stratMod) external view returns (address);
 
     /**
      * @notice Returns 'true' if the `stratMod` has created an EigenPod, and 'false' otherwise.
      * @param stratModOwner The owner of the StrategyModule
      * @param stratModIndex The index of the `stratModOwner` StrategyModules you want to know if it has an EigenPod.
+     * @dev Revert if owner doesn't have StrategyModule or if index is invalid.
      */
     function hasPod(address stratModOwner, uint256 stratModIndex) external view returns (bool);
 
@@ -66,14 +88,14 @@ interface IStrategyModuleManager {
      * @param stratModOwner The address of the StrategyModules' owner.
      * @dev Revert if the `stratModOwner` doesn't have any StrategyModule.
      */
-    function isStratModDelegated(address stratModOwner) external view returns (bool[] memory);
+    function isDelegated(address stratModOwner) external view returns (bool[] memory);
 
     /**
      * @notice Specify to which operators `stratModOwner`'s StrategyModules are delegated to.
      * @param stratModOwner The address of the StrategyModules' owner.
      * @dev Revert if the `stratModOwner` doesn't have any StrategyModule.
      */
-    function stratModDelegateTo(address stratModOwner) external view returns (address[] memory);
+    function delegateTo(address stratModOwner) external view returns (address[] memory);
 
     /// @dev Returned when a specific address doesn't have a StrategyModule
     error DoNotHaveStratMod(address);
