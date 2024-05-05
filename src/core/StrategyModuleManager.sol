@@ -6,8 +6,10 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "eigenlayer-contracts/interfaces/IEigenPodManager.sol";
 import "eigenlayer-contracts/interfaces/IDelegationManager.sol";
 
+import "../tokens/ByzNft.sol";
 import "./StrategyModule.sol";
 
+import "../interfaces/IByzNft.sol";
 import "../interfaces/IStrategyModule.sol";
 import "../interfaces/IStrategyModuleManager.sol";
 
@@ -18,6 +20,9 @@ import "../interfaces/IStrategyModuleManager.sol";
 contract StrategyModuleManager is IStrategyModuleManager, Ownable {
 
     /* ============== STATE VARIABLES ============== */
+
+    /// @notice ByzNft contract
+    IByzNft public immutable byzNft;
 
     /// @notice EigenLayer's EigenPodManager contract
     IEigenPodManager public immutable eigenPodManager;
@@ -37,6 +42,7 @@ contract StrategyModuleManager is IStrategyModuleManager, Ownable {
         IEigenPodManager _eigenPodManager,
         IDelegationManager _delegationManager
     ) {
+        byzNft = IByzNft(address(new ByzNft()));
         eigenPodManager = _eigenPodManager;
         delegationManager = _delegationManager;
     }
@@ -95,10 +101,11 @@ contract StrategyModuleManager is IStrategyModuleManager, Ownable {
      */
     function computeStratModAddr(address stratModOwner) public view returns (address) {
         uint256 stratModIndex = getStratModNumber(stratModOwner);
+        uint256 nftId = uint256(keccak256(abi.encodePacked(stratModOwner, stratModIndex)));
 
         return Create2.computeAddress(
             keccak256(abi.encodePacked(stratModOwner, stratModIndex)), //salt
-            keccak256(abi.encodePacked(type(StrategyModule).creationCode, abi.encode(address(this),address(eigenPodManager),address(delegationManager),stratModOwner))) //bytecode
+            keccak256(abi.encodePacked(type(StrategyModule).creationCode, abi.encode(address(this), byzNft, nftId, address(eigenPodManager), address(delegationManager)))) //bytecode
         );
     }
 
@@ -209,15 +216,22 @@ contract StrategyModuleManager is IStrategyModuleManager, Ownable {
         // number of stratMods `msg.sender` has already created
         uint256 stratModIndex = getStratModNumber(msg.sender);
 
+        // mint a byzNft to the Strategy Module's creator
+        uint256 nftId = byzNft.mint(msg.sender, stratModIndex);
+
         // create the stratMod
         address stratMod = Create2.deploy(
             0,
             keccak256(abi.encodePacked(msg.sender, stratModIndex)),
-            abi.encodePacked(type(StrategyModule).creationCode, abi.encode(address(this), address(eigenPodManager), address(delegationManager), msg.sender))
+            abi.encodePacked(
+                type(StrategyModule).creationCode,
+                abi.encode(address(this), byzNft, nftId, address(eigenPodManager), address(delegationManager))
+            )
         );
 
         // store the stratMod in the mapping
         ownerToStratMods[msg.sender].push(stratMod);
+
         return stratMod;
     }
 

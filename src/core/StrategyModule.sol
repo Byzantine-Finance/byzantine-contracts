@@ -7,8 +7,11 @@ import "eigenlayer-contracts/interfaces/IDelegationManager.sol";
 import "eigenlayer-contracts/interfaces/ISignatureUtils.sol";
 import "eigenlayer-contracts/libraries/BeaconChainProofs.sol";
 
+import "../interfaces/IByzNft.sol";
 import "../interfaces/IStrategyModuleManager.sol";
 import "../interfaces/IStrategyModule.sol";
+
+// TODO: Allow Strategy Module ByzNft to be tradeable => conceive a fair exchange mechanism between the seller and the buyer
 
 contract StrategyModule is IStrategyModule {
     using BeaconChainProofs for *;
@@ -21,17 +24,19 @@ contract StrategyModule is IStrategyModule {
     /// @notice The single StrategyModuleManager for Byzantine
     IStrategyModuleManager public immutable stratModManager;
 
+    /// @notice ByzNft contract
+    IByzNft public immutable byzNft;
+
+    /// @notice The ByzNft associated to this StrategyModule.
+    /// @notice The owner of the ByzNft is the StrategyModule owner.
+    uint256 public immutable stratModNftId;
+
     /// @notice EigenLayer's EigenPodManager contract
     /// @dev this is the pod manager transparent proxy
     IEigenPodManager public immutable eigenPodManager;
 
     /// @notice EigenLayer's DelegationManager contract
     IDelegationManager public immutable delegationManager;
-
-    /* ============== STATE VARIABLES ============== */
-
-    /// @notice The owner of this StrategyModule
-    address public stratModOwner;
 
     /* ============== MODIFIERS ============== */
 
@@ -40,8 +45,8 @@ contract StrategyModule is IStrategyModule {
         _;
     }
 
-    modifier onlyStratModOwner() {
-        if (msg.sender != stratModOwner) revert OnlyStrategyModuleOwner();
+    modifier onlyNftOwner() {
+        if (msg.sender != stratModOwner()) revert OnlyNftOwner();
         _;
     }
 
@@ -49,17 +54,31 @@ contract StrategyModule is IStrategyModule {
 
     constructor(
         address _stratModManagerAddr,
+        IByzNft _byzNft,
+        uint256 _nftId,
         address _eigenPodManagerAddr,
-        address _delegationManagerAddr,
-        address _stratModOwner
+        address _delegationManagerAddr
     ) {
         stratModManager = IStrategyModuleManager(_stratModManagerAddr);
+        byzNft = _byzNft;
         eigenPodManager = IEigenPodManager(_eigenPodManagerAddr);
         delegationManager = IDelegationManager(_delegationManagerAddr);
-        stratModOwner = _stratModOwner;
+        stratModNftId = _nftId;
     }
 
     /* ============== EXTERNAL FUNCTIONS ============== */
+
+    /**
+     * @notice Strategy Module owner can transfer its NFT to another address.
+     * That action makes him give the ownership of the StrategyModule and all the token it owns.
+     * Should be used carefully.
+     * @param newOwner The address of the new owner of the StrategyModule.
+     * @dev The ByzNft owner must first call the `approve` function to allow the Strategy Module to transfer the NFT.
+     * @dev Function will revert if not called by the ByzNft holder.
+     */
+    function transferStratModOwnership(address newOwner) external onlyNftOwner() {
+        byzNft.safeTransferFrom(msg.sender, newOwner, stratModNftId);
+    }
 
     /**
      * @notice Creates an EigenPod for the strategy module.
@@ -67,7 +86,7 @@ contract StrategyModule is IStrategyModule {
      * @dev Function will revert if the StrategyModule already has an EigenPod.
      * @dev Returns EigenPod address
      */
-    function createPod() external onlyStratModOwner returns (address) {
+    function createPod() external onlyNftOwner returns (address) {
         return eigenPodManager.createPod();
     }
 
@@ -83,7 +102,7 @@ contract StrategyModule is IStrategyModule {
         bytes calldata pubkey, 
         bytes calldata signature,
         bytes32 depositDataRoot
-    ) external payable onlyStratModOwner {
+    ) external payable onlyNftOwner {
         eigenPodManager.stake{value: msg.value}(pubkey, signature, depositDataRoot);
     }
 
@@ -119,7 +138,7 @@ contract StrategyModule is IStrategyModule {
         uint40[] calldata validatorIndices,
         bytes[] calldata validatorFieldsProofs,
         bytes32[][] calldata validatorFields
-    ) external onlyStratModOwner {
+    ) external onlyNftOwner {
 
         IEigenPod myPod = eigenPodManager.ownerToPod(address(this));
 
@@ -178,12 +197,21 @@ contract StrategyModule is IStrategyModule {
      *          1) the `staker` is not already delegated to an operator
      *          2) the `operator` has indeed registered as an operator in EigenLayer
      */
-    function delegateTo(address operator) external onlyStratModOwner {
+    function delegateTo(address operator) external onlyNftOwner {
 
         // Create an empty delegation approver signature
         ISignatureUtils.SignatureWithExpiry memory emptySignatureAndExpiry;
 
         delegationManager.delegateTo(operator, emptySignatureAndExpiry, bytes32(0));
+    }
+
+    /* ================ VIEW FUNCTIONS ================ */
+
+    /**
+     * @notice Returns the address of the owner of the Strategy Module's ByzNft.
+     */
+    function stratModOwner() public view returns (address) {
+        return byzNft.ownerOf(stratModNftId);
     }
 
     /* ============== INTERNAL FUNCTIONS ============== */

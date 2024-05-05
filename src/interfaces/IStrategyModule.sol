@@ -8,7 +8,20 @@ interface IStrategyModule {
   /**
    * @notice Returns the owner of this StrategyModule
    */
+  function stratModNftId() external view returns (uint256);
+
+  /**
+   * @notice Returns the address of the owner of the Strategy Module's ByzNft.
+   */
   function stratModOwner() external view returns (address);
+
+  /**
+   * @notice Strategy Module owner can transfer its NFT to another address.
+   * That action makes him give the ownership of the StrategyModule and all the token it owns.
+   * Should be used carefully.
+   * @param newOwner The address of the new owner of the StrategyModule.
+   */
+  function transferStratModOwnership(address newOwner) external;
 
   /**
    * @notice Call the EigenPodManager contract
@@ -107,8 +120,8 @@ interface IStrategyModule {
   error OnlyStrategyModuleManager();
 
   
-  /// @dev Error when unauthorized call to a function callable only by the StrategyModuleOwner.
-  error OnlyStrategyModuleOwner();
+  /// @dev Error when unauthorized call to a function callable only by the Strategy Module Owner (aka the ByzNft holder).
+  error OnlyNftOwner();
 
   
   /// @dev Returned on failed Eigen Layer contracts call
