@@ -69,18 +69,6 @@ contract StrategyModule is IStrategyModule {
     /* ============== EXTERNAL FUNCTIONS ============== */
 
     /**
-     * @notice Strategy Module owner can transfer its NFT to another address.
-     * That action makes him give the ownership of the StrategyModule and all the token it owns.
-     * Should be used carefully.
-     * @param newOwner The address of the new owner of the StrategyModule.
-     * @dev The ByzNft owner must first call the `approve` function to allow the Strategy Module to transfer the NFT.
-     * @dev Function will revert if not called by the ByzNft holder.
-     */
-    function transferStratModOwnership(address newOwner) external onlyNftOwner() {
-        byzNft.safeTransferFrom(msg.sender, newOwner, stratModNftId);
-    }
-
-    /**
      * @notice Creates an EigenPod for the strategy module.
      * @dev Function will revert if not called by the StrategyModule owner.
      * @dev Function will revert if the StrategyModule already has an EigenPod.

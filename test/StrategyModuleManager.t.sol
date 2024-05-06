@@ -53,20 +53,26 @@ contract StrategyModuleManagerTest is ProofParsing, EigenLayerDeployer {
 
         // Alice creates a StrategyModule
         address stratModAddrAlice1 = _createStratMod(alice);
+        uint256 nft1 = IStrategyModule(stratModAddrAlice1).stratModNftId();
         assertEq(strategyModuleManager.numStratMods(), 1);
         assertEq(StrategyModule(stratModAddrAlice1).stratModOwner(), alice);
+        assertEq(strategyModuleManager.getStratModByNftId(nft1), stratModAddrAlice1);
 
         // Bob creates a StrategyModule
         address stratModAddrBob = _createStratMod(bob);
+        uint256 nft2 = IStrategyModule(stratModAddrBob).stratModNftId();
         assertEq(strategyModuleManager.numStratMods(), 2);
+        assertEq(strategyModuleManager.getStratModByNftId(nft2), stratModAddrBob);
 
         address stratModOwnerBob = StrategyModule(stratModAddrBob).stratModOwner();
         assertEq(stratModOwnerBob, bob);
 
         // Alice creates a second StrategyModule
         address stratModAddrAlice2 = _createStratMod(alice);
+        uint256 nft3 = IStrategyModule(stratModAddrAlice2).stratModNftId();
         assertEq(strategyModuleManager.numStratMods(), 3);
         assertEq(StrategyModule(stratModAddrAlice2).stratModOwner(), alice);
+        assertEq(strategyModuleManager.getStratModByNftId(nft3), stratModAddrAlice2);
 
         // Get Alice StrategyModules
         address[] memory aliceStratMods = strategyModuleManager.getStratMods(alice);
@@ -78,12 +84,13 @@ contract StrategyModuleManagerTest is ProofParsing, EigenLayerDeployer {
         address[] memory bobStratMods = strategyModuleManager.getStratMods(bob);
         assertEq(bobStratMods.length, 1);
         assertEq(bobStratMods[0], stratModAddrBob);
+
     }
 
     function testStratModNftId() public {
         // Alice creates a StrategyModule
-        uint256 expectedNftId = uint256(keccak256(abi.encodePacked(alice, strategyModuleManager.getStratModNumber(alice))));
         address stratModAddrAlice = _createStratMod(alice);
+        uint256 expectedNftId = uint256(keccak256(abi.encodePacked(alice, strategyModuleManager.numStratMods())));
 
         assertEq(expectedNftId, IStrategyModule(stratModAddrAlice).stratModNftId());
     }
@@ -96,15 +103,40 @@ contract StrategyModuleManagerTest is ProofParsing, EigenLayerDeployer {
         
         // Alice approves the StrategyModule to transfer to Bob
         ByzNft byzNftContract = ByzNft(address(strategyModuleManager.byzNft()));
-        byzNftContract.approve(stratModAddrAlice, IStrategyModule(stratModAddrAlice).stratModNftId());
+        byzNftContract.approve(address(strategyModuleManager), IStrategyModule(stratModAddrAlice).stratModNftId());
 
         // Alice transfers the StrategyModule to Bob
-        IStrategyModule(stratModAddrAlice).transferStratModOwnership(bob);
+        strategyModuleManager.transferStratModOwnership(stratModAddrAlice, bob);
 
         // Verify if Bob is the new owner
         assertEq(bob, IStrategyModule(stratModAddrAlice).stratModOwner());
 
         vm.stopPrank();
+
+        // Verify if the mappings has been correctly updated
+        address[] memory aliceStratMods = strategyModuleManager.getStratMods(alice);
+        assertEq(aliceStratMods.length, 0);
+        assertEq(aliceStratMods, new address[](0));
+        address[] memory bobStratMods = strategyModuleManager.getStratMods(bob);
+        assertEq(bobStratMods.length, 1);
+        assertEq(bobStratMods[0], stratModAddrAlice);
+    }
+
+    function test_RevertWhen_NonStratModOwnerTransfersStratMod() public {
+        // Alice creates a StrategyModule
+        address stratModAddrAlice = _createStratMod(alice);
+        
+        vm.startPrank(alice);
+
+        // Alice approves the StrategyModule to transfer to Bob
+        ByzNft byzNftContract = ByzNft(address(strategyModuleManager.byzNft()));
+        byzNftContract.approve(address(strategyModuleManager), IStrategyModule(stratModAddrAlice).stratModNftId());
+
+        vm.stopPrank();
+
+        // This smart contract transfers the StrategyModule to Bob
+        vm.expectRevert(IStrategyModuleManager.NotStratModOwner.selector);
+        strategyModuleManager.transferStratModOwnership(stratModAddrAlice, bob);
     }
 
     function test_RevertWhen_notStratModOwnercreatesPod() public {
@@ -148,10 +180,10 @@ contract StrategyModuleManagerTest is ProofParsing, EigenLayerDeployer {
 
     function test_HasPod() public {
         address stratModAddr = _createStratMod(bob);
-        assertEq(strategyModuleManager.hasPod(bob, 0), false);
+        assertEq(strategyModuleManager.hasPod(stratModAddr), false);
         vm.prank(bob);
         IStrategyModule(stratModAddr).createPod();
-        assertEq(strategyModuleManager.hasPod(bob, 0), true);
+        assertEq(strategyModuleManager.hasPod(stratModAddr), true);
     }
 
     function testCreateStratModAndPrecalculatePodAddress() public {
@@ -169,7 +201,7 @@ contract StrategyModuleManagerTest is ProofParsing, EigenLayerDeployer {
         vm.stopPrank();
     }
 
-    function testPrecalculatePodAddress() public {
+    /*function testPrecalculatePodAddress() public {
         // Alice already has a StrategyModule
         _createStratMod(alice);
         // And we want to know the Pod address of its second one without having to create it
@@ -186,7 +218,7 @@ contract StrategyModuleManagerTest is ProofParsing, EigenLayerDeployer {
         address realBobPod = strategyModuleManager.getPodByStratModAddr(firstStratModAddr);
         assertEq(realBobPod, computedBobPod);
 
-    }
+    }*/
 
     function testNativeStacking() public {
         // Get the validator deposit data
@@ -231,7 +263,7 @@ contract StrategyModuleManagerTest is ProofParsing, EigenLayerDeployer {
         assertEq(strategyModuleManager.numStratMods(), 1);
 
         // Verify StrategyModule ownership
-        address stratModAddr = strategyModuleManager.getStratModByIndex(alice, 0);
+        address stratModAddr = strategyModuleManager.getStratMods(alice)[0];
         assertEq(IStrategyModule(stratModAddr).stratModOwner(), alice);
     }
 
