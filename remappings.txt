@@ -3,3 +3,4 @@
 eigenlayer-contracts/=lib/eigenlayer-contracts/src/contracts/
 ds-test/=lib/ds-test/src/
 forge-std/=lib/forge-std/src/
+ds-math/=lib/ds-math/src/
