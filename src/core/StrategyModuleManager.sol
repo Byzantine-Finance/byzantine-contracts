@@ -7,9 +7,11 @@ import "eigenlayer-contracts/interfaces/IEigenPodManager.sol";
 import "eigenlayer-contracts/interfaces/IDelegationManager.sol";
 
 import "../tokens/ByzNft.sol";
+import "./Auction.sol";
 import "./StrategyModule.sol";
 
 import "../interfaces/IByzNft.sol";
+import "../interfaces/IAuction.sol";
 import "../interfaces/IStrategyModule.sol";
 import "../interfaces/IStrategyModuleManager.sol";
 
@@ -17,16 +19,21 @@ import "../interfaces/IStrategyModuleManager.sol";
 
 contract StrategyModuleManager is IStrategyModuleManager, Ownable {
 
-    /* ============== STATE VARIABLES ============== */
+    /* ============== CONSTANTS + IMMUTABLES ============== */
 
     /// @notice ByzNft contract
     IByzNft public immutable byzNft;
+
+    /// @notice Auction contract
+    IAuction public immutable auction;
 
     /// @notice EigenLayer's EigenPodManager contract
     IEigenPodManager public immutable eigenPodManager;
 
     /// @notice EigenLayer's DelegationManager contract
     IDelegationManager public immutable delegationManager;
+
+    /* ============== STATE VARIABLES ============== */
 
     /// @notice Staker to its owned StrategyModules
     mapping(address => address[]) public stakerToStratMods;
@@ -44,6 +51,7 @@ contract StrategyModuleManager is IStrategyModuleManager, Ownable {
         IDelegationManager _delegationManager
     ) {
         byzNft = IByzNft(address(new ByzNft()));
+        auction = IAuction(address(new Auction()));
         eigenPodManager = _eigenPodManager;
         delegationManager = _delegationManager;
     }
@@ -68,21 +76,25 @@ contract StrategyModuleManager is IStrategyModuleManager, Ownable {
     }
 
     /**
-     * @notice Create a StrategyModule for the sender and then stake native ETH for a new beacon chain validator
-     * on that newly created StrategyModule. Also creates an EigenPod for the StrategyModule.
-     * @param pubkey The 48 bytes public key of the beacon chain validator.
-     * @param signature The validator's signature of the deposit data.
-     * @param depositDataRoot The root/hash of the deposit data for the validator's deposit.
+     * @notice A 32ETH staker create a Strategy Module and deposit in its smart contract its stake.
+     * @return The addresses of the newly created StrategyModule AND the address of its associated EigenPod (for the DV withdrawal address)
+     * @dev This action triggers an auction to select node operators to create a Distributed Validator.
+     * @dev One node operator of the DV (the DV manager) will have to deposit the 32ETH in the Beacon Chain.
      * @dev Function will revert if not exactly 32 ETH are sent with the transaction.
      */
-    function createStratModAndStakeNativeETH(
-        bytes calldata pubkey, 
-        bytes calldata signature,
-        bytes32 depositDataRoot
-    ) external payable returns (address) {
-        address stratMod = _deployStratMod();
-        IStrategyModule(stratMod).callEigenPodManager{value: msg.value}(abi.encodeWithSignature("stake(bytes,bytes,bytes32)", pubkey, signature, depositDataRoot));
-        return stratMod;
+    function createStratModAndStakeNativeETH() external payable returns (address, address) {
+        require(msg.value == 32 ether, "StrategyModuleManager.createStratModAndStakeNativeETH: must initially stake for any validator with 32 ether");
+
+        // Create a StrategyModule and an EigenPod
+        address newStratMod = _deployStratMod();
+        address newEigenPod = IStrategyModule(newStratMod).createPod();
+
+        // Transfer the stake in the newly created StrategyModule => the sender keep the ownership of its ETH.
+        payable(newStratMod).transfer(msg.value);
+
+        // TODO: Call Auction Smart Contract and trigger an auction to find a DV
+
+        return (newStratMod, newEigenPod);
     }
 
     /**
@@ -118,7 +130,18 @@ contract StrategyModuleManager is IStrategyModuleManager, Ownable {
         // Add stratMod to newOwner's portfolio
         stakerToStratMods[newOwner].push(stratModAddr);
     }
-    
+
+    /**
+     * @notice Byzantine owner fill the expected/ trusted public key for a DV (retrievable from the Obol SDK/API).
+     * @dev Protection against a trustless cluster manager trying to deposit the 32ETH in another ethereum validator.
+     * @param stratModAddr The address of the Strategy Module to set the trusted DV pubkey
+     * @param pubKey The public key of the DV retrieved with the Obol SDK/API from a configHash
+     * @dev Revert if not callable by StrategyModuleManager owner.
+     */
+    function setTrustedDVPubKey(address stratModAddr, bytes calldata pubKey) external onlyOwner {
+        IStrategyModule(stratModAddr).setTrustedDVPubKey(pubKey);
+    }
+
     /* ============== VIEW FUNCTIONS ============== */
 
     /**
@@ -233,6 +256,7 @@ contract StrategyModuleManager is IStrategyModuleManager, Ownable {
         address stratMod = address(
             new StrategyModule(
                 address(this),
+                address(auction),
                 byzNft,
                 nftId,
                 address(eigenPodManager),

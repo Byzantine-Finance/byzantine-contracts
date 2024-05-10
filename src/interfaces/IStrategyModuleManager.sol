@@ -13,19 +13,13 @@ interface IStrategyModuleManager {
     function createStratMod() external returns (address);
 
     /**
-     * @notice Create a StrategyModule for the sender and then stake native ETH for a new beacon chain validator
-     * on that newly created StrategyModule. Also creates an EigenPod for the StrategyModule.
-     * @param pubkey The 48 bytes public key of the beacon chain validator.
-     * @param signature The validator's signature of the deposit data.
-     * @param depositDataRoot The root/hash of the deposit data for the validator's deposit.
+     * @notice A 32ETH staker create a Strategy Module and deposit in its smart contract its stake.
+     * @return The addresses of the newly created StrategyModule AND the address of its associated EigenPod (for the DV withdrawal address)
+     * @dev This action triggers an auction to select node operators to create a Distributed Validator.
+     * @dev One node operator of the DV (the DV manager) will have to deposit the 32ETH in the Beacon Chain.
      * @dev Function will revert if not exactly 32 ETH are sent with the transaction.
      */
-    function createStratModAndStakeNativeETH(
-        bytes calldata pubkey, 
-        bytes calldata signature, 
-        bytes32 depositDataRoot
-    ) 
-        external payable returns (address);
+    function createStratModAndStakeNativeETH() external payable returns (address, address);
 
     /**
      * @notice Strategy Module owner can transfer its Strategy Module to another address.
@@ -38,6 +32,15 @@ interface IStrategyModuleManager {
      * @dev Function will revert if the new owner is the same as the old owner.
      */
     function transferStratModOwnership(address stratModAddr, address newOwner) external;
+
+    /**
+     * @notice Byzantine owner fill the expected/ trusted public key for a DV (retrievable from the Obol SDK/API).
+     * @dev Protection against a trustless cluster manager trying to deposit the 32ETH in another ethereum validator.
+     * @param stratModAddr The address of the Strategy Module to set the trusted DV pubkey
+     * @param pubKey The public key of the DV retrieved with the Obol SDK/API from a configHash
+     * @dev Revert if not callable by StrategyModuleManager owner.
+     */
+    function setTrustedDVPubKey(address stratModAddr, bytes calldata pubKey) external;
 
     /**
      * @notice Returns the number of StrategyModules owned by an address.
@@ -98,7 +101,7 @@ interface IStrategyModuleManager {
     /// @dev Returned when a specific address doesn't have a StrategyModule
     error DoNotHaveStratMod(address);
 
-    /// @dev Returned when call a function only callable by the StrategyModule owner
+    /// @dev Returned when unauthorized call to a function only callable by the StrategyModule owner
     error NotStratModOwner();
     
 }
