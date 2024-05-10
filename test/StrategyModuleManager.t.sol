@@ -12,6 +12,7 @@ import "./utils/ProofParsing.sol";
 import "../src/core/StrategyModuleManager.sol";
 import "../src/core/StrategyModule.sol";
 import "../src/tokens/ByzNft.sol";
+import "../src/core/Auction.sol";
 
 import "../src/interfaces/IStrategyModule.sol";
 import "../src/interfaces/IStrategyModuleManager.sol";
@@ -45,33 +46,40 @@ contract StrategyModuleManagerTest is ProofParsing, EigenLayerDeployer {
     }
 
     function testByzNftContractOwner() public view {
-        ByzNft byzNftContract = ByzNft(address(strategyModuleManager.byzNft()));
+        ByzNft byzNftContract = _getByzNftContract();
         assertEq(byzNftContract.owner(), address(strategyModuleManager));
     }
 
     function testCreateStratMods() public {
 
+        // First, verify if ALice and Bob have StrategyModules
+        assertFalse(strategyModuleManager.hasStratMods(alice));
+        assertFalse(strategyModuleManager.hasStratMods(bob));
+
         // Alice creates a StrategyModule
         address stratModAddrAlice1 = _createStratMod(alice);
         uint256 nft1 = IStrategyModule(stratModAddrAlice1).stratModNftId();
         assertEq(strategyModuleManager.numStratMods(), 1);
-        assertEq(StrategyModule(stratModAddrAlice1).stratModOwner(), alice);
+        assertTrue(strategyModuleManager.hasStratMods(alice));
+        assertEq(strategyModuleManager.getStratModNumber(alice), 1);
+        assertEq(IStrategyModule(stratModAddrAlice1).stratModOwner(), alice);
         assertEq(strategyModuleManager.getStratModByNftId(nft1), stratModAddrAlice1);
 
         // Bob creates a StrategyModule
         address stratModAddrBob = _createStratMod(bob);
         uint256 nft2 = IStrategyModule(stratModAddrBob).stratModNftId();
         assertEq(strategyModuleManager.numStratMods(), 2);
+        assertTrue(strategyModuleManager.hasStratMods(bob));
+        assertEq(strategyModuleManager.getStratModNumber(bob), 1);
+        assertEq(IStrategyModule(stratModAddrBob).stratModOwner(), bob);
         assertEq(strategyModuleManager.getStratModByNftId(nft2), stratModAddrBob);
-
-        address stratModOwnerBob = StrategyModule(stratModAddrBob).stratModOwner();
-        assertEq(stratModOwnerBob, bob);
 
         // Alice creates a second StrategyModule
         address stratModAddrAlice2 = _createStratMod(alice);
         uint256 nft3 = IStrategyModule(stratModAddrAlice2).stratModNftId();
         assertEq(strategyModuleManager.numStratMods(), 3);
-        assertEq(StrategyModule(stratModAddrAlice2).stratModOwner(), alice);
+        assertEq(strategyModuleManager.getStratModNumber(alice), 2);
+        assertEq(IStrategyModule(stratModAddrAlice2).stratModOwner(), alice);
         assertEq(strategyModuleManager.getStratModByNftId(nft3), stratModAddrAlice2);
 
         // Get Alice StrategyModules
@@ -99,19 +107,17 @@ contract StrategyModuleManagerTest is ProofParsing, EigenLayerDeployer {
         // Alice creates a StrategyModule
         address stratModAddrAlice = _createStratMod(alice);
 
-        vm.startPrank(alice);
-        
-        // Alice approves the StrategyModule to transfer to Bob
-        ByzNft byzNftContract = ByzNft(address(strategyModuleManager.byzNft()));
-        byzNftContract.approve(address(strategyModuleManager), IStrategyModule(stratModAddrAlice).stratModNftId());
+        // Alice approves the StrategyModuleManager to transfer to Bob
+        _approveNftTransferByStratModManager(alice, IStrategyModule(stratModAddrAlice).stratModNftId());
 
         // Alice transfers the StrategyModule to Bob
+        vm.prank(alice);
         strategyModuleManager.transferStratModOwnership(stratModAddrAlice, bob);
+        assertEq(strategyModuleManager.getStratModNumber(alice), 0);
 
         // Verify if Bob is the new owner
         assertEq(bob, IStrategyModule(stratModAddrAlice).stratModOwner());
-
-        vm.stopPrank();
+        assertEq(strategyModuleManager.getStratModNumber(bob), 1);
 
         // Verify if the mappings has been correctly updated
         address[] memory aliceStratMods = strategyModuleManager.getStratMods(alice);
@@ -125,26 +131,33 @@ contract StrategyModuleManagerTest is ProofParsing, EigenLayerDeployer {
     function test_RevertWhen_NonStratModOwnerTransfersStratMod() public {
         // Alice creates a StrategyModule
         address stratModAddrAlice = _createStratMod(alice);
-        
-        vm.startPrank(alice);
 
-        // Alice approves the StrategyModule to transfer to Bob
-        ByzNft byzNftContract = ByzNft(address(strategyModuleManager.byzNft()));
-        byzNftContract.approve(address(strategyModuleManager), IStrategyModule(stratModAddrAlice).stratModNftId());
-
-        vm.stopPrank();
+        // Alice approves the StrategyModuleManager to transfer to Bob
+        _approveNftTransferByStratModManager(alice, IStrategyModule(stratModAddrAlice).stratModNftId());
 
         // This smart contract transfers the StrategyModule to Bob
         vm.expectRevert(IStrategyModuleManager.NotStratModOwner.selector);
         strategyModuleManager.transferStratModOwnership(stratModAddrAlice, bob);
     }
 
-    function test_RevertWhen_notStratModOwnercreatesPod() public {
+    function test_RevertWhen_TransferStratModToItself() public {
+        // Alice creates a StrategyModule
+        address stratModAddrAlice = _createStratMod(alice);
+
+        // Alice approves the StrategyModule to transfer to herself
+        _approveNftTransferByStratModManager(alice, IStrategyModule(stratModAddrAlice).stratModNftId());     
+
+        vm.expectRevert(bytes("StrategyModuleManager.transferStratModOwnership: cannot transfer ownership to the same address"));
+        vm.prank(alice);
+        strategyModuleManager.transferStratModOwnership(stratModAddrAlice, alice);
+    }
+
+    function test_RevertWhen_notStratModOwnerCreatesPod() public {
         // Alice creates a StrategyModule
         address stratModAddrAlice = _createStratMod(alice);
 
         // Bob try to create an EigenPod for Alice's StrategyModule
-        vm.expectRevert(IStrategyModule.OnlyNftOwner.selector);
+        vm.expectRevert(IStrategyModule.OnlyStrategyModuleOwnerOrManager.selector);
         vm.prank(bob);
         IStrategyModule(stratModAddrAlice).createPod();
     }
@@ -180,10 +193,10 @@ contract StrategyModuleManagerTest is ProofParsing, EigenLayerDeployer {
 
     function test_HasPod() public {
         address stratModAddr = _createStratMod(bob);
-        assertEq(strategyModuleManager.hasPod(stratModAddr), false);
+        assertFalse(strategyModuleManager.hasPod(stratModAddr));
         vm.prank(bob);
         IStrategyModule(stratModAddr).createPod();
-        assertEq(strategyModuleManager.hasPod(stratModAddr), true);
+        assertTrue(strategyModuleManager.hasPod(stratModAddr));
     }
 
     function testCreateStratModAndPrecalculatePodAddress() public {
@@ -193,12 +206,28 @@ contract StrategyModuleManagerTest is ProofParsing, EigenLayerDeployer {
         // Pre-calculate alice's EigenPod address
         address expectedEigenPod = strategyModuleManager.getPodByStratModAddr(stratModAddr);
 
-        vm.prank(alice);
         // Alice deploys an EigenPod
+        vm.prank(alice);
         address eigenPod = IStrategyModule(stratModAddr).createPod();
 
         assertEq(eigenPod, expectedEigenPod);
         vm.stopPrank();
+    }
+
+    function test_callEigenPodManager() public {
+        // Alice creates a StrategyModule
+        address stratModAddr = _createStratMod(alice);
+        // Alice creates an EigenPod
+        vm.prank(alice);
+        IStrategyModule(stratModAddr).createPod();
+
+        // Alice wants to call EigenPodManager directly
+        bytes memory functionToCall = abi.encodeWithSignature("ownerToPod(address)", stratModAddr);
+        vm.prank(alice);
+        bytes memory ret = IStrategyModule(stratModAddr).callEigenPodManager(functionToCall);
+        IEigenPod pod = abi.decode(ret, (IEigenPod));
+
+        assertEq(address(pod), strategyModuleManager.getPodByStratModAddr(stratModAddr));
     }
 
     /*function testPrecalculatePodAddress() public {
@@ -220,51 +249,163 @@ contract StrategyModuleManagerTest is ProofParsing, EigenLayerDeployer {
 
     }*/
 
-    function testNativeStacking() public {
-        // Get the validator deposit data
-        (bytes memory pubkey, bytes memory signature, bytes32 depositDataRoot) = 
-            _getDepositData(abi.encodePacked("./test/test-data/alice-eigenPod-deposit-data.json"));
+    function testStakerDeposit32ETH() public {
 
-        // Alice create StrategyModule and stake 32 ETH
+        // Alice get 40ETH
         vm.deal(alice, 40 ether);
-        address stratMod = _createStratMod(alice);
-        vm.prank(alice);
-        IStrategyModule(stratMod).stakeNativeETH{value: 32 ether}(pubkey, signature, depositDataRoot);
 
+        // Alice create StrategyModule and stake 32 ETH in the contract
+        (address stratModAddr, address podAddr) = _createStratModAndStakeNativeETH(alice, 32 ether);
         assertEq(alice.balance, 8 ether);
-        vm.stopPrank();
+        assertEq(address(strategyModuleManager).balance, 0 ether);
+
+        // Verify Alice Strategy Module Balance
+        assertEq(stratModAddr.balance, 32 ether);
+
+        // Verify the address of the EigenPod
+        assertEq(strategyModuleManager.getPodByStratModAddr(stratModAddr), podAddr);
+
     }
 
     function test_RevertWhen_Not32ETHDeposited() public {
-        // Get the validator deposit data
-        (bytes memory pubkey, bytes memory signature, bytes32 depositDataRoot) = 
-            _getDepositData(abi.encodePacked("./test/test-data/alice-eigenPod-deposit-data.json"));
 
-        // Alice create StrategyModule and stake 31 ETH
+        // Alice get 40ETH
         vm.deal(alice, 40 ether);
-        address stratMod = _createStratMod(alice);
-        vm.prank(alice);
-        vm.expectRevert(bytes("EigenPod.stake: must initially stake for any validator with 32 ether"));
-        IStrategyModule(stratMod).stakeNativeETH{value: 31 ether}(pubkey, signature, depositDataRoot);
-        vm.stopPrank();
+
+        // Alice create StrategyModule and stake 31 ETH in the contract
+        vm.expectRevert(bytes("StrategyModuleManager.createStratModAndStakeNativeETH: must initially stake for any validator with 32 ether"));
+        _createStratModAndStakeNativeETH(alice, 31 ether);
+
     }
 
-    function test_directlyStakeNativeETH() public {
-        // Get the validator deposit data
-        (bytes memory pubkey, bytes memory signature, bytes32 depositDataRoot) = 
-            _getDepositData(abi.encodePacked("./test/test-data/alice-eigenPod-deposit-data.json"));
+    function testStakerWithdrawStratModBalance() public {
+        // First, verify alice has no ETH
+        assertEq(alice.balance, 0 ether);
 
-        // Alice stakes 32 ETH on Byzantine. The function creates StrategyModule for her
-        vm.deal(alice, 40 ether);
+        // Alice creates a StrategyModule
+        address stratModAddr = _createStratMod(alice);
+
+        // Alice's Strategy Module get 64ETH
+        vm.deal(stratModAddr, 64 ether);
+        assertEq(stratModAddr.balance, 64 ether);
+
+        // Alice withdraw the Strategy Module balance
         vm.prank(alice);
-        strategyModuleManager.createStratModAndStakeNativeETH{value: 32 ether}(pubkey, signature, depositDataRoot);
+        IStrategyModule(stratModAddr).withdrawContractBalance();
+        assertEq(alice.balance, 64 ether);
+        assertEq(stratModAddr.balance, 0 ether);
+    }
 
-        assertEq(alice.balance, 8 ether);
-        assertEq(strategyModuleManager.numStratMods(), 1);
+    function testSetTrustedDVPubKey() public {
 
-        // Verify StrategyModule ownership
-        address stratModAddr = strategyModuleManager.getStratMods(alice)[0];
-        assertEq(IStrategyModule(stratModAddr).stratModOwner(), alice);
+        bytes memory pubkey = 
+            _getTrustedPubKey(abi.encodePacked("./test/test-data/cluster-lock-DV0-noPod.json"));
+
+        // Alice create StrategyModule and deposit 32 ETH in the contract
+        address stratModAddr = _createStratMod(alice);
+
+        // Verify nobody has initialized the trusted DV pubKey
+        assertEq(IStrategyModule(stratModAddr).getTrustedDVPubKey().length, 0);
+
+        // Bob, a hacker, try to set the DV pubKey of Alice's StrategyModule
+        vm.prank(bob);
+        vm.expectRevert(bytes("Ownable: caller is not the owner"));
+        strategyModuleManager.setTrustedDVPubKey(stratModAddr, pubkey);
+
+        // Byzantine admin set the correct DV pubKey of Alice's StrategyModule
+        strategyModuleManager.setTrustedDVPubKey(stratModAddr, pubkey);
+        assertEq(IStrategyModule(stratModAddr).getTrustedDVPubKey(), pubkey);
+
+    }
+
+    function testClusterDetailsIntegrity() public {
+        // Alice get 40ETH
+        vm.deal(alice, 40 ether);
+
+        // Alice create StrategyModule and stake 32 ETH in the contract
+        (address stratModAddr,) = _createStratModAndStakeNativeETH(alice, 32 ether);
+
+        // An auction is triggered and fill the cluster details of StrategyModule
+        _simulateAuction(stratModAddr);
+
+        // Verify the cluster details of the StrategyModule
+        address[] memory clusterDetailsNodesAddr = IStrategyModule(stratModAddr).getDVNodesAddr();
+        address[4] memory selectedNodes = _getDVNodesAddr(abi.encodePacked("./test/test-data/cluster-lock-DV0-noPod.json"));
+        assertEq(clusterDetailsNodesAddr.length, selectedNodes.length);
+        for (uint i = 0; i < selectedNodes.length; i++) {
+            assertEq(selectedNodes[i], clusterDetailsNodesAddr[i]);
+        }
+        assertEq(selectedNodes[0], IStrategyModule(stratModAddr).getClusterManager());
+
+        // Verify the status of the DV
+        IStrategyModule.DVStatus dvStatus = IStrategyModule(stratModAddr).getDVStatus();
+        assertEq(uint(dvStatus), uint(IStrategyModule.DVStatus.WAITING_ACTIVATION));
+    }
+
+    function testBeaconChainDeposit() public {
+
+        // Alice get 40ETH
+        vm.deal(alice, 40 ether);
+
+        // Alice create StrategyModule and stake 32 ETH in the contract
+        (address stratModAddr,) = _createStratModAndStakeNativeETH(alice, 32 ether);
+
+        // An auction is triggered and fill the cluster details of StrategyModule
+        _simulateAuction(stratModAddr);
+
+        // Get the DV deposit data
+        (bytes memory pubkey, bytes memory signature, bytes32 depositDataRoot) = 
+            _getDepositData(abi.encodePacked("./test/test-data/deposit-data-DV0-noPod.json"));
+        // Get the trusted pubKey
+        bytes memory trustedPubkey = 
+            _getTrustedPubKey(abi.encodePacked("./test/test-data/cluster-lock-DV0-noPod.json"));
+        // Get the cluster manager address
+        address clusterManager = IStrategyModule(stratModAddr).getClusterManager();
+
+        // The cluster manager deposits the 32ETH on the Beacon Chain before the trusted pubKey has been set
+        vm.prank(clusterManager);
+        vm.expectRevert(bytes("StrategyModule.beaconChainDeposit: Trusted pubkey not initialized"));
+        IStrategyModule(stratModAddr).beaconChainDeposit(pubkey, signature, depositDataRoot);
+
+        // Alice set the trusted pubKey of the DV
+        vm.prank(alice);
+        IStrategyModule(stratModAddr).setTrustedDVPubKey(trustedPubkey);
+
+        // The cluster manager tries again to deposit the 32ETH on the Beacon Chain
+        vm.prank(clusterManager);
+        IStrategyModule(stratModAddr).beaconChainDeposit(pubkey, signature, depositDataRoot);
+
+        // Verify the balance of the StrategyModule
+        assertEq(stratModAddr.balance, 0 ether);
+
+        // Verify the status of the DV
+        IStrategyModule.DVStatus dvStatus = IStrategyModule(stratModAddr).getDVStatus();
+        assertEq(uint(dvStatus), uint(IStrategyModule.DVStatus.DEPOSITED_NOT_VERIFIED));
+    }
+
+    function test_RevertWhen_NotValidPubKey() public {
+        // Get the DV deposit data
+        (bytes memory pubkey, bytes memory signature, bytes32 depositDataRoot) = 
+            _getDepositData(abi.encodePacked("./test/test-data/deposit-data-DV0-noPod.json"));
+        // We assume the trusted pubKey is this one
+        bytes memory trustedPubkey = hex"a81a7517846c800845e31dc03dcd9e0cdca5bdf367116d90f5cc339b6b588ab7f824e36bd9b71749aae94341b86083aa";
+
+        // Alice get 40ETH
+        vm.deal(alice, 40 ether);
+
+        // Alice creates a Strategy Module and stake ETH
+        (address stratModAddr,) = _createStratModAndStakeNativeETH(alice, 32 ether);
+
+        // An auction is triggered and fill the cluster details of StrategyModule
+        _simulateAuction(stratModAddr);
+
+        // Byzantine admin set the trusted DV pubKey
+        strategyModuleManager.setTrustedDVPubKey(stratModAddr, trustedPubkey);
+
+        // Cluster Manager deposits the 32ETH on the Beacon Chain
+        vm.prank(IStrategyModule(stratModAddr).getClusterManager());
+        vm.expectRevert(bytes("StrategyModule.beaconChainDeposit: Invalid DV pubkey"));
+        IStrategyModule(stratModAddr).beaconChainDeposit(pubkey, signature, depositDataRoot);
     }
 
     // That test reverts because the `withdrawal_credential_proof` file generated with the Byzantine API
@@ -273,10 +414,12 @@ contract StrategyModuleManagerTest is ProofParsing, EigenLayerDeployer {
 
         // Read required data from example files
 
-        // Get the validator deposit data
+        // Get the DV deposit data
         (bytes memory pubkey, bytes memory signature, bytes32 depositDataRoot) = 
-            _getDepositData(abi.encodePacked("./test/test-data/alice-eigenPod-deposit-data.json"));
-
+            _getDepositData(abi.encodePacked("./test/test-data/deposit-data-DV0-noPod.json"));
+        // Get the trusted pubKey
+        bytes memory trustedPubkey = 
+            _getTrustedPubKey(abi.encodePacked("./test/test-data/cluster-lock-DV0-noPod.json"));
         // Get the validator fields proof
         (
             BeaconChainProofs.StateRootProof memory stateRootProofStruct,
@@ -291,27 +434,34 @@ contract StrategyModuleManagerTest is ProofParsing, EigenLayerDeployer {
         uint64 timestamp = 0;
         vm.warp(timestamp);
 
+        // Alice get 40ETH
         vm.deal(alice, 40 ether);
-        vm.startPrank(alice);
 
-        // Create a pod and stake ETH
-        address stratMod = strategyModuleManager.createStratMod();
-        IStrategyModule(stratMod).createPod();
-        IStrategyModule(stratMod).stakeNativeETH{value: 32 ether}(pubkey, signature, depositDataRoot);
+        // Alice creates a Strategy Module and stake ETH
+        (address stratModAddr,) = _createStratModAndStakeNativeETH(alice, 32 ether);
+
+        // An auction is triggered and fill the cluster details of StrategyModule
+        _simulateAuction(stratModAddr);
+
+        // Byzantine admin set the trusted DV pubKey
+        strategyModuleManager.setTrustedDVPubKey(stratModAddr, trustedPubkey);
+
+        // Cluster Manager deposits the 32ETH on the Beacon Chain
+        vm.prank(IStrategyModule(stratModAddr).getClusterManager());
+        IStrategyModule(stratModAddr).beaconChainDeposit(pubkey, signature, depositDataRoot);
 
         // Deposit received on the Beacon Chain
         cheats.warp(timestamp += 16 hours);
 
         //set the oracle block root
-        _setOracleBlockRoot();
+        _setOracleBlockRoot(abi.encodePacked("./test/test-data/withdrawal_credential_proof_1634654.json"));
 
         // Verify the proof
+        vm.prank(alice);
         cheats.expectRevert(
             bytes("EigenPod.verifyCorrectWithdrawalCredentials: Proof is not for this EigenPod")
         );
-        IStrategyModule(stratMod).verifyWithdrawalCredentials(timestamp, stateRootProofStruct, validatorIndices, proofsArray, validatorFieldsArray);
-
-        vm.stopPrank();
+        IStrategyModule(stratModAddr).verifyWithdrawalCredentials(timestamp, stateRootProofStruct, validatorIndices, proofsArray, validatorFieldsArray);
 
     }
 
@@ -323,10 +473,12 @@ contract StrategyModuleManagerTest is ProofParsing, EigenLayerDeployer {
 
         // Read required data from example files
 
-        // Get the validator deposit data
+        // Get the DV deposit data
         (bytes memory pubkey, bytes memory signature, bytes32 depositDataRoot) = 
-            _getDepositData(abi.encodePacked("./test/test-data/alice-eigenPod-deposit-data.json"));
-
+            _getDepositData(abi.encodePacked("./test/test-data/deposit-data-DV0-noPod.json"));
+        // Get the trusted pubKey
+        bytes memory trustedPubkey = 
+            _getTrustedPubKey(abi.encodePacked("./test/test-data/cluster-lock-DV0-noPod.json"));
         // Get the validator fields proof
         (
             BeaconChainProofs.StateRootProof memory stateRootProofStruct,
@@ -334,33 +486,40 @@ contract StrategyModuleManagerTest is ProofParsing, EigenLayerDeployer {
             bytes[] memory proofsArray,
             bytes32[][] memory validatorFieldsArray
         ) = 
-            _getValidatorFieldsProof(abi.encodePacked("./test/test-data/balance_update_proof_1634654.json"));
-
+            _getValidatorFieldsProof(abi.encodePacked("./test/test-data/withdrawal_credential_proof_1634654.json"));
 
         // Start the test
 
         uint64 timestamp = 0;
         vm.warp(timestamp);
 
+        // Alice get 40ETH
         vm.deal(alice, 40 ether);
-        vm.startPrank(alice);
 
-        // Create a pod and stake ETH
-        address stratMod = strategyModuleManager.createStratMod();
-        IStrategyModule(stratMod).createPod();
-        IStrategyModule(stratMod).stakeNativeETH{value: 32 ether}(pubkey, signature, depositDataRoot);
+        // Alice creates a Strategy Module and stake ETH
+        (address stratModAddr,) = _createStratModAndStakeNativeETH(alice, 32 ether);
+
+        // An auction is triggered and fill the cluster details of StrategyModule
+        _simulateAuction(stratModAddr);
+
+        // Byzantine admin set the trusted DV pubKey
+        strategyModuleManager.setTrustedDVPubKey(stratModAddr, trustedPubkey);
+
+        // Cluster Manager deposits the 32ETH on the Beacon Chain
+        vm.prank(IStrategyModule(stratModAddr).getClusterManager());
+        IStrategyModule(stratModAddr).beaconChainDeposit(pubkey, signature, depositDataRoot);
 
         // Deposit received on the Beacon Chain
         cheats.warp(timestamp += 16 hours);
 
         //set the oracle block root
-        _setOracleBlockRoot();
+        _setOracleBlockRoot(abi.encodePacked("./test/test-data/withdrawal_credential_proof_1634654.json"));
 
         // Verify the proof
         cheats.expectRevert(
             bytes("EigenPod.verifyBalanceUpdate: Validator not active")
         );
-        IStrategyModule(stratMod).verifyBalanceUpdates(timestamp, stateRootProofStruct, validatorIndices, proofsArray, validatorFieldsArray);
+        IStrategyModule(stratModAddr).verifyBalanceUpdates(timestamp, stateRootProofStruct, validatorIndices, proofsArray, validatorFieldsArray);
 
         vm.stopPrank();
 
@@ -393,10 +552,8 @@ contract StrategyModuleManagerTest is ProofParsing, EigenLayerDeployer {
         // Alice stake 32 ETH
         vm.deal(alice, 40 ether);
         vm.startPrank(alice);
-        // Get the validator deposit data
-        (bytes memory pubkey, bytes memory signature, bytes32 depositDataRoot) = 
-            _getDepositData(abi.encodePacked("./test/test-data/alice-eigenPod-deposit-data.json"));
-        address stratModAddr = strategyModuleManager.createStratModAndStakeNativeETH{value: 32 ether}(pubkey, signature, depositDataRoot);
+
+        (address stratModAddr,) = strategyModuleManager.createStratModAndStakeNativeETH{value: 32 ether}();
         // Alice delegate its staked ETH to the ELOperator1
         IStrategyModule(stratModAddr).delegateTo(ELOperator1);
         vm.stopPrank();
@@ -428,6 +585,21 @@ contract StrategyModuleManagerTest is ProofParsing, EigenLayerDeployer {
         return strategyModuleManager.createStratMod();
     }
 
+    function _createStratModAndStakeNativeETH(address _staker, uint256 _stake) internal returns (address, address) {
+        vm.prank(_staker);
+        return strategyModuleManager.createStratModAndStakeNativeETH{value: _stake}();
+    }
+
+    function _getByzNftContract() internal view returns (ByzNft) {
+        return ByzNft(address(strategyModuleManager.byzNft()));
+    }
+
+    function _approveNftTransferByStratModManager(address approver, uint256 nftId) internal {
+        ByzNft byzNftContract = _getByzNftContract();
+        vm.prank(approver);
+        byzNftContract.approve(address(strategyModuleManager), nftId);
+    }
+
     function _getDepositData(
         bytes memory depositFilePath
     ) internal returns (
@@ -438,12 +610,17 @@ contract StrategyModuleManagerTest is ProofParsing, EigenLayerDeployer {
         // File generated with the Obol LaunchPad
         setJSON(string(depositFilePath));
 
-        pubkey = getDVPubKey();
+        pubkey = getDVPubKeyDeposit();
         signature = getDVSignature();
         depositDataRoot = getDVDepositDataRoot();
         //console.logBytes(pubkey);
         //console.logBytes(signature);
         //console.logBytes32(depositDataRoot);
+    }
+
+    function _getTrustedPubKey(bytes memory lockFilePath) internal returns (bytes memory pubkey) {
+        setJSON(string(lockFilePath));
+        pubkey = getDVPubKeyLock();
     }
 
     function _getValidatorFieldsProof(
@@ -471,11 +648,17 @@ contract StrategyModuleManagerTest is ProofParsing, EigenLayerDeployer {
         return (stateRootProofStruct, validatorIndices, proofsArray, validatorFieldsArray);
     }
 
+    function _getDVNodesAddr(bytes memory lockFilePath) internal returns (address[4] memory) {
+        setJSON(string(lockFilePath));
+        return getDVNodesAddr();
+    }
+
     function _getStateRootProof() internal returns (BeaconChainProofs.StateRootProof memory) {
         return BeaconChainProofs.StateRootProof(getBeaconStateRoot(), abi.encodePacked(getStateRootProof()));
     }
 
-    function _setOracleBlockRoot() internal {
+    function _setOracleBlockRoot(bytes memory proofFilePath) internal {
+        setJSON(string(proofFilePath));
         bytes32 latestBlockRoot = getLatestBlockRoot();
         //set beaconStateRoot
         beaconChainOracle.setOracleBlockRootAtTimestamp(latestBlockRoot);
@@ -497,6 +680,34 @@ contract StrategyModuleManagerTest is ProofParsing, EigenLayerDeployer {
             "_registerAsOperator: operatorDetails not set appropriately"
         );
         assertTrue(delegation.isDelegated(operator), "_registerAsOperator: operator doesn't delegate itself");
+    }
+
+    function _simulateAuction(
+        address stratModAddrNeedingDV
+    ) internal {
+        // Get the 4 winners of the auction (no auction takes place as it's a simulation)
+        address[4] memory nodesAddr = _getDVNodesAddr(abi.encodePacked("./test/test-data/cluster-lock-DV0-noPod.json"));
+
+        IStrategyModule.Node[] memory nodes = new IStrategyModule.Node[](4);
+        for (uint256 i = 0; i < 4; i++) {
+            nodes[i] = IStrategyModule.Node(
+                365, // We assume all the nodes have 365 Validation Credits
+                100, // We assume all the nodes have 100 reputation score
+                nodesAddr[i]
+            );
+        }
+
+        // Define nodesAddr[0] as the cluster manager
+        address clusterManager = nodesAddr[0];
+
+        // Bob try to update Alice's cluster details
+        vm.prank(bob);
+        vm.expectRevert(IStrategyModule.OnlyAuctionContract.selector);
+        IStrategyModule(stratModAddrNeedingDV).updateClusterDetails(nodes, clusterManager);
+
+        Auction auctionContract = Auction(address(strategyModuleManager.auction()));
+        vm.prank(address(auctionContract));
+        IStrategyModule(stratModAddrNeedingDV).updateClusterDetails(nodes, clusterManager);
     }
 
 }
