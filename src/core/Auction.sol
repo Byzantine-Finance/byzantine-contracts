@@ -5,47 +5,51 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "ds-math/math.sol";
 import "../libraries/ProcessDataLib.sol";
 
-/// TODO: Calculation of the reputation score of operators
+/// TODO: Calculation of the reputation score of node operators
+/// TODO: Create a whitelist to avoid our partner to pay the bond
+/// TODO: Create escrow contract to pay directly the bid
+/// TODO: Sort the array off-chain, verify on-chain (or use ChainLink Functions)
 
 contract Auction is ReentrancyGuard, DSMath {
+    using ProcessDataLib for ProcessDataLib.Set;
+
     /* ===================== STATE VARIABLES ===================== */
 
     /// @notice Keep state variables private for better gas efficiency
-    using ProcessDataLib for ProcessDataLib.Set;
-    ProcessDataLib.Set private _opSet;
+    ProcessDataLib.Set private _nodeOpSet;
 
     uint256 private constant _WAD = 1e18;
     uint256 private _expectedReturnWei;
+    uint256 private _minDuration;
     /// @notice Maximum discount rate in percentage, upscaled to 1e2 (15% => 1500)
     uint256 private _maxDiscountRate;
-    uint256 private _minDuration;
-    uint256 private _operatorBond;
     uint256 private _clusterSize = 4;
+    uint256 private _nodeOpBond;
 
     address payable public vault;
     address payable public byzantineFinance;
 
-    enum OperatorStatus {
+    enum NodeOpStatus {
         inProtocol, // bid set, seeking for work
         auctionWinner, // winner of an auction but bid price not paid yet
         pendingForDvt, // bid price paid and awaiting DVT
         activeInDvt // active in DVT
     }
 
-    /// @notice Stores detail of operator in the protocol
-    struct OperatorStruct {
+    /// @notice Stores detail of node operators in the protocol
+    struct NodeOpStruct {
         uint256 bidPrice;
         uint256 auctionScore;
         uint256 reputationScore;
-        OperatorStatus opStatus;
+        NodeOpStatus nodeStatus;
     }
-    /// @notice Operator address => operator struct
-    mapping(address => OperatorStruct) private _operatorStructs;
+    /// @notice Node operator address => node operator struct
+    mapping(address => NodeOpStruct) private _nodeOpStructs;
 
-    event OperatorJoined(address operatorAddress);
-    event OperatorLeft(address operatorAddress);
+    event NodeOpJoined(address nodeOpAddress);
+    event NodeOpLeft(address nodeOpAddress);
     event BidUpdated(
-        address operatorAddress,
+        address nodeOpAddress,
         uint256 bidPrice,
         uint256 auctionScore,
         uint256 reputationScore
@@ -54,12 +58,12 @@ contract Auction is ReentrancyGuard, DSMath {
         uint256 _expectedReturnWei,
         uint256 _maxDiscountRate,
         uint256 _minDuration,
-        uint256 _operatorBond
+        uint256 _nodeOpBond
     );
     event ClusterSizeUpdated(uint256 _clusterSize);
     event TopWinners(address[] winners);
-    event BidPaid(address operatorAddress, uint256 bidPrice);
-    event ListOfOperators(address[] operators);
+    event BidPaid(address nodeOpAddress, uint256 bidPrice);
+    event ListOfNodeOps(address[] nodeOps);
 
     /* ===================== CONSTRUCTOR ===================== */
 
@@ -68,24 +72,24 @@ contract Auction is ReentrancyGuard, DSMath {
         uint256 __expectedReturnWei,
         uint256 __maxDiscountRate,
         uint256 __minDuration,
-        uint256 __operatorBond
+        uint256 __nodeOpBond
     ) {
         byzantineFinance = payable(msg.sender);
         vault = payable(_vault);
         _expectedReturnWei = __expectedReturnWei;
         _maxDiscountRate = __maxDiscountRate;
         _minDuration = __minDuration;
-        _operatorBond = __operatorBond;
+        _nodeOpBond = __nodeOpBond;
     }
 
     /* ===================== EXTERNAL FUNCTIONS ===================== */
 
     /**
-     * @notice Function triggered by Byzantine once 32ETH are gathered from stakers.
-     * It sorts the operators by their auction score and returns a new memory array.
-     * The status of the operators in the topWinners array is updated to auctionWinner.
+     * @notice Function triggered by the StrategyModuleManeger every time a staker deposit 32ETH.
+     * It sorts the node operators by their auction score and returns a new memory array.
+     * The status of the node operators in the topWinners array is updated to auctionWinner.
      * @dev The length of return array varies depending on the cluster size.
-     * @dev The _opArray does not alter the storage array _opSet.addrList.
+     * @dev The _nodeOpArray does not alter the storage array _nodeOpSet.addrList.
      */
     function sortAndGetTopWinners()
         external
@@ -93,9 +97,11 @@ contract Auction is ReentrancyGuard, DSMath {
         nonReentrant
         returns (address[] memory)
     {
-        address[] memory _opArray = _opSet.addrList;
+        address[] memory _nodeOpArray = _nodeOpSet.addrList;
+
+        // BUG: Should compare the length of node op with the status inProtocol
         require(
-            _opArray.length >= _clusterSize,
+            _nodeOpArray.length >= _clusterSize,
             "No enough operators for the cluser."
         );
 
@@ -103,39 +109,40 @@ contract Auction is ReentrancyGuard, DSMath {
         address[] memory topWinners = new address[](_clusterSize);
 
         /// @notice Initialize the new array with the first n elements, no sorting here
-        uint256 initializedCount = 0;
+        uint256 initializedCount; // = 0
         for (
             uint256 i = 0;
             i < _clusterSize && initializedCount < _clusterSize;
             i++
         ) {
             if (
-                _operatorStructs[_opArray[i]].opStatus ==
-                OperatorStatus.inProtocol
+                _nodeOpStructs[_nodeOpArray[i]].nodeStatus ==
+                NodeOpStatus.inProtocol
             ) {
-                topWinners[initializedCount++] = _opArray[i];
+                topWinners[initializedCount++] = _nodeOpArray[i];
             }
         }
 
         /// @notice Iterate through the operator array to find the n largest numbers
-        for (uint256 i = _clusterSize; i < _opArray.length; i++) {
-            OperatorStruct storage opStruct = _operatorStructs[_opArray[i]];
+        for (uint256 i = _clusterSize; i < _nodeOpArray.length; i++) {
+            NodeOpStruct storage nodeOpStruct = _nodeOpStructs[_nodeOpArray[i]];
             if (
-                opStruct.opStatus == OperatorStatus.auctionWinner ||
-                opStruct.opStatus == OperatorStatus.pendingForDvt ||
-                opStruct.opStatus == OperatorStatus.activeInDvt
+                nodeOpStruct.nodeStatus == NodeOpStatus.auctionWinner ||
+                nodeOpStruct.nodeStatus == NodeOpStatus.pendingForDvt ||
+                nodeOpStruct.nodeStatus == NodeOpStatus.activeInDvt
             ) continue;
 
             /// @notice Get the score to compare with the scores in topWinners array
-            uint256 scoreToCompare = _operatorStructs[_opArray[i]].auctionScore;
+            uint256 scoreToCompare = _nodeOpStructs[_nodeOpArray[i]]
+                .auctionScore;
 
             /// @notice Initialize the lowest score in the topWinners array
             uint256 lowestScoreIndex = 0;
-            uint256 lowestScore = _operatorStructs[topWinners[0]].auctionScore;
+            uint256 lowestScore = _nodeOpStructs[topWinners[0]].auctionScore;
 
             /// @notice Find the lowest score in the topWinners array
             for (uint256 j = 1; j < _clusterSize; j++) {
-                uint256 score = _operatorStructs[topWinners[j]].auctionScore;
+                uint256 score = _nodeOpStructs[topWinners[j]].auctionScore;
                 if (score < lowestScore) {
                     lowestScoreIndex = j; // 1
                     lowestScore = score;
@@ -144,12 +151,12 @@ contract Auction is ReentrancyGuard, DSMath {
 
             /// @notice Replace the lowest score with the current score if it is higher
             if (scoreToCompare > lowestScore) {
-                topWinners[lowestScoreIndex] = _opArray[i];
+                topWinners[lowestScoreIndex] = _nodeOpArray[i];
             }
         }
 
         for (uint256 i = 0; i < topWinners.length; i++) {
-            _operatorStructs[topWinners[i]].opStatus = OperatorStatus
+            _nodeOpStructs[topWinners[i]].nodeStatus = NodeOpStatus
                 .auctionWinner;
         }
         emit TopWinners(topWinners);
@@ -163,16 +170,16 @@ contract Auction is ReentrancyGuard, DSMath {
      * @dev The operator must be in the top winners to call this function.
      */
     function acceptAndPayBid() external {
-        OperatorStruct storage op = _operatorStructs[msg.sender];
+        NodeOpStruct storage nodeOp = _nodeOpStructs[msg.sender];
         require(
-            op.opStatus == OperatorStatus.auctionWinner,
+            nodeOp.nodeStatus == NodeOpStatus.auctionWinner,
             "Operator not in the top winners."
         );
 
-        uint256 bidPrice = op.bidPrice;
+        uint256 bidPrice = nodeOp.bidPrice;
         _sendFunds(vault, bidPrice);
 
-        op.opStatus = OperatorStatus.pendingForDvt;
+        nodeOp.nodeStatus = NodeOpStatus.pendingForDvt;
 
         emit BidPaid(msg.sender, bidPrice);
     }
@@ -184,18 +191,18 @@ contract Auction is ReentrancyGuard, DSMath {
         uint256 __expectedReturnWei,
         uint256 __maxDiscountRate,
         uint256 __minDuration,
-        uint256 __operatorBond
+        uint256 __nodeOpBond
     ) external onlyOwner {
         _expectedReturnWei = __expectedReturnWei;
         _maxDiscountRate = __maxDiscountRate;
         _minDuration = __minDuration;
-        _operatorBond = __operatorBond;
+        _nodeOpBond = __nodeOpBond;
 
         emit AuctionConfigUpdated(
             __expectedReturnWei,
             __maxDiscountRate,
             __minDuration,
-            __operatorBond
+            __nodeOpBond
         );
     }
 
@@ -210,19 +217,19 @@ contract Auction is ReentrancyGuard, DSMath {
     }
 
     /**
-     * @notice Operator joins the protocol by paying the bond and setting the bid price.
-     * @param _discountRate: discount rate set by the node operator in percentage, upscaled to 1e3
+     * @notice Operator joins the protocol by paying the bond and setting the bid parameters.
+     * @param _discountRate: discount rate set by the node operator in percentage (from 0 to 10000 -> 100%)
      * @param _timeInDays: duration of being a validator, in days
-     * @dev Auction score and bid price are stored in OperatorStruct
+     * @dev Auction score and bid price are stored in NodeOpStruct
      */
     function joinProtocol(
         uint256 _discountRate,
         uint256 _timeInDays
     ) external payable {
-        require(msg.value == _operatorBond, "Bond value must be 1 ETH.");
-        _opSet.insert(msg.sender);
-        OperatorStruct storage op = _operatorStructs[msg.sender];
-        op.reputationScore = 1;
+        require(msg.value == _nodeOpBond, "Bond value must be 1 ETH.");
+        _nodeOpSet.insert(msg.sender);
+        NodeOpStruct storage nodeOp = _nodeOpStructs[msg.sender];
+        nodeOp.reputationScore = 1;
 
         /// @notice Calculate operator's bid price and auction score
         uint256 dailyVcPrice = _calculateDailyVcPrice(_discountRate);
@@ -230,14 +237,14 @@ contract Auction is ReentrancyGuard, DSMath {
         uint256 auctionScore = _calculateAuctionScore(
             dailyVcPrice,
             _timeInDays,
-            op.reputationScore
+            nodeOp.reputationScore
         );
 
-        op.bidPrice = bidPrice;
-        op.auctionScore = auctionScore;
-        op.opStatus = OperatorStatus.inProtocol;
+        nodeOp.bidPrice = bidPrice;
+        nodeOp.auctionScore = auctionScore;
+        nodeOp.nodeStatus = NodeOpStatus.inProtocol;
 
-        emit OperatorJoined(msg.sender);
+        emit NodeOpJoined(msg.sender);
     }
 
     /**
@@ -245,17 +252,17 @@ contract Auction is ReentrancyGuard, DSMath {
      * @dev Operator must not be pending for or active in a DVT.
      */
     function leaveProtocol() external {
-        OperatorStatus status = _operatorStructs[msg.sender].opStatus;
-        require(_opSet.exists(msg.sender), "Operator not in protocol.");
+        NodeOpStatus status = _nodeOpStructs[msg.sender].nodeStatus;
+        require(_nodeOpSet.exists(msg.sender), "Operator not in protocol.");
         require(
-            status != OperatorStatus.pendingForDvt ||
-                status != OperatorStatus.activeInDvt,
+            status != NodeOpStatus.pendingForDvt ||
+                status != NodeOpStatus.activeInDvt,
             "Operator pending for or active in a DVT cannot leave."
         );
-        _opSet.remove(msg.sender);
-        _sendFunds(msg.sender, _operatorBond);
+        _nodeOpSet.remove(msg.sender);
+        _sendFunds(msg.sender, _nodeOpBond);
 
-        emit OperatorLeft(msg.sender);
+        emit NodeOpLeft(msg.sender);
     }
 
     /**
@@ -265,19 +272,24 @@ contract Auction is ReentrancyGuard, DSMath {
      * @dev The auction score is updated.
      */
     function updateBid(uint256 _discountRate, uint256 _timeInDays) external {
-        require(_opSet.exists(msg.sender), "Operator not in protocol.");
-        OperatorStruct storage op = _operatorStructs[msg.sender];
+        require(_nodeOpSet.exists(msg.sender), "Operator not in protocol.");
+        NodeOpStruct storage nodeOp = _nodeOpStructs[msg.sender];
         uint256 dailyVcPrice = _calculateDailyVcPrice(_discountRate);
         uint256 bidPrice = _calculateBidPrice(_timeInDays, dailyVcPrice);
         uint256 auctionScore = _calculateAuctionScore(
             dailyVcPrice,
             _timeInDays,
-            op.reputationScore
+            nodeOp.reputationScore
         );
-        op.bidPrice = bidPrice;
-        op.auctionScore = auctionScore;
+        nodeOp.bidPrice = bidPrice;
+        nodeOp.auctionScore = auctionScore;
 
-        emit BidUpdated(msg.sender, bidPrice, auctionScore, op.reputationScore);
+        emit BidUpdated(
+            msg.sender,
+            bidPrice,
+            auctionScore,
+            nodeOp.reputationScore
+        );
     }
 
     /**
@@ -296,38 +308,39 @@ contract Auction is ReentrancyGuard, DSMath {
     function operatorInProtocol(
         address _opAddr
     ) external view onlyOwner returns (bool) {
-        return _opSet.exists(_opAddr);
+        return _nodeOpSet.exists(_opAddr);
     }
 
     /**
      * @notice Get the detail of an operator by address.
      * @param _opAddr: operator address
      */
-    function getOperatorStruct(
+    function getNodeOpStruct(
         address _opAddr
-    ) external view returns (uint256, uint256, uint256, OperatorStatus) {
-        require(_opSet.exists(_opAddr), "Not a member.");
-        OperatorStruct storage op = _operatorStructs[_opAddr];
-        return (op.bidPrice, op.auctionScore, op.reputationScore, op.opStatus);
+    ) external view returns (uint256, uint256, uint256, NodeOpStatus) {
+        require(_nodeOpSet.exists(_opAddr), "Not a member.");
+        NodeOpStruct storage nodeOp = _nodeOpStructs[_opAddr];
+        return (
+            nodeOp.bidPrice,
+            nodeOp.auctionScore,
+            nodeOp.reputationScore,
+            nodeOp.nodeStatus
+        );
     }
 
     /**
-     * @notice Get the total number of operators in the protocol.
+     * @notice Get the total number of node operators in the protocol.
      */
-    function getNumberOfOperators() external view onlyOwner returns (uint256) {
-        return _opSet.count();
+    function getNumberOfNodeOps() external view onlyOwner returns (uint256) {
+        return _nodeOpSet.count();
     }
 
     /**
-     * @notice Get the list of operators in the protocol.
+     * @notice Get the list of node operators in the protocol.
      */
-    function getListOfOperators()
-        external
-        onlyOwner
-        returns (address[] memory)
-    {
-        emit ListOfOperators(_opSet.addrList);
-        return _opSet.addrList;
+    function getListOfNodeOps() external onlyOwner returns (address[] memory) {
+        emit ListOfNodeOps(_nodeOpSet.addrList);
+        return _nodeOpSet.addrList;
     }
 
     function getAuctionConfigValues()
@@ -340,7 +353,7 @@ contract Auction is ReentrancyGuard, DSMath {
             _expectedReturnWei,
             _maxDiscountRate,
             _minDuration,
-            _operatorBond,
+            _nodeOpBond,
             _clusterSize
         );
     }
@@ -396,8 +409,7 @@ contract Auction is ReentrancyGuard, DSMath {
         uint256 _dailyVcPrice,
         uint256 _timeInDays,
         uint256 _reputation
-    ) internal view returns (uint256) {
-        require(_timeInDays >= _minDuration, "Time in days must be >= 30.");
+    ) internal pure returns (uint256) {
         uint256 powerValue = _pow(_timeInDays);
         return (_dailyVcPrice * powerValue * _reputation) / _WAD;
     }

@@ -14,10 +14,10 @@ contract AuctionTest is Test {
     AuctionMock mock;
 
     address VAULT = makeAddr("vault");
-    uint EXPECTED_RETURN = (uint256(32 ether) * 37) / 1000 / 365; //3243835616438356
-    uint MAX_DISCOUNT_RATE = 15e2;
+    uint256 EXPECTED_RETURN = (uint256(32 ether) * 37) / 1000 / 365; //3243835616438356
+    uint112 MAX_DISCOUNT_RATE = 15e2;
     uint MIN_DURATION = 30;
-    uint OPERATOR_BOND = 1 ether;
+    uint256 OPERATOR_BOND = 1 ether;
 
     address OPERATOR_1 = makeAddr("operator_1");
     address OPERATOR_2 = makeAddr("operator_2");
@@ -59,7 +59,7 @@ contract AuctionTest is Test {
     function test_OperatorsCorrectlyJoinedAndLeftProtocol() external {
         // Operator_1 joins the protocol
         operatorJoinsProtocol(OPERATOR_1, 5e2, 30);
-        assertEq(auction.getNumberOfOperators(), 1);
+        assertEq(auction.getNumberOfNodeOps(), 1);
 
         // Operator_2 joins the protocol
         operatorJoinsProtocol(OPERATOR_2, 10e2, 60);
@@ -71,7 +71,7 @@ contract AuctionTest is Test {
         address[] memory expectedOperators = new address[](2);
         expectedOperators[0] = OPERATOR_1;
         expectedOperators[1] = OPERATOR_2;
-        assertEq(auction.getListOfOperators(), expectedOperators);
+        assertEq(auction.getListOfNodeOps(), expectedOperators);
 
         // Operator_1 leaves the protocol
         vm.startPrank(OPERATOR_1);
@@ -81,7 +81,7 @@ contract AuctionTest is Test {
         vm.stopPrank();
 
         // Check number of operators in the protocol
-        assertEq(auction.getNumberOfOperators(), 1);
+        assertEq(auction.getNumberOfNodeOps(), 1);
         // Check if operator is in the protocol
         assertEq(auction.operatorInProtocol(OPERATOR_1), false);
     }
@@ -116,9 +116,9 @@ contract AuctionTest is Test {
         vm.expectRevert(bytes("Operator not in protocol."));
         auction.updateBid(300, 40);
 
-        // Left operator is no longer in the protocol, so cannot call getOperatorStruct
+        // Left operator is no longer in the protocol, so cannot call getNodeOpStruct
         vm.expectRevert();
-        auction.getOperatorStruct(OPERATOR_1);
+        auction.getNodeOpStruct(OPERATOR_1);
         vm.stopPrank();
 
         // Operators who are not in the protocol cannot leave the protocol or update bid
@@ -148,9 +148,9 @@ contract AuctionTest is Test {
         vm.expectRevert();
         auction.operatorInProtocol(OPERATOR_1);
         vm.expectRevert();
-        auction.getNumberOfOperators();
+        auction.getNumberOfNodeOps();
         vm.expectRevert();
-        auction.getListOfOperators();
+        auction.getListOfNodeOps();
         vm.stopPrank();
     }
 
@@ -203,8 +203,8 @@ contract AuctionTest is Test {
             uint256 bidPrice,
             uint256 auctionScore,
             uint256 reputationScore,
-            Auction.OperatorStatus opStatus
-        ) = auction.getOperatorStruct(OPERATOR_1);
+            Auction.NodeOpStatus opStatus
+        ) = auction.getNodeOpStruct(OPERATOR_1);
 
         assertEq(bidPrice, 254559999999999790);
         assertEq(auctionScore, 1004466779031871);
@@ -217,14 +217,14 @@ contract AuctionTest is Test {
     function test_CalculationsWorkCorrectly() external {
         // Operator_2 joins the protocol with discountRate = 5% and timeInDays = 30
         operatorJoinsProtocol(OPERATOR_1, 5e2, 30);
-        assertEq(auction.getNumberOfOperators(), 1);
+        assertEq(auction.getNumberOfNodeOps(), 1);
 
         (
             uint256 bidPrice_1,
             uint256 auctionScore_1,
             uint256 reputationScore_1,
-            Auction.OperatorStatus opStatus_1
-        ) = auction.getOperatorStruct(OPERATOR_1);
+            Auction.NodeOpStatus opStatus_1
+        ) = auction.getNodeOpStruct(OPERATOR_1);
 
         // Check if the value of bidPrice for Operator_1 is calculated correctly
         assertEq(bidPrice_1, 23112328767123270);
@@ -236,13 +236,13 @@ contract AuctionTest is Test {
 
         // Operator_2 joins the protocol with discountRate = 10% and timeInDays = 60
         operatorJoinsProtocol(OPERATOR_2, 10e2, 60);
-        assertEq(auction.getNumberOfOperators(), 2);
+        assertEq(auction.getNumberOfNodeOps(), 2);
         (
             uint256 bidPrice_2,
             uint256 auctionScore_2,
             uint256 reputationScore_2,
-            Auction.OperatorStatus opStatus_2
-        ) = auction.getOperatorStruct(OPERATOR_2);
+            Auction.NodeOpStatus opStatus_2
+        ) = auction.getNodeOpStruct(OPERATOR_2);
 
         // Check if the value of bidPrice for Operator_2 is calculated correctly
         assertEq(bidPrice_2, 43791780821917800);
@@ -341,7 +341,7 @@ contract AuctionTest is Test {
         // Operator_5 status should be updated to 2, pendingForDvt
         assertEq(uint(getOperatorStatus(OPERATOR_5)), 2);
         // Calculate the bid price for OPERATOR_5
-        (uint256 bidPrice_5, , , ) = auction.getOperatorStruct(OPERATOR_5);
+        (uint256 bidPrice_5, , , ) = auction.getNodeOpStruct(OPERATOR_5);
 
         // Check the balance of the vault
         assertEq(address(VAULT).balance, bidPrice_5);
@@ -350,7 +350,7 @@ contract AuctionTest is Test {
         vm.prank(OPERATOR_10);
         auction.acceptAndPayBid();
         // Calculate the bid price for OPERATOR_10
-        (uint256 bidPrice_10, , , ) = auction.getOperatorStruct(OPERATOR_10);
+        (uint256 bidPrice_10, , , ) = auction.getNodeOpStruct(OPERATOR_10);
 
         // Check the balance of the vault
         assertEq(address(VAULT).balance, bidPrice_5 + bidPrice_10);
@@ -388,14 +388,14 @@ contract AuctionTest is Test {
     function getAuctionScoreOfTheOperator(
         address operator
     ) internal view returns (uint256) {
-        (, uint256 auctionScore, , ) = auction.getOperatorStruct(operator);
+        (, uint256 auctionScore, , ) = auction.getNodeOpStruct(operator);
         return auctionScore;
     }
 
     function getOperatorStatus(
         address operator
-    ) internal view returns (Auction.OperatorStatus) {
-        (, , , Auction.OperatorStatus opStatus) = auction.getOperatorStruct(
+    ) internal view returns (Auction.NodeOpStatus) {
+        (, , , Auction.NodeOpStatus opStatus) = auction.getNodeOpStruct(
             operator
         );
         return opStatus;
