@@ -27,7 +27,7 @@ contract Auction is ReentrancyGuard, DSMath {
     uint256 private _nodeOpBond;
 
     address payable public vault;
-    address payable public byzantineFinance;
+    address public byzantineFinance;
 
     enum NodeOpStatus {
         inProtocol, // bid set, seeking for work
@@ -45,6 +45,11 @@ contract Auction is ReentrancyGuard, DSMath {
     }
     /// @notice Node operator address => node operator struct
     mapping(address => NodeOpStruct) private _nodeOpStructs;
+
+    /// @notice Mapping for the whitelisted node operators
+    mapping(address => bool) private _nodeOpsWhitelist;
+
+    /* ===================== EVENTS ===================== */
 
     event NodeOpJoined(address nodeOpAddress);
     event NodeOpLeft(address nodeOpAddress);
@@ -74,7 +79,7 @@ contract Auction is ReentrancyGuard, DSMath {
         uint256 __minDuration,
         uint256 __nodeOpBond
     ) {
-        byzantineFinance = payable(msg.sender);
+        byzantineFinance = msg.sender;
         vault = payable(_vault);
         _expectedReturnWei = __expectedReturnWei;
         _maxDiscountRate = __maxDiscountRate;
@@ -83,6 +88,26 @@ contract Auction is ReentrancyGuard, DSMath {
     }
 
     /* ===================== EXTERNAL FUNCTIONS ===================== */
+
+    /**
+     * @notice Add a node operator to the the whitelist to not make him pay the bond.
+     * @param _nodeOpAddr: the node operator to whitelist.
+     * @dev Revert if the node operator is already whitelisted.
+     */
+    function addNodeOpToWhitelist(address _nodeOpAddr) external onlyOwner {
+        require(!isWhitelisted(_nodeOpAddr), "Address already whitelisted");
+        _nodeOpsWhitelist[_nodeOpAddr] = true;
+    }
+
+    /**
+     * @notice Remove a node operator to the the whitelist.
+     * @param _nodeOpAddr: the node operator to remove from whitelist.
+     * @dev Revert if the node operator is not whitelisted.
+     */
+    function removeNodeOpFromWhitelist(address _nodeOpAddr) external onlyOwner {
+        require(isWhitelisted(_nodeOpAddr), "Address is not whitelisted");
+        _nodeOpsWhitelist[_nodeOpAddr] = false;
+    }
 
     /**
      * @notice Function triggered by the StrategyModuleManeger every time a staker deposit 32ETH.
@@ -302,6 +327,14 @@ contract Auction is ReentrancyGuard, DSMath {
     /* ===================== GETTER FUNCTIONS ===================== */
 
     /**
+     * @notice Return true if the `_nodeOpAddr` is whitelisted, false otherwise.
+     * @param _nodeOpAddr: operator address you want to know if whitelisted
+     */
+    function isWhitelisted(address _nodeOpAddr) public view returns (bool) {
+        return _nodeOpsWhitelist[_nodeOpAddr];
+    }
+
+    /**
      * @notice Check if an operator is in the protocol by address
      * @param _opAddr: operator address
      */
@@ -429,7 +462,7 @@ contract Auction is ReentrancyGuard, DSMath {
      * @dev The receiver is vault in the present contract
      */
     function _sendFunds(address _receiver, uint256 _amount) internal {
-        (bool success, ) = _receiver.call{value: _amount}("");
+        (bool success, ) = payable(_receiver).call{value: _amount}("");
         require(success, "Transfer failed.");
     }
 

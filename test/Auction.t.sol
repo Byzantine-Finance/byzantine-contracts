@@ -56,6 +56,34 @@ contract AuctionTest is Test {
         vm.deal(OPERATOR_10, STARTING_BALANCE);
     }
 
+    function test_AddToWhitelist() external {
+        // First, OPERATOR_1 wants to add himself to the whitelist
+        vm.prank(OPERATOR_1);
+        vm.expectRevert(bytes("Not the owner."));
+        auction.addNodeOpToWhitelist(OPERATOR_1);
+
+        // Byzantine add OPERATOR_1 to the whitelist
+        auction.addNodeOpToWhitelist(OPERATOR_1);
+        assertTrue(auction.isWhitelisted(OPERATOR_1));
+
+        // Should revert if Byzantine add a second time OPERATOR_1 to the whitelist
+        vm.expectRevert(bytes("Address already whitelisted"));
+        auction.addNodeOpToWhitelist(OPERATOR_1);
+    }
+
+    function test_RemoveFromWhitelist() external {
+        // Byzantine add OPERATOR_1 to the whitelist
+        auction.addNodeOpToWhitelist(OPERATOR_1);
+
+        // Should revert if Byzantine remove a non-whitelisted address
+        vm.expectRevert(bytes("Address is not whitelisted"));
+        auction.removeNodeOpFromWhitelist(OPERATOR_2);
+
+        // Byzantine remove OPERATOR_1 from the whitelist
+        auction.removeNodeOpFromWhitelist(OPERATOR_1);
+        assertFalse(auction.isWhitelisted(OPERATOR_1));
+    }
+
     function test_OperatorsCorrectlyJoinedAndLeftProtocol() external {
         // Operator_1 joins the protocol
         operatorJoinsProtocol(OPERATOR_1, 5e2, 30);
