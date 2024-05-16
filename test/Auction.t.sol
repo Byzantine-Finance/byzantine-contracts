@@ -13,274 +13,333 @@ contract AuctionTest is Test {
     Auction auction;
     AuctionMock mock;
 
-    address VAULT = makeAddr("vault");
-    uint256 EXPECTED_RETURN = (uint256(32 ether) * 37) / 1000 / 365; //3243835616438356
-    uint112 MAX_DISCOUNT_RATE = 15e2;
-    uint MIN_DURATION = 30;
-    uint256 OPERATOR_BOND = 1 ether;
-
-    address OPERATOR_1 = makeAddr("operator_1");
-    address OPERATOR_2 = makeAddr("operator_2");
-    address OPERATOR_3 = makeAddr("operator_3");
-    address OPERATOR_4 = makeAddr("operator_4");
-    address OPERATOR_5 = makeAddr("operator_5");
-    address OPERATOR_6 = makeAddr("operator_6");
-    address OPERATOR_7 = makeAddr("operator_7");
-    address OPERATOR_8 = makeAddr("operator_8");
-    address OPERATOR_9 = makeAddr("operator_9");
-    address OPERATOR_10 = makeAddr("operator_10");
-    address RANDOM_ADDRESS = makeAddr("random_address");
-    uint256 constant BOND_VALUE = 1 ether;
+    uint256 constant BOND = 1 ether;
     uint256 constant STARTING_BALANCE = 10 ether;
+
+    address ESCROW = makeAddr("escrow");
+    uint256 EXPECTED_DAILY_RETURN = (uint256(32 ether) * 37) / 1000 / 365; //3243835616438356
+    uint256 MAX_DISCOUNT_RATE = 15e2;
+    uint256 MIN_DURATION = 30;
+
+    address[] public nodeOps = [
+        makeAddr("node_operator_0"),
+        makeAddr("node_operator_1"),
+        makeAddr("node_operator_2"),
+        makeAddr("node_operator_3"),
+        makeAddr("node_operator_4"),
+        makeAddr("node_operator_5"),
+        makeAddr("node_operator_6"),
+        makeAddr("node_operator_7"),
+        makeAddr("node_operator_8"),
+        makeAddr("node_operator_9")
+    ];
+    address RANDOM_ADDRESS = makeAddr("random_address");
 
     function setUp() external {
         auction = new Auction(
-            VAULT,
-            EXPECTED_RETURN,
+            ESCROW,
+            EXPECTED_DAILY_RETURN,
             MAX_DISCOUNT_RATE,
-            MIN_DURATION,
-            OPERATOR_BOND
+            MIN_DURATION
         );
 
         mock = new AuctionMock(payable(msg.sender));
 
-        vm.deal(OPERATOR_1, STARTING_BALANCE);
-        vm.deal(OPERATOR_2, STARTING_BALANCE);
-        vm.deal(OPERATOR_3, STARTING_BALANCE);
-        vm.deal(OPERATOR_4, STARTING_BALANCE);
-        vm.deal(OPERATOR_5, STARTING_BALANCE);
-        vm.deal(OPERATOR_6, STARTING_BALANCE);
-        vm.deal(OPERATOR_7, STARTING_BALANCE);
-        vm.deal(OPERATOR_8, STARTING_BALANCE);
-        vm.deal(OPERATOR_9, STARTING_BALANCE);
-        vm.deal(OPERATOR_10, STARTING_BALANCE);
+        for (uint i = 0; i < nodeOps.length; i++) {
+            vm.deal(nodeOps[i], STARTING_BALANCE);
+        }
+
+        // nodeOps[9] is whitelisted
+        auction.addNodeOpToWhitelist(nodeOps[9]);
     }
 
     function test_AddToWhitelist() external {
-        // First, OPERATOR_1 wants to add himself to the whitelist
-        vm.prank(OPERATOR_1);
+        // First, nodeOps[0] wants to add himself to the whitelist
+        vm.prank(nodeOps[0]);
         vm.expectRevert(bytes("Not the owner."));
-        auction.addNodeOpToWhitelist(OPERATOR_1);
+        auction.addNodeOpToWhitelist(nodeOps[0]);
 
-        // Byzantine add OPERATOR_1 to the whitelist
-        auction.addNodeOpToWhitelist(OPERATOR_1);
-        assertTrue(auction.isWhitelisted(OPERATOR_1));
+        // Byzantine adds nodeOps[0] to the whitelist
+        auction.addNodeOpToWhitelist(nodeOps[0]);
+        assertTrue(auction.isWhitelisted(nodeOps[0]));
 
-        // Should revert if Byzantine add a second time OPERATOR_1 to the whitelist
+        // Should revert if Byzantine add a second time nodeOps[0] to the whitelist
         vm.expectRevert(bytes("Address already whitelisted"));
-        auction.addNodeOpToWhitelist(OPERATOR_1);
+        auction.addNodeOpToWhitelist(nodeOps[0]);
     }
 
     function test_RemoveFromWhitelist() external {
-        // Byzantine add OPERATOR_1 to the whitelist
-        auction.addNodeOpToWhitelist(OPERATOR_1);
+        // Byzantine add nodeOps[0] to the whitelist
+        auction.addNodeOpToWhitelist(nodeOps[0]);
 
         // Should revert if Byzantine remove a non-whitelisted address
         vm.expectRevert(bytes("Address is not whitelisted"));
-        auction.removeNodeOpFromWhitelist(OPERATOR_2);
+        auction.removeNodeOpFromWhitelist(nodeOps[1]);
 
-        // Byzantine remove OPERATOR_1 from the whitelist
-        auction.removeNodeOpFromWhitelist(OPERATOR_1);
-        assertFalse(auction.isWhitelisted(OPERATOR_1));
+        // Byzantine removes nodeOps[0] from the whitelist
+        auction.removeNodeOpFromWhitelist(nodeOps[0]);
+        assertFalse(auction.isWhitelisted(nodeOps[0]));
     }
 
-    function test_OperatorsCorrectlyJoinedAndLeftProtocol() external {
-        // Operator_1 joins the protocol
-        operatorJoinsProtocol(OPERATOR_1, 5e2, 30);
-        assertEq(auction.getNumberOfNodeOps(), 1);
+    function testBid_RevertWhen_NodeOpAlreadyInAuction() external {
+        // nodeOps[0] bids (10%, 30 days)
+        _nodeOpBid(nodeOps[0], 10e2, 30);
 
-        // Operator_2 joins the protocol
-        operatorJoinsProtocol(OPERATOR_2, 10e2, 60);
-
-        // Check the balance of the auction contract with two operators joined
-        assertEq(address(auction).balance, 2 ether);
-
-        // Check the list of operators in the protocol
-        address[] memory expectedOperators = new address[](2);
-        expectedOperators[0] = OPERATOR_1;
-        expectedOperators[1] = OPERATOR_2;
-        assertEq(auction.getListOfNodeOps(), expectedOperators);
-
-        // Operator_1 leaves the protocol
-        vm.startPrank(OPERATOR_1);
-        auction.leaveProtocol();
-        // Check the balance of the auction contract
-        assertEq(address(auction).balance, 1 ether);
-        vm.stopPrank();
-
-        // Check number of operators in the protocol
-        assertEq(auction.getNumberOfNodeOps(), 1);
-        // Check if operator is in the protocol
-        assertEq(auction.operatorInProtocol(OPERATOR_1), false);
+        // nodeOps[0] does a second bid (15%, 45 days)
+        uint256 priceToPay = auction.getPriceToPay(nodeOps[0], 15e2, 45);
+        vm.prank(nodeOps[0]);
+        vm.expectRevert(bytes("Already in auction, call updateBid function"));
+        auction.bid{value: priceToPay}(15e2, 45);
     }
 
-    function test_RevertWhen_OperatorJoinsProtocolWithInvalidValues() external {
-        // Operator_1 joins the protocol with lower bond value
-        vm.prank(OPERATOR_1);
-        vm.expectRevert(bytes("Bond value must be 1 ETH."));
-        auction.joinProtocol{value: 0.5 ether}(5e2, 30);
+    function testBid_RevertWhen_WrongBidParameters() external {
+        // nodeOps[0] bids with invalid duration (15%, 10 days)
+        vm.startPrank(nodeOps[0]);
+        vm.expectRevert(bytes("Validating duration too short"));
+        auction.getPriceToPay(nodeOps[0], 15e2, 10);
+        vm.expectRevert(bytes("Validating duration too short"));
+        auction.bid{value: 9 ether}(15e2, 10);
         vm.stopPrank();
 
-        // Operator_1 joins the protocol with invalid discount rate
-        vm.prank(OPERATOR_1);
-        vm.expectRevert(bytes("Discount rate exceeds the maximum."));
-        auction.joinProtocol{value: BOND_VALUE}(16e2, 29);
-        vm.stopPrank();
-
-        // Operator_1 joins the protocol with invalid time duration
-        vm.prank(OPERATOR_1);
-        vm.expectRevert(bytes("Time in days must be >= 30."));
-        auction.joinProtocol{value: BOND_VALUE}(10e2, 29);
+        // nodeOps[1] bids with invalid discount rate (16%, 30 days)
+        vm.startPrank(nodeOps[1]);
+        vm.expectRevert(bytes("Discount rate too high"));
+        auction.getPriceToPay(nodeOps[1], 16e2, 30);
+        vm.expectRevert(bytes("Discount rate too high"));
+        auction.bid{value: 9 ether}(16e2, 30);
         vm.stopPrank();
     }
 
-    function test_RevertWhen_NotMemberOperatorsCallAnyFunction() external {
-        // Operator_1 joins and then leaves the protocol
-        operatorJoinsProtocol(OPERATOR_1, 5e2, 30);
-        leaveProtocol(OPERATOR_1);
-
-        // Left operator tries to update bid without joining the protocol
-        vm.startPrank(OPERATOR_1);
-        vm.expectRevert(bytes("Operator not in protocol."));
-        auction.updateBid(300, 40);
-
-        // Left operator is no longer in the protocol, so cannot call getNodeOpStruct
-        vm.expectRevert();
-        auction.getNodeOpStruct(OPERATOR_1);
-        vm.stopPrank();
-
-        // Operators who are not in the protocol cannot leave the protocol or update bid
-        vm.startPrank(OPERATOR_3);
-        vm.expectRevert();
-        auction.leaveProtocol();
-        vm.expectRevert(bytes("Operator not in protocol."));
-        auction.updateBid(300, 40);
-        vm.stopPrank();
+    function testBid_RevertWhen_NotEnoughEthSent() external {
+        // nodeOps[0] bids (15%, 45 days)
+        uint256 priceToPay = auction.getPriceToPay(nodeOps[0], 15e2, 45);
+        vm.prank(nodeOps[0]);
+        vm.expectRevert(bytes("Not enough ethers sent"));
+        auction.bid{value: (priceToPay - 0.1 ether)}(15e2, 45);
     }
 
-    function test_RevertWhen_AnyAddressExceptByzantineCallsOnlyOwnerFunctions()
-        external
-    {
-        // Operator_1 joins the protocol
-        operatorJoinsProtocol(OPERATOR_1, 5e2, 30);
+    function testBid_RefundTheSkimmingEthers() external {
+        // Verify the initial balance of nodeOps[0]
+        assertEq(nodeOps[0].balance, STARTING_BALANCE);
+        // nodeOps[0] bids (15%, 45 days)
+        uint256 priceToPay = auction.getPriceToPay(nodeOps[0], 15e2, 45);
+        vm.prank(nodeOps[0]);
+        auction.bid{value: (priceToPay + 1 ether)}(15e2, 45);
 
-        vm.startPrank(OPERATOR_1);
-        vm.expectRevert();
-        auction.sortAndGetTopWinners();
-        vm.expectRevert();
-        auction.updateAuctionConfig(0.003 ether, 10e2, 60, 1 ether);
-        vm.expectRevert();
-        auction.updateClusterSize(6);
-        vm.expectRevert();
-        auction.sendFundsToByzantine();
-        vm.expectRevert();
-        auction.operatorInProtocol(OPERATOR_1);
-        vm.expectRevert();
-        auction.getNumberOfNodeOps();
-        vm.expectRevert();
-        auction.getListOfNodeOps();
-        vm.stopPrank();
+        // Verify the balance of nodeOps[0]
+        assertEq(nodeOps[0].balance, STARTING_BALANCE - priceToPay);
+        // Verify the balance of the auction contract
+        assertEq(address(auction).balance, priceToPay);
     }
 
-    function test_UpdateAuctionConfigWorksCorrectly() external {
+    function testBid_AuctionScoreMapping() external {
+        // nodeOps[0] bids (10%, 30 days)
+        _nodeOpBid(nodeOps[0], 10e2, 30);
+        (,,uint256 auctionScore_0,,) = auction.getNodeOpDetails(nodeOps[0]);
+        address[] memory auctionScoreToNodeOps = auction.getAuctionScoreToNodeOps(auctionScore_0);
+        assertEq(auctionScoreToNodeOps.length, 1);
+        assertEq(auctionScoreToNodeOps[0], nodeOps[0]);
+
+        // nodeOps[1] has the same bid (10%, 30 days)
+        _nodeOpBid(nodeOps[1], 10e2, 30);
+        (,,uint256 auctionScore_1,,) = auction.getNodeOpDetails(nodeOps[1]);
+        auctionScoreToNodeOps = auction.getAuctionScoreToNodeOps(auctionScore_1);
+        assertEq(auctionScoreToNodeOps.length, 2);
+        assertEq(auctionScoreToNodeOps[0], nodeOps[0]);
+        assertEq(auctionScoreToNodeOps[1], nodeOps[1]);
+    }
+
+    function testUpdateBid_RevertWhen_NodeOpNotInAuction() external {
+        // nodeOps[0] updates its bid but hasn't bid
+        vm.expectRevert(bytes("Not in auction, call bid function"));
+        auction.updateBid{value: 8 ether}(15e2, 45);
+    }
+
+    function testUpdateBid_Outbid_RevertWhen_NotEnoughEthSent() external {
+        // nodeOps[9] bids (15%, 30 days)
+        _nodeOpBid(nodeOps[9], 15e2, 30);
+
+        // nodeOps[9] updates its bid (5%, 3 days)
+        uint256 amountToAdd = auction.getUpdateBidPrice(nodeOps[9], 5e2, 30);
+        vm.prank(nodeOps[9]);
+        vm.expectRevert(bytes("Not enough ethers sent to outbid"));
+        auction.updateBid{value: (amountToAdd - 0.001 ether)}(5e2, 30);
+    }
+
+    function testUpdateBid_Outbid_RefundTheSkimmingEthers() external {
+        // Verify the initial balance of nodeOps[9]
+        assertEq(nodeOps[9].balance, STARTING_BALANCE);
+
+        // nodeOps[9] bids (5%, 30 days)
+        uint256 bidPrice = auction.getPriceToPay(nodeOps[9], 5e2, 30);
+        _nodeOpBid(nodeOps[9], 5e2, 30);
+
+        // Verify the balance of nodeOps[9] after bidding
+        assertEq(nodeOps[9].balance, STARTING_BALANCE - bidPrice);
+        // Verify the balance of auction contract after nodeOps[9] bid
+        assertEq(address(auction).balance, bidPrice);
+
+        // nodeOps[9] updates its bid (14%, 3 days)
+        uint256 amountToAdd = auction.getUpdateBidPrice(nodeOps[9], 14e2, 45);
+        vm.prank(nodeOps[9]);
+        auction.updateBid{value: (amountToAdd + 2 ether)}(14e2, 45);
+
+        // Verify the balance of nodeOps[9] after updating its bid
+        assertEq(nodeOps[9].balance, STARTING_BALANCE - (bidPrice + amountToAdd));
+        // Verify the balance of auction contract after nodeOps[9] updates its bid
+        assertEq(address(auction).balance, bidPrice + amountToAdd);
+    }
+
+    function testUpdateBid_DecreaseBid() external {
+        // TODO: Wait for Escrow contract to refund the bidder
+    }
+
+    function testUpdateBid_AuctionScoreMapping() external {
+        // nodeOps[9] bids (5%, 90 days)
+        _nodeOpBid(nodeOps[9], 5e2, 90);
+        (,,uint256 FirstAuctionScore,,) = auction.getNodeOpDetails(nodeOps[9]);
+
+        // nodeOps[8] has the same bid (5%, 90 days)
+        _nodeOpBid(nodeOps[8], 5e2, 90);
+
+        // nodeOps[9] updates its bid (14%, 90 days)
+        _nodeOpUpdateBid(nodeOps[9], 14e2, 90);
+        (,,uint256 SecondAuctionScore,,) = auction.getNodeOpDetails(nodeOps[9]);
+
+        // Verify if nodeOps[9] has been removed from FirstAuctionScore
+        address[] memory auctionScore1ToNodeOps = auction.getAuctionScoreToNodeOps(FirstAuctionScore);
+        assertEq(auctionScore1ToNodeOps.length, 1);
+        assertEq(auctionScore1ToNodeOps[0], nodeOps[8]);
+
+        // Verify if nodeOps[9] has been added to the SecondAuctionScore
+        address[] memory auctionScore2ToNodeOps = auction.getAuctionScoreToNodeOps(SecondAuctionScore);
+        assertEq(auctionScore2ToNodeOps.length, 1);
+        assertEq(auctionScore2ToNodeOps[0], nodeOps[9]);
+
+        // nodeOps[8] also updates its bid (14%, 90 days)
+        _nodeOpUpdateBid(nodeOps[8], 14e2, 90);
+
+        // Verify if FirstAuctionScore doesn't have any nodeOps
+        auctionScore1ToNodeOps = auction.getAuctionScoreToNodeOps(FirstAuctionScore);
+        assertEq(auctionScore1ToNodeOps.length, 0);
+
+        // Verify if nodeOps[8] has been added to the SecondAuctionScore
+        auctionScore2ToNodeOps = auction.getAuctionScoreToNodeOps(SecondAuctionScore);
+        assertEq(auctionScore2ToNodeOps.length, 2);
+        assertEq(auctionScore2ToNodeOps[0], nodeOps[9]);
+        assertEq(auctionScore2ToNodeOps[1], nodeOps[8]);
+    }
+
+    function testUpdateBid_NodeOpStruct() external {
+        // nodeOps[9] bids (5%, 90 days)
+        _nodeOpBid(nodeOps[9], 5e2, 90);
+
+        // nodeOps[9] updates its bid (10%, 60 days)
+        _nodeOpUpdateBid(nodeOps[9], 10e2, 60);
         (
-            uint256 _expectedReturnWei,
+            uint256 vcNumber_9,
+            uint256 bidPrice_9,
+            uint256 auctionScore_9,
+            uint256 reputationScore_9,
+            Auction.NodeOpStatus opStatus_9
+        ) = auction.getNodeOpDetails(nodeOps[9]);
+
+        // Check if the value of vcNumber for nodeOps[9] is correct
+        assertEq(vcNumber_9, 60);
+        // Check if the value of bidPrice for nodeOps[9] is calculated correctly
+        assertEq(bidPrice_9, 43791780821917800);
+        // Check if the value of auctionScore for nodeOps[9] is calculated correctly
+        assertEq(auctionScore_9, 774971987896852);
+        assertEq(reputationScore_9, 1);
+        assertEq(uint(opStatus_9), 1);
+
+
+    }
+
+    function test_UpdateAuctionConfig() external {
+        (
+            uint256 _expectedDailyReturnWei,
             uint256 _maxDiscountRate,
             uint256 _minDuration,
-            uint256 _operatorBond,
             uint256 _clusterSize
         ) = auction.getAuctionConfigValues();
 
         // Check if the initial values are correct
-        assertEq(_expectedReturnWei, EXPECTED_RETURN);
+        assertEq(_expectedDailyReturnWei, EXPECTED_DAILY_RETURN);
         assertEq(_maxDiscountRate, MAX_DISCOUNT_RATE);
         assertEq(_minDuration, MIN_DURATION);
-        assertEq(_operatorBond, BOND_VALUE);
         assertEq(_clusterSize, 4);
 
         // Update auction configuration
-        auction.updateAuctionConfig(0.003 ether, 10e2, 60, 1.5 ether);
+        uint256 newExpectedDailyReturnWei = 0.0003 ether;
+        uint256 newMaxDiscountRate = 10e2;
+        uint256 newMinDuration = 60;
+        auction.updateAuctionConfig(newExpectedDailyReturnWei, newMaxDiscountRate, newMinDuration);
 
-        // After update
         (
-            uint256 _newExpectedReturnWei,
+            uint256 _newExpectedDailyReturnWei,
             uint256 _newMaxDiscountRate,
             uint256 _newMinDuration,
-            uint256 _newOperatorBond,
             uint256 _newClusterSize
         ) = auction.getAuctionConfigValues();
 
         // Check if the auction configuration is updated correctly
-        assertEq(_newExpectedReturnWei, 0.003 ether);
-        assertEq(_newMaxDiscountRate, 10e2);
-        assertEq(_newMinDuration, 60);
-        assertEq(_newOperatorBond, 1.5 ether);
+        assertEq(_newExpectedDailyReturnWei, newExpectedDailyReturnWei);
+        assertEq(_newMaxDiscountRate, newMaxDiscountRate);
+        assertEq(_newMinDuration, newMinDuration);
         assertEq(_newClusterSize, 4);
     }
 
-    function test_OperatorUpdatesBidCorrectly() external {
-        // Operator_1 joins the protocol
-        operatorJoinsProtocol(OPERATOR_1, 5e2, 30);
+    function test_updateClusterSize() external {
+        // Update cluster size to 7
+        auction.updateClusterSize(7);
 
-        // Update bid for Operator_1
-        vm.startPrank(OPERATOR_1);
-        auction.updateBid(14e2, 365);
-
-        // Check if the bid is updated correctly
-        (
-            uint256 bidPrice,
-            uint256 auctionScore,
-            uint256 reputationScore,
-            Auction.NodeOpStatus opStatus
-        ) = auction.getNodeOpStruct(OPERATOR_1);
-
-        assertEq(bidPrice, 254559999999999790);
-        assertEq(auctionScore, 1004466779031871);
-        assertEq(reputationScore, 1);
-        assertEq(uint(opStatus), 0);
-
-        vm.stopPrank();
+        (,,,uint256 _newClusterSize) = auction.getAuctionConfigValues();
+        assertEq(_newClusterSize, 7);
     }
 
-    function test_CalculationsWorkCorrectly() external {
-        // Operator_2 joins the protocol with discountRate = 5% and timeInDays = 30
-        operatorJoinsProtocol(OPERATOR_1, 5e2, 30);
-        assertEq(auction.getNumberOfNodeOps(), 1);
-
+    function test_AuctionCalculations_And_NodeOpDetails() external {
+        // nodeOps[0] bid with discountRate = 5% and timeInDays = 30
+        _nodeOpBid(nodeOps[0], 5e2, 30);
         (
+            uint256 vcNumber_0,
+            uint256 bidPrice_0,
+            uint256 auctionScore_0,
+            uint256 reputationScore_0,
+            Auction.NodeOpStatus opStatus_0
+        ) = auction.getNodeOpDetails(nodeOps[0]);
+
+        // Check if the value of vcNumber for nodeOps[0] is correct
+        assertEq(vcNumber_0, 30);
+        // Check if the value of bidPrice for nodeOps[0] is calculated correctly
+        assertEq(bidPrice_0, 23112328767123270);
+        // Check if the value of auctionScore for nodeOps[0] is calculated correctly
+        assertEq(auctionScore_0, 793861565530208);
+        // Check other values in the node op Struct
+        assertEq(reputationScore_0, 1);
+        assertEq(uint(opStatus_0), 1);
+
+        // nodeOps[1] bid with discountRate = 10% and timeInDays = 60
+        _nodeOpBid(nodeOps[1], 10e2, 60);
+        (
+            uint256 vcNumber_1,
             uint256 bidPrice_1,
             uint256 auctionScore_1,
             uint256 reputationScore_1,
             Auction.NodeOpStatus opStatus_1
-        ) = auction.getNodeOpStruct(OPERATOR_1);
+        ) = auction.getNodeOpDetails(nodeOps[1]);
 
-        // Check if the value of bidPrice for Operator_1 is calculated correctly
-        assertEq(bidPrice_1, 23112328767123270);
-        // Check if the value of auctionScore for Operator_1 is calculated correctly
-        assertEq(auctionScore_1, 793861565530208);
-        // Check other values in the operatorStruct
+        // Check if the value of vcNumber for nodeOps[1] is correct
+        assertEq(vcNumber_1, 60);
+        // Check if the value of bidPrice for nodeOps[1] is calculated correctly
+        assertEq(bidPrice_1, 43791780821917800);
+        // Check if the value of auctionScore for nodeOps[1] is calculated correctly
+        assertEq(auctionScore_1, 774971987896852);
         assertEq(reputationScore_1, 1);
-        assertEq(uint(opStatus_1), 0);
-
-        // Operator_2 joins the protocol with discountRate = 10% and timeInDays = 60
-        operatorJoinsProtocol(OPERATOR_2, 10e2, 60);
-        assertEq(auction.getNumberOfNodeOps(), 2);
-        (
-            uint256 bidPrice_2,
-            uint256 auctionScore_2,
-            uint256 reputationScore_2,
-            Auction.NodeOpStatus opStatus_2
-        ) = auction.getNodeOpStruct(OPERATOR_2);
-
-        // Check if the value of bidPrice for Operator_2 is calculated correctly
-        assertEq(bidPrice_2, 43791780821917800);
-        // Check if the value of auctionScore for Operator_2 is calculated correctly
-        assertEq(auctionScore_2, 774971987896852);
-        assertEq(reputationScore_2, 1);
-        assertEq(uint(opStatus_2), 0);
+        assertEq(uint(opStatus_1), 1);
     }
 
-    function test_TopFourWinnersAreSelectedIfClusterSizeIsFour() external {
+    /*function test_TopFourWinnersAreSelectedIfClusterSizeIsFour() external {
         // Supposing that 10 operators have joined the protocol
         letTenOperatorsJoinProtocol();
 
@@ -294,9 +353,9 @@ contract AuctionTest is Test {
         assertEq(topWinners[1], OPERATOR_7);
         assertEq(topWinners[2], OPERATOR_5);
         assertEq(topWinners[3], OPERATOR_10);
-    }
+    }*/
 
-    function test_TopSevenWinnersAreSelectedIfClusterSizeIsSeven() external {
+    /*function test_TopSevenWinnersAreSelectedIfClusterSizeIsSeven() external {
         // Update cluster size to 7
         auction.updateClusterSize(7);
 
@@ -316,9 +375,9 @@ contract AuctionTest is Test {
         assertEq(topWinners[4], OPERATOR_5);
         assertEq(topWinners[5], OPERATOR_10);
         assertEq(topWinners[6], OPERATOR_7);
-    }
+    }*/
 
-    function test_OnlyOperatorsWithInProtocolStatusAreSubjectToAuctionSort()
+    /*function test_OnlyOperatorsWithInProtocolStatusAreSubjectToAuctionSort()
         external
     {
         // Supposing that 10 operators have joined the protocol
@@ -338,9 +397,9 @@ contract AuctionTest is Test {
         assertEq(topWinners[1], OPERATOR_9);
         assertEq(topWinners[2], OPERATOR_6);
         assertEq(topWinners[3], OPERATOR_4);
-    }
+    }*/
 
-    function test_RevertWhen_NumberOfOperatorsIsLessThanClusterSize() external {
+    /*function test_RevertWhen_NumberOfOperatorsIsLessThanClusterSize() external {
         // Update cluster size to 11
         auction.updateClusterSize(11);
 
@@ -350,9 +409,9 @@ contract AuctionTest is Test {
         // Sort and get top winners
         vm.expectRevert(bytes("No enough operators for the cluser."));
         auction.sortAndGetTopWinners();
-    }
+    }*/
 
-    function test_WinnerOperatorCanAcceptAndPayBid() external {
+    /*function test_WinnerOperatorCanAcceptAndPayBid() external {
         // Supposing that 10 operators have joined the protocol
         letTenOperatorsJoinProtocol();
         // Sort and get top winners
@@ -365,7 +424,9 @@ contract AuctionTest is Test {
 
         // OPERATOR_5 accepts and pays the bid
         vm.prank(OPERATOR_5);
+        console.log(OPERATOR_5.balance);
         auction.acceptAndPayBid();
+        console.log(OPERATOR_5.balance);
         // Operator_5 status should be updated to 2, pendingForDvt
         assertEq(uint(getOperatorStatus(OPERATOR_5)), 2);
         // Calculate the bid price for OPERATOR_5
@@ -382,33 +443,33 @@ contract AuctionTest is Test {
 
         // Check the balance of the vault
         assertEq(address(VAULT).balance, bidPrice_5 + bidPrice_10);
-    }
-
-    function test_SendFundsFromVaultToByzantine() external {
-        // Use AuctionMock to simulate the scenario where funds are sent to Byzantine
-        vm.deal(address(mock), 10 ether);
-        assertEq(address(mock).balance, 10 ether);
-
-        vm.prank(msg.sender);
-        // Test the sendFundsToByzantine function in Auction contract
-        mock.sendFundsToByzantine();
-
-        // After sending funds to Byzantine
-        assertEq(address(mock).balance, 0);
-    }
+    }*/
 
     /* ===================== HELPER FUNCTIONS ===================== */
 
-    function operatorJoinsProtocol(
-        address operator,
+    function _nodeOpBid(
+        address _nodeOp,
         uint256 _discountRate,
         uint256 _timeInDays
     ) internal {
-        vm.prank(operator);
-        auction.joinProtocol{value: BOND_VALUE}(_discountRate, _timeInDays);
+        // Get price to pay
+        uint256 priceToPay = auction.getPriceToPay(_nodeOp, _discountRate, _timeInDays);
+        vm.prank(_nodeOp);
+        auction.bid{value: priceToPay}(_discountRate, _timeInDays);
     }
 
-    function leaveProtocol(address operator) internal {
+    function _nodeOpUpdateBid(
+        address _nodeOp,
+        uint256 _newDiscountRate,
+        uint256 _newTimeInDays
+    ) internal {
+        // Get price to pay
+        uint256 priceToAdd = auction.getUpdateBidPrice(_nodeOp, _newDiscountRate, _newTimeInDays);
+        vm.prank(_nodeOp);
+        auction.updateBid{value: priceToAdd}(_newDiscountRate, _newTimeInDays);
+    }
+
+    /*function leaveProtocol(address operator) internal {
         vm.prank(operator);
         auction.leaveProtocol();
     }
@@ -509,5 +570,5 @@ contract AuctionTest is Test {
             "Operator_10 auction score: ",
             getAuctionScoreOfTheOperator(OPERATOR_10)
         );
-    }
+    }*/
 }

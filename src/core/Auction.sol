@@ -3,53 +3,66 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "ds-math/math.sol";
+
 import "../libraries/ProcessDataLib.sol";
+import "../libraries/BokkyPooBahsRedBlackTreeLibrary.sol";
 
 /// TODO: Calculation of the reputation score of node operators
-/// TODO: Create a whitelist to avoid our partner to pay the bond
 /// TODO: Create escrow contract to pay directly the bid
-/// TODO: Sort the array off-chain, verify on-chain (or use ChainLink Functions)
 
 contract Auction is ReentrancyGuard, DSMath {
     using ProcessDataLib for ProcessDataLib.Set;
+    using BokkyPooBahsRedBlackTreeLibrary for BokkyPooBahsRedBlackTreeLibrary.Tree;
+
+    /* ================= CONSTANTS + IMMUTABLES ================= */
+
+    uint256 private constant _WAD = 1e18;
+    uint256 private constant _BOND = 1 ether;
 
     /* ===================== STATE VARIABLES ===================== */
 
-    /// @notice Keep state variables private for better gas efficiency
-    ProcessDataLib.Set private _nodeOpSet;
+    /// @notice Auction scores stored in a Red-Black tree (complexity O(log n))
+    BokkyPooBahsRedBlackTreeLibrary.Tree private _auctionTree;
 
-    uint256 private constant _WAD = 1e18;
-    uint256 private _expectedReturnWei;
+    /// @notice Daily rewards of Ethereum Pos (in WEI)
+    uint256 private _expectedDailyReturnWei;
+    /// @notice Minimum duration to be part of a DV (in days)
     uint256 private _minDuration;
-    /// @notice Maximum discount rate in percentage, upscaled to 1e2 (15% => 1500)
+    /// @notice Maximum discount rate (i.e the max profit margin of node op) in percentage (from 0 to 10000 -> 100%)
     uint256 private _maxDiscountRate;
+    /// @notice Number of nodes in a Distributed Validator
     uint256 private _clusterSize = 4;
-    uint256 private _nodeOpBond;
 
-    address payable public vault;
+    /// @notice Escrow contract address where the bids and the bonds are sent and stored
+    address payable public escrowAddr;
+    /// @notice Smart contract admin
     address public byzantineFinance;
 
+    /// @notice Node operator address => node operator auction details
+    mapping(address => NodeOpDetails) private _nodeOpsInfo;
+
+    /// @notice Auction score => node operator array (different node ops can have the same auction score)
+    mapping(uint256 => ProcessDataLib.Set) private _auctionScoreToNodeOps;
+
+    /// @notice Mapping for the whitelisted node operators
+    mapping(address => bool) private _nodeOpsWhitelist;
+
+    /* ===================== TO PUT IN CONTRACT INTERFACE ===================== */
+
     enum NodeOpStatus {
-        inProtocol, // bid set, seeking for work
-        auctionWinner, // winner of an auction but bid price not paid yet
-        pendingForDvt, // bid price paid and awaiting DVT
-        activeInDvt // active in DVT
+        inactive, // has left the auction or has finished his work
+        inAuction, // bid set, seeking for work
+        inDV // auction won. We assume he has accepted to join the DV
     }
 
-    /// @notice Stores detail of node operators in the protocol
-    struct NodeOpStruct {
+    /// @notice Stores auction details of node operators
+    struct NodeOpDetails {
+        uint256 vcNumber;
         uint256 bidPrice;
         uint256 auctionScore;
         uint256 reputationScore;
         NodeOpStatus nodeStatus;
     }
-    /// @notice Node operator address => node operator struct
-    mapping(address => NodeOpStruct) private _nodeOpStructs;
-
-    /// @notice Mapping for the whitelisted node operators
-    mapping(address => bool) private _nodeOpsWhitelist;
-
-    /* ===================== EVENTS ===================== */
 
     event NodeOpJoined(address nodeOpAddress);
     event NodeOpLeft(address nodeOpAddress);
@@ -60,10 +73,9 @@ contract Auction is ReentrancyGuard, DSMath {
         uint256 reputationScore
     );
     event AuctionConfigUpdated(
-        uint256 _expectedReturnWei,
+        uint256 _expectedDailyReturnWei,
         uint256 _maxDiscountRate,
-        uint256 _minDuration,
-        uint256 _nodeOpBond
+        uint256 _minDuration
     );
     event ClusterSizeUpdated(uint256 _clusterSize);
     event TopWinners(address[] winners);
@@ -73,18 +85,16 @@ contract Auction is ReentrancyGuard, DSMath {
     /* ===================== CONSTRUCTOR ===================== */
 
     constructor(
-        address _vault,
-        uint256 __expectedReturnWei,
+        address _escrowAddr,
+        uint256 __expectedDailyReturnWei,
         uint256 __maxDiscountRate,
-        uint256 __minDuration,
-        uint256 __nodeOpBond
+        uint256 __minDuration
     ) {
         byzantineFinance = msg.sender;
-        vault = payable(_vault);
-        _expectedReturnWei = __expectedReturnWei;
+        escrowAddr = payable(_escrowAddr);
+        _expectedDailyReturnWei = __expectedDailyReturnWei;
         _maxDiscountRate = __maxDiscountRate;
         _minDuration = __minDuration;
-        _nodeOpBond = __nodeOpBond;
     }
 
     /* ===================== EXTERNAL FUNCTIONS ===================== */
@@ -122,7 +132,7 @@ contract Auction is ReentrancyGuard, DSMath {
         nonReentrant
         returns (address[] memory)
     {
-        address[] memory _nodeOpArray = _nodeOpSet.addrList;
+        /*address[] memory _nodeOpArray = _nodeOpSet.addrList;
 
         // BUG: Should compare the length of node op with the status inProtocol
         require(
@@ -186,90 +196,202 @@ contract Auction is ReentrancyGuard, DSMath {
         }
         emit TopWinners(topWinners);
 
-        return topWinners;
+        return topWinners;*/
     }
 
     /**
-     * @notice Function triggered by the winner operator to accept the bid and pay the bid price.
-     * It updates the operator status to pendingForDvt.
-     * @dev The operator must be in the top winners to call this function.
-     */
-    function acceptAndPayBid() external {
-        NodeOpStruct storage nodeOp = _nodeOpStructs[msg.sender];
-        require(
-            nodeOp.nodeStatus == NodeOpStatus.auctionWinner,
-            "Operator not in the top winners."
-        );
-
-        uint256 bidPrice = nodeOp.bidPrice;
-        _sendFunds(vault, bidPrice);
-
-        nodeOp.nodeStatus = NodeOpStatus.pendingForDvt;
-
-        emit BidPaid(msg.sender, bidPrice);
-    }
-
-    /**
-     * @notice Update the auction configuration except cluster size
-     */
-    function updateAuctionConfig(
-        uint256 __expectedReturnWei,
-        uint256 __maxDiscountRate,
-        uint256 __minDuration,
-        uint256 __nodeOpBond
-    ) external onlyOwner {
-        _expectedReturnWei = __expectedReturnWei;
-        _maxDiscountRate = __maxDiscountRate;
-        _minDuration = __minDuration;
-        _nodeOpBond = __nodeOpBond;
-
-        emit AuctionConfigUpdated(
-            __expectedReturnWei,
-            __maxDiscountRate,
-            __minDuration,
-            __nodeOpBond
-        );
-    }
-
-    /**
-     * @notice Update the cluster size
-     */
-    function updateClusterSize(uint256 __clusterSize) external onlyOwner {
-        require(__clusterSize >= 4, "Cluster size must be at least 4.");
-        _clusterSize = __clusterSize;
-
-        emit ClusterSizeUpdated(__clusterSize);
-    }
-
-    /**
-     * @notice Operator joins the protocol by paying the bond and setting the bid parameters.
-     * @param _discountRate: discount rate set by the node operator in percentage (from 0 to 10000 -> 100%)
+     * @notice Fonction to determine the auction price for a validator according to its bid parameters
+     * @param _nodeOpAddr: address of the node operator joining the auction
+     * @param _discountRate: discount rate (i.e the desired profit margin) in percentage (scale from 0 to 10000)
      * @param _timeInDays: duration of being a validator, in days
-     * @dev Auction score and bid price are stored in NodeOpStruct
+     * @dev Revert if `_discountRate` or `_timeInDays` don't respect the values set by the byzantine.
      */
-    function joinProtocol(
+    function getPriceToPay(
+        address _nodeOpAddr,
         uint256 _discountRate,
         uint256 _timeInDays
-    ) external payable {
-        require(msg.value == _nodeOpBond, "Bond value must be 1 ETH.");
-        _nodeOpSet.insert(msg.sender);
-        NodeOpStruct storage nodeOp = _nodeOpStructs[msg.sender];
-        nodeOp.reputationScore = 1;
+    ) public view returns (uint256) {
+        // Verify the standing bid parameters
+        require(_discountRate <= _maxDiscountRate, "Discount rate too high");
+        require(_timeInDays >= _minDuration, "Validating duration too short");
+
+        /// @notice Calculate operator's bid price
+        uint256 dailyVcPrice = _calculateDailyVcPrice(_discountRate);
+        uint256 bidPrice = _calculateBidPrice(_timeInDays, dailyVcPrice);
+
+        // Return the price to pay according to the whitelist
+        if (isWhitelisted(_nodeOpAddr)) {
+            return bidPrice;
+        }
+        return bidPrice + _BOND;
+    }
+
+    /**
+     * @notice Operators set their standing bid parameters and pay their bid to an escrow smart contract.
+     * If a node op doesn't win the auction, its bid stays in the escrow contract for the next auction.
+     * An node op who hasn't won an auction can ask the escrow contract to refund its bid if he wants to leave the protocol.
+     * If a node op wants to update its bid parameters, call `updateBid` function.
+     * @notice Non-whitelisted operators will have to pay the 1ETH bond as well.
+     * @param _discountRate: discount rate (i.e the desired profit margin) in percentage (scale from 0 to 10000)
+     * @param _timeInDays: duration of being a validator, in days
+     * @dev By calling this function, the node op insert a data in the auction Binary Search Tree (sorted by auction score).
+     * @dev Revert if the node op is already in auction. Call `updateBid` instead.
+     * @dev Revert if `_discountRate` or `_timeInDays` don't respect the values set by the byzantine.
+     * @dev Revert if the ethers sent by the node op are not enough to pay for the bid (and the bond).
+     * @dev If too many ethers has been sent the function give back the excess to the sender.
+     */
+    function bid(
+        uint256 _discountRate,
+        uint256 _timeInDays
+    ) external payable nonReentrant {
+        // Verify if the sender is not already in auction
+        require(_nodeOpsInfo[msg.sender].nodeStatus != NodeOpStatus.inAuction, "Already in auction, call updateBid function");
+
+        // Verify the standing bid parameters
+        require(_discountRate <= _maxDiscountRate, "Discount rate too high");
+        require(_timeInDays >= _minDuration, "Validating duration too short");
+
+        /// TODO: Get the reputation score of msg.sender
+        uint256 reputationScore = 1;
 
         /// @notice Calculate operator's bid price and auction score
         uint256 dailyVcPrice = _calculateDailyVcPrice(_discountRate);
         uint256 bidPrice = _calculateBidPrice(_timeInDays, dailyVcPrice);
-        uint256 auctionScore = _calculateAuctionScore(
-            dailyVcPrice,
-            _timeInDays,
-            nodeOp.reputationScore
-        );
+        uint256 auctionScore = _calculateAuctionScore(dailyVcPrice, _timeInDays, reputationScore);
 
-        nodeOp.bidPrice = bidPrice;
-        nodeOp.auctionScore = auctionScore;
-        nodeOp.nodeStatus = NodeOpStatus.inProtocol;
+        uint256 priceToPay;
+        // If msg.sender is whitelisted, he only pays the bid
+        if (isWhitelisted(msg.sender)) {
+            priceToPay = bidPrice;
+        } else {
+            priceToPay = bidPrice + _BOND;
+        }
 
-        emit NodeOpJoined(msg.sender);
+        // Verify if the sender has sent enough ethers
+        require(msg.value >= priceToPay, "Not enough ethers sent");
+
+        // If to many ethers has been sent, refund the sender
+        uint256 amountToRefund = msg.value - priceToPay;
+        if (amountToRefund > 0) {
+            payable(msg.sender).transfer(amountToRefund);
+        }
+
+        // TODO: transfer the ethers in the escrow contract
+
+        // Verify if auctionScore is not already in the tree
+        if (!_auctionTree.exists(auctionScore)) {
+            _auctionTree.insert(auctionScore);
+        }
+
+        // Insert the nodeOp in the auctionScore mapping
+        _auctionScoreToNodeOps[auctionScore].insert(msg.sender);
+
+        // Fill or update the nodeOpDetails
+        _nodeOpsInfo[msg.sender] = NodeOpDetails({
+            vcNumber: _timeInDays,
+            bidPrice: bidPrice,
+            auctionScore: auctionScore,
+            reputationScore: reputationScore,
+            nodeStatus: NodeOpStatus.inAuction
+        });
+    }
+
+    /**
+     * @notice Fonction to determine the price to add in the protocol if the node operator outbids. Returns 0 if he decrease its bid.
+     * @param _nodeOpAddr: address of the node operator updating its bid
+     * @param _discountRate: discount rate (i.e the desired profit margin) in percentage (scale from 0 to 10000)
+     * @param _timeInDays: duration of being a validator, in days
+     * @dev Revert if `_discountRate` or `_timeInDays` don't respect the values set by the byzantine.
+     */
+    function getUpdateBidPrice(
+        address _nodeOpAddr,
+        uint256 _discountRate,
+        uint256 _timeInDays
+    ) public view returns (uint256) {
+        // Verify the standing bid parameters
+        require(_discountRate <= _maxDiscountRate, "Discount rate too high");
+        require(_timeInDays >= _minDuration, "Validating duration too short");
+
+        // Get what the node op has already paid
+        uint256 previousBidPrice = _nodeOpsInfo[_nodeOpAddr].bidPrice;
+
+        /// @notice Calculate operator's new bid price
+        uint256 newDailyVcPrice = _calculateDailyVcPrice(_discountRate);
+        uint256 newBidPrice = _calculateBidPrice(_timeInDays, newDailyVcPrice);
+
+        if (newBidPrice > previousBidPrice) {
+            return newBidPrice - previousBidPrice;
+        }
+        return 0;
+    }
+
+    /**
+     * @notice Update the bid of a node operator. A same address cannot have several bids, so the node op
+     * will have to pay more if he outbids. If he decreases his bid, the escrow contract will send him the difference.
+     * @param _newDiscountRate: new discount rate (i.e the desired profit margin) in percentage (scale from 0 to 10000)
+     * @param _newTimeInDays: new duration of being a validator, in days
+     * @dev To call that function, the node op has to be inAuction.
+     * @dev Revert if `_discountRate` or `_timeInDays` don't respect the values set by the byzantine.
+     */
+    function updateBid(
+        uint256 _newDiscountRate,
+        uint256 _newTimeInDays
+    ) external payable nonReentrant {
+        // Verify if the sender is in the auction
+        require(_nodeOpsInfo[msg.sender].nodeStatus == NodeOpStatus.inAuction, "Not in auction, call bid function");
+
+        // Verify the standing bid parameters
+        require(_newDiscountRate <= _maxDiscountRate, "Discount rate too high");
+        require(_newTimeInDays >= _minDuration, "Validating duration too short");
+
+        // Get the previous bid price and auction score of msg.sender
+        (,uint256 previousBidPrice,uint256 previousAuctionScore,,) = getNodeOpDetails(msg.sender);
+
+        /// TODO: Get the reputation score of msg.sender
+        uint256 reputationScore = 1;
+
+        /// @notice Calculate operator's new bid price and new auction score
+        uint256 newDailyVcPrice = _calculateDailyVcPrice(_newDiscountRate);
+        uint256 newBidPrice = _calculateBidPrice(_newTimeInDays, newDailyVcPrice);
+        uint256 newAuctionScore = _calculateAuctionScore(newDailyVcPrice, _newTimeInDays, reputationScore);
+
+        if (newBidPrice > previousBidPrice) {
+            // TODO: gas optimization with unchecked
+            uint256 ethersToAdd = newBidPrice - previousBidPrice;
+            // Verify if the sender has sent the difference
+            require(msg.value >= ethersToAdd, "Not enough ethers sent to outbid");
+            // If to many ethers has been sent, refund the sender
+            uint256 amountToRefund = msg.value - ethersToAdd;
+            if (amountToRefund > 0) {
+                payable(msg.sender).transfer(amountToRefund);
+            }
+            // TODO: transfer the ethers in the escrow contract
+        } else {
+            // TODO: gas optimization with unchecked
+            uint256 ethersToSendBack = previousBidPrice - newBidPrice;
+            // TODO: Ask the escrow to send back the ethers
+        }
+
+        // If msg.sender is the only one with that Auction score, remove it from the tree and the mapping
+        if (_auctionScoreToNodeOps[previousAuctionScore].count() == 1) {
+            _auctionTree.remove(previousAuctionScore);
+            delete _auctionScoreToNodeOps[previousAuctionScore];
+        } else {
+            // remove node op from the auction score mapping
+            _auctionScoreToNodeOps[previousAuctionScore].remove(msg.sender);
+        }
+
+        // Add node op to new auction score mapping
+        _auctionScoreToNodeOps[newAuctionScore].insert(msg.sender);
+
+        // Update the nodeOpDetails
+        _nodeOpsInfo[msg.sender] = NodeOpDetails({
+            vcNumber: _newTimeInDays,
+            bidPrice: newBidPrice,
+            auctionScore: newAuctionScore,
+            reputationScore: reputationScore,
+            nodeStatus: NodeOpStatus.inAuction
+        });
     }
 
     /**
@@ -277,7 +399,8 @@ contract Auction is ReentrancyGuard, DSMath {
      * @dev Operator must not be pending for or active in a DVT.
      */
     function leaveProtocol() external {
-        NodeOpStatus status = _nodeOpStructs[msg.sender].nodeStatus;
+        // UPdtate struct auctionScore at 0 and status
+        /*NodeOpStatus status = _nodeOpsInfo[msg.sender].nodeStatus;
         require(_nodeOpSet.exists(msg.sender), "Operator not in protocol.");
         require(
             status != NodeOpStatus.pendingForDvt ||
@@ -285,43 +408,35 @@ contract Auction is ReentrancyGuard, DSMath {
             "Operator pending for or active in a DVT cannot leave."
         );
         _nodeOpSet.remove(msg.sender);
-        _sendFunds(msg.sender, _nodeOpBond);
+        _sendFunds(msg.sender, _BOND);
 
         emit NodeOpLeft(msg.sender);
+        */
     }
 
     /**
-     * @notice Update the bid of an operator.
-     * @param _discountRate: discount rate set by the node operator in percentage, upscaled to 1e3
-     * @param _timeInDays: duration of being a validator, in days
-     * @dev The auction score is updated.
+     * @notice Update the auction configuration except cluster size
+     * @param __expectedDailyReturnWei: the new expected daily return of Ethereum staking (in wei)
+     * @param __maxDiscountRate: the new maximum discount rate (i.e the max profit margin of node op) (from 0 to 10000 -> 100%)
+     * @param __minDuration: the new minimum duration of beeing a validator in a DV (in days)
      */
-    function updateBid(uint256 _discountRate, uint256 _timeInDays) external {
-        require(_nodeOpSet.exists(msg.sender), "Operator not in protocol.");
-        NodeOpStruct storage nodeOp = _nodeOpStructs[msg.sender];
-        uint256 dailyVcPrice = _calculateDailyVcPrice(_discountRate);
-        uint256 bidPrice = _calculateBidPrice(_timeInDays, dailyVcPrice);
-        uint256 auctionScore = _calculateAuctionScore(
-            dailyVcPrice,
-            _timeInDays,
-            nodeOp.reputationScore
-        );
-        nodeOp.bidPrice = bidPrice;
-        nodeOp.auctionScore = auctionScore;
-
-        emit BidUpdated(
-            msg.sender,
-            bidPrice,
-            auctionScore,
-            nodeOp.reputationScore
-        );
+    function updateAuctionConfig(
+        uint256 __expectedDailyReturnWei,
+        uint256 __maxDiscountRate,
+        uint256 __minDuration
+    ) external onlyOwner {
+        _expectedDailyReturnWei = __expectedDailyReturnWei;
+        _maxDiscountRate = __maxDiscountRate;
+        _minDuration = __minDuration;
     }
 
     /**
-     * @notice Send any remaining funds of the present contract to Byzantine.
+     * @notice Update the cluster size (i.e the number of node operators in a DV)
+     * @param __clusterSize: the new cluster size
      */
-    function sendFundsToByzantine() external onlyOwner {
-        _sendFunds(byzantineFinance, address(this).balance);
+    function updateClusterSize(uint256 __clusterSize) external onlyOwner {
+        require(__clusterSize >= 4, "Cluster size must be at least 4.");
+        _clusterSize = __clusterSize;
     }
 
     /* ===================== GETTER FUNCTIONS ===================== */
@@ -335,25 +450,16 @@ contract Auction is ReentrancyGuard, DSMath {
     }
 
     /**
-     * @notice Check if an operator is in the protocol by address
-     * @param _opAddr: operator address
+     * @notice Returns the auction details of a node operator
+     * @param _nodeOpAddr The node operator address to get the details
+     * @return (vcNumber, bidPrice, auctionScore, reputationScore, nodeStatus)
      */
-    function operatorInProtocol(
-        address _opAddr
-    ) external view onlyOwner returns (bool) {
-        return _nodeOpSet.exists(_opAddr);
-    }
-
-    /**
-     * @notice Get the detail of an operator by address.
-     * @param _opAddr: operator address
-     */
-    function getNodeOpStruct(
-        address _opAddr
-    ) external view returns (uint256, uint256, uint256, NodeOpStatus) {
-        require(_nodeOpSet.exists(_opAddr), "Not a member.");
-        NodeOpStruct storage nodeOp = _nodeOpStructs[_opAddr];
+    function getNodeOpDetails(
+        address _nodeOpAddr
+    ) public view returns (uint256, uint256, uint256, uint256, NodeOpStatus) {
+        NodeOpDetails memory nodeOp = _nodeOpsInfo[_nodeOpAddr];
         return (
+            nodeOp.vcNumber,
             nodeOp.bidPrice,
             nodeOp.auctionScore,
             nodeOp.reputationScore,
@@ -362,31 +468,25 @@ contract Auction is ReentrancyGuard, DSMath {
     }
 
     /**
-     * @notice Get the total number of node operators in the protocol.
+     * @notice Returns the array of node operators who have the `_auctionScore`
+     * @param _auctionScore The auction score to get the node operators array
      */
-    function getNumberOfNodeOps() external view onlyOwner returns (uint256) {
-        return _nodeOpSet.count();
+    function getAuctionScoreToNodeOps(
+        uint256 _auctionScore
+    ) public view returns (address[] memory) {
+        return _auctionScoreToNodeOps[_auctionScore].addrList;
     }
 
     /**
-     * @notice Get the list of node operators in the protocol.
+     * @notice Returns the auction configuration values.
+     * @dev Function callable only by the owner.
+     * @return (_expectedDailyReturnWei, _maxDiscountRate, _minDuration, _clusterSize)
      */
-    function getListOfNodeOps() external onlyOwner returns (address[] memory) {
-        emit ListOfNodeOps(_nodeOpSet.addrList);
-        return _nodeOpSet.addrList;
-    }
-
-    function getAuctionConfigValues()
-        external
-        view
-        onlyOwner
-        returns (uint256, uint256, uint256, uint256, uint256)
-    {
+    function getAuctionConfigValues() external view onlyOwner returns (uint256, uint256, uint256, uint256) {
         return (
-            _expectedReturnWei,
+            _expectedDailyReturnWei,
             _maxDiscountRate,
             _minDuration,
-            _nodeOpBond,
             _clusterSize
         );
     }
@@ -394,48 +494,34 @@ contract Auction is ReentrancyGuard, DSMath {
     /* ===================== INTERNAL FUNCTIONS ===================== */
 
     /**
-     * @notice Calculate the daily validation credit price
-     * @param _discountRate: discount rate in percentage, upscaled to 1e3
-     * @return _dailyVcPrice: daily validation credit price in WEI
-     * @dev price_vc = Re*(1 - D)/cluster_size
-     * @dev The expected return is in WEI (1e18), set by Byzantine
-     * @dev The discount rate must not exceed the maximum discount rate
+     * @notice Calculate and returns the daily Validation Credit price (in WEI)
+     * @param _discountRate: discount rate (i.e the desired profit margin) in percentage (scale from 0 to 10000)
+     * @dev vc_price = Re*(1 - D)/cluster_size
+     * @dev The `_expectedDailyReturnWei` is set by Byzantine and corresponds to the Ethereum daily staking return.
      */
-    function _calculateDailyVcPrice(
-        uint256 _discountRate
-    ) internal view returns (uint256) {
-        require(
-            _discountRate <= _maxDiscountRate,
-            "Discount rate exceeds the maximum."
-        );
-        return
-            (_expectedReturnWei * (10000 - _discountRate)) /
-            (_clusterSize * 10000);
+    function _calculateDailyVcPrice(uint256 _discountRate) internal view returns (uint256) {
+        return (_expectedDailyReturnWei * (10000 - _discountRate)) / (_clusterSize * 10000);
     }
 
     /**
-     * @notice Calculate the bid price that should be paid by the winner node operator
+     * @notice Calculate and returns the bid price that should be paid by the node operator (in WEI)
      * @param _timeInDays: duration of being a validator, in days
-     * @param _dailyVcPrice: daily validation credit price in WEI
-     * @return _bidPrice: bid price in WEI
-     * @dev bid_price = time_in_days * price_vc
-     * @dev Time in days must be >= 30
+     * @param _dailyVcPrice: daily Validation Credit price (in WEI)
+     * @dev bid_price = time_in_days * vc_price
      */
     function _calculateBidPrice(
         uint256 _timeInDays,
         uint256 _dailyVcPrice
-    ) internal view returns (uint256) {
-        require(_timeInDays >= _minDuration, "Time in days must be >= 30.");
+    ) internal pure returns (uint256) {
         return _timeInDays * _dailyVcPrice;
     }
 
     /**
-     * @notice Calculate the auction score of an operator
-     * @param _dailyVcPrice: daily validation credit price in WEI
+     * @notice Calculate and returns the auction score of a node operator
+     * @param _dailyVcPrice: daily Validation Credit price in WEI
      * @param _timeInDays: duration of being a validator, in days
      * @param _reputation: reputation score of the operator
-     * @return _auctionScore: auction score of the operator, upscaled to 1e18
-     * @dev powerValue = 1.001**_timeInDays, calculated from _pow function
+     * @dev powerValue = 1.001**_timeInDays, calculated from `_pow` function
      * @dev The result is divided by 1e18 to downscaled from 1e36 to 1e18
      */
     function _calculateAuctionScore(
@@ -449,8 +535,7 @@ contract Auction is ReentrancyGuard, DSMath {
 
     /**
      * @notice Calculate the power value of 1.001**_timeInDays
-     * @dev 1.001 becomes 1001 * 1e24
-     * @dev The result is divided by 1e9 to downscaled to 1e18 as the return value is upscaled to 1e27
+     * @dev The result is divided by 1e9 to downscaled to 1e18 as the return value of `rpow` is upscaled to 1e27
      */
     function _pow(uint256 _timeIndays) internal pure returns (uint256) {
         uint256 fixedPoint = 1001 * 1e24;
