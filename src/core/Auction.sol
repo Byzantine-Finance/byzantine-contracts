@@ -395,23 +395,40 @@ contract Auction is ReentrancyGuard, DSMath {
     }
 
     /**
-     * @notice Operator leaves the protocol and gets the bond back.
-     * @dev Operator must not be pending for or active in a DVT.
+     * @notice Allow a node operator to abandon the auction and withdraw the bid he paid.
+     * It's not possible to withdraw if the node operator is actively validating.
+     * @dev Status is set to inactive and auction details to 0 unless the reputation which is unmodified
      */
-    function leaveProtocol() external {
-        // UPdtate struct auctionScore at 0 and status
-        /*NodeOpStatus status = _nodeOpsInfo[msg.sender].nodeStatus;
-        require(_nodeOpSet.exists(msg.sender), "Operator not in protocol.");
-        require(
-            status != NodeOpStatus.pendingForDvt ||
-                status != NodeOpStatus.activeInDvt,
-            "Operator pending for or active in a DVT cannot leave."
-        );
-        _nodeOpSet.remove(msg.sender);
-        _sendFunds(msg.sender, _BOND);
+    function withdrawBid() external {
+        // Verify if the sender is in the auction
+        require(_nodeOpsInfo[msg.sender].nodeStatus == NodeOpStatus.inAuction, "Not in auction, cannot withdraw");
 
-        emit NodeOpLeft(msg.sender);
-        */
+        // Get the paid bid and auction score of msg.sender
+        (,uint256 bidToRefund,uint256 auctionScore,,) = getNodeOpDetails(msg.sender);
+
+        // Check if other node ops doesn't have the same auction score
+        if (_auctionScoreToNodeOps[auctionScore].count() == 1) {
+            // Remove auction score from the tree and the mapping
+            _auctionTree.remove(auctionScore);
+            delete _auctionScoreToNodeOps[auctionScore];
+        } else {
+            // remove node op from the auction score mapping
+            _auctionScoreToNodeOps[auctionScore].remove(msg.sender);
+        }
+
+        // TODO: Get the reputation score of msg.sender
+        uint256 reputationScore = 1;
+
+        // Update the nodeOpDetails
+        _nodeOpsInfo[msg.sender] = NodeOpDetails({
+            vcNumber: 0,
+            bidPrice: 0,
+            auctionScore: 0,
+            reputationScore: reputationScore,
+            nodeStatus: NodeOpStatus.inactive
+        });
+
+        // TODO: Ask the Escrow contract to refund the node op
     }
 
     /**
@@ -540,15 +557,6 @@ contract Auction is ReentrancyGuard, DSMath {
     function _pow(uint256 _timeIndays) internal pure returns (uint256) {
         uint256 fixedPoint = 1001 * 1e24;
         return DSMath.rpow(fixedPoint, _timeIndays) / 1e9;
-    }
-
-    /**
-     * @notice Send funds to a receiver
-     * @dev The receiver is vault in the present contract
-     */
-    function _sendFunds(address _receiver, uint256 _amount) internal {
-        (bool success, ) = payable(_receiver).call{value: _amount}("");
-        require(success, "Transfer failed.");
     }
 
     /* ===================== MODIFIERS ===================== */

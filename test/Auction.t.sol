@@ -339,6 +339,64 @@ contract AuctionTest is Test {
         assertEq(uint(opStatus_1), 1);
     }
 
+    function testWithdrawBid_RevertWhen_NotInAuction() external {
+        // nodeOps[0] withdraw its bid but hasn't had bid
+        vm.expectRevert(bytes("Not in auction, cannot withdraw"));
+        auction.withdrawBid();
+    }
+
+    function testWithdrawBid() external {
+        // nodeOps[0] bid with discountRate = 13% and timeInDays = 100
+        _nodeOpBid(nodeOps[0], 13e2, 100);
+        (,,uint256 auctionScoreBeforeWithdrawal,,) = auction.getNodeOpDetails(nodeOps[0]);
+
+        // nodeOps[0] withdraw its bid
+        vm.prank(nodeOps[0]);
+        auction.withdrawBid();
+
+        // Verify auctionScore mapping
+        address[] memory auctionScoreMapping = auction.getAuctionScoreToNodeOps(auctionScoreBeforeWithdrawal);
+        assertEq(auctionScoreMapping.length, 0);
+
+        // Verify nodeOps[0] auction details
+        (
+            uint256 vcNumber_0,
+            uint256 bidPrice_0,
+            uint256 auctionScore_0,
+            uint256 reputationScore_0,
+            Auction.NodeOpStatus opStatus_0
+        ) = auction.getNodeOpDetails(nodeOps[0]);
+        assertEq(vcNumber_0, 0);
+        assertEq(bidPrice_0, 0);
+        assertEq(auctionScore_0, 0);
+        assertEq(reputationScore_0, 1);
+        assertEq(uint(opStatus_0), 0);
+
+        // TODO: Verify nodeOps[0] balance once Escrow contract is implemented
+    }
+
+    function testWithdrawBidWhenSameAuctionScore() external {
+        // nodeOps[0] bid with discountRate = 13% and timeInDays = 100
+        _nodeOpBid(nodeOps[0], 13e2, 100);
+        (,,uint256 auctionScore,,) = auction.getNodeOpDetails(nodeOps[0]);
+        // nodeOps[9] bid with discountRate = 13% and timeInDays = 100
+        _nodeOpBid(nodeOps[9], 13e2, 100);
+
+        address[] memory auctionScoreMapping = auction.getAuctionScoreToNodeOps(auctionScore);
+        assertEq(auctionScoreMapping.length, 2);
+
+        // nodeOps[0] withdraw its bid
+        vm.prank(nodeOps[0]);
+        auction.withdrawBid();
+
+        // Verify auctionScore mapping
+        auctionScoreMapping = auction.getAuctionScoreToNodeOps(auctionScore);
+        assertEq(auctionScoreMapping.length, 1);
+        assertEq(auctionScoreMapping[0], nodeOps[9]);
+
+        // TODO: Verify nodeOps[0] balance once Escrow contract is implemented
+    }
+
     /*function test_TopFourWinnersAreSelectedIfClusterSizeIsFour() external {
         // Supposing that 10 operators have joined the protocol
         letTenOperatorsJoinProtocol();
