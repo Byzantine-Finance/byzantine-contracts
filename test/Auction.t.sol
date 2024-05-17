@@ -136,17 +136,20 @@ contract AuctionTest is Test {
         // nodeOps[0] bids (10%, 30 days)
         _nodeOpBid(nodeOps[0], 10e2, 30);
         (,,uint256 auctionScore_0,,) = auction.getNodeOpDetails(nodeOps[0]);
-        address[] memory auctionScoreToNodeOps = auction.getAuctionScoreToNodeOps(auctionScore_0);
-        assertEq(auctionScoreToNodeOps.length, 1);
-        assertEq(auctionScoreToNodeOps[0], nodeOps[0]);
+        address auctionScoreToNodeOp = auction.getAuctionScoreToNodeOp(auctionScore_0);
+        assertEq(auctionScoreToNodeOp, nodeOps[0]);
 
-        // nodeOps[1] has the same bid (10%, 30 days)
-        _nodeOpBid(nodeOps[1], 10e2, 30);
+        // nodeOps[1] bids (11%, 30 days)
+        _nodeOpBid(nodeOps[1], 11e2, 30);
         (,,uint256 auctionScore_1,,) = auction.getNodeOpDetails(nodeOps[1]);
-        auctionScoreToNodeOps = auction.getAuctionScoreToNodeOps(auctionScore_1);
-        assertEq(auctionScoreToNodeOps.length, 2);
-        assertEq(auctionScoreToNodeOps[0], nodeOps[0]);
-        assertEq(auctionScoreToNodeOps[1], nodeOps[1]);
+        auctionScoreToNodeOp = auction.getAuctionScoreToNodeOp(auctionScore_1);
+        assertEq(auctionScoreToNodeOp, nodeOps[1]);
+
+        // Revert if nodeOps[2] bids the same as nodeOps[1]
+        uint256 priceToPay = auction.getPriceToPay(nodeOps[2], 11e2, 30);
+        vm.prank(nodeOps[2]);
+        vm.expectRevert(bytes("Auction Score already exists"));
+        auction.bid{value: priceToPay}(11e2, 30);
     }
 
     function testUpdateBid_RevertWhen_NodeOpNotInAuction() external {
@@ -199,35 +202,26 @@ contract AuctionTest is Test {
         _nodeOpBid(nodeOps[9], 5e2, 90);
         (,,uint256 FirstAuctionScore,,) = auction.getNodeOpDetails(nodeOps[9]);
 
-        // nodeOps[8] has the same bid (5%, 90 days)
-        _nodeOpBid(nodeOps[8], 5e2, 90);
+        // nodeOps[8] bids (5%, 120 days)
+        _nodeOpBid(nodeOps[8], 5e2, 120);
 
         // nodeOps[9] updates its bid (14%, 90 days)
         _nodeOpUpdateBid(nodeOps[9], 14e2, 90);
         (,,uint256 SecondAuctionScore,,) = auction.getNodeOpDetails(nodeOps[9]);
 
         // Verify if nodeOps[9] has been removed from FirstAuctionScore
-        address[] memory auctionScore1ToNodeOps = auction.getAuctionScoreToNodeOps(FirstAuctionScore);
-        assertEq(auctionScore1ToNodeOps.length, 1);
-        assertEq(auctionScore1ToNodeOps[0], nodeOps[8]);
+        address auctionScore1ToNodeOp = auction.getAuctionScoreToNodeOp(FirstAuctionScore);
+        assertEq(auctionScore1ToNodeOp, address(0));
 
         // Verify if nodeOps[9] has been added to the SecondAuctionScore
-        address[] memory auctionScore2ToNodeOps = auction.getAuctionScoreToNodeOps(SecondAuctionScore);
-        assertEq(auctionScore2ToNodeOps.length, 1);
-        assertEq(auctionScore2ToNodeOps[0], nodeOps[9]);
+        address auctionScore2ToNodeOp = auction.getAuctionScoreToNodeOp(SecondAuctionScore);
+        assertEq(auctionScore2ToNodeOp, nodeOps[9]);
 
-        // nodeOps[8] also updates its bid (14%, 90 days)
-        _nodeOpUpdateBid(nodeOps[8], 14e2, 90);
-
-        // Verify if FirstAuctionScore doesn't have any nodeOps
-        auctionScore1ToNodeOps = auction.getAuctionScoreToNodeOps(FirstAuctionScore);
-        assertEq(auctionScore1ToNodeOps.length, 0);
-
-        // Verify if nodeOps[8] has been added to the SecondAuctionScore
-        auctionScore2ToNodeOps = auction.getAuctionScoreToNodeOps(SecondAuctionScore);
-        assertEq(auctionScore2ToNodeOps.length, 2);
-        assertEq(auctionScore2ToNodeOps[0], nodeOps[9]);
-        assertEq(auctionScore2ToNodeOps[1], nodeOps[8]);
+        // nodeOps[8] updates its bid to the same as nodeOps[9] (14%, 90 days)
+        uint256 priceToPay = auction.getUpdateBidPrice(nodeOps[8], 14e2, 90);
+        vm.prank(nodeOps[8]);
+        vm.expectRevert(bytes("Auction Score already exists"));
+        auction.updateBid{value: priceToPay}(14e2, 90);
     }
 
     function testUpdateBid_NodeOpStruct() external {
@@ -355,8 +349,8 @@ contract AuctionTest is Test {
         auction.withdrawBid();
 
         // Verify auctionScore mapping
-        address[] memory auctionScoreMapping = auction.getAuctionScoreToNodeOps(auctionScoreBeforeWithdrawal);
-        assertEq(auctionScoreMapping.length, 0);
+        address auctionScoreMapping = auction.getAuctionScoreToNodeOp(auctionScoreBeforeWithdrawal);
+        assertEq(auctionScoreMapping, address(0));
 
         // Verify nodeOps[0] auction details
         (
@@ -373,28 +367,9 @@ contract AuctionTest is Test {
         assertEq(uint(opStatus_0), 0);
 
         // TODO: Verify nodeOps[0] balance once Escrow contract is implemented
-    }
 
-    function testWithdrawBidWhenSameAuctionScore() external {
-        // nodeOps[0] bid with discountRate = 13% and timeInDays = 100
+        // Verify if nodeOps[1] can bid with the same parameters after withdrawal
         _nodeOpBid(nodeOps[0], 13e2, 100);
-        (,,uint256 auctionScore,,) = auction.getNodeOpDetails(nodeOps[0]);
-        // nodeOps[9] bid with discountRate = 13% and timeInDays = 100
-        _nodeOpBid(nodeOps[9], 13e2, 100);
-
-        address[] memory auctionScoreMapping = auction.getAuctionScoreToNodeOps(auctionScore);
-        assertEq(auctionScoreMapping.length, 2);
-
-        // nodeOps[0] withdraw its bid
-        vm.prank(nodeOps[0]);
-        auction.withdrawBid();
-
-        // Verify auctionScore mapping
-        auctionScoreMapping = auction.getAuctionScoreToNodeOps(auctionScore);
-        assertEq(auctionScoreMapping.length, 1);
-        assertEq(auctionScoreMapping[0], nodeOps[9]);
-
-        // TODO: Verify nodeOps[0] balance once Escrow contract is implemented
     }
 
     /*function test_TopFourWinnersAreSelectedIfClusterSizeIsFour() external {

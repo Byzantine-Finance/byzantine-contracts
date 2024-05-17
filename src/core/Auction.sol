@@ -4,14 +4,12 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "ds-math/math.sol";
 
-import "../libraries/ProcessDataLib.sol";
 import "../libraries/BokkyPooBahsRedBlackTreeLibrary.sol";
 
 /// TODO: Calculation of the reputation score of node operators
 /// TODO: Create escrow contract to pay directly the bid
 
 contract Auction is ReentrancyGuard, DSMath {
-    using ProcessDataLib for ProcessDataLib.Set;
     using BokkyPooBahsRedBlackTreeLibrary for BokkyPooBahsRedBlackTreeLibrary.Tree;
 
     /* ================= CONSTANTS + IMMUTABLES ================= */
@@ -41,8 +39,8 @@ contract Auction is ReentrancyGuard, DSMath {
     /// @notice Node operator address => node operator auction details
     mapping(address => NodeOpDetails) private _nodeOpsInfo;
 
-    /// @notice Auction score => node operator array (different node ops can have the same auction score)
-    mapping(uint256 => ProcessDataLib.Set) private _auctionScoreToNodeOps;
+    /// @notice Auction score => node operator address
+    mapping(uint256 => address) private _auctionScoreToNodeOp;
 
     /// @notice Mapping for the whitelisted node operators
     mapping(address => bool) private _nodeOpsWhitelist;
@@ -259,6 +257,8 @@ contract Auction is ReentrancyGuard, DSMath {
         uint256 bidPrice = _calculateBidPrice(_timeInDays, dailyVcPrice);
         uint256 auctionScore = _calculateAuctionScore(dailyVcPrice, _timeInDays, reputationScore);
 
+        require(!_auctionTree.exists(auctionScore), "Auction Score already exists");
+
         uint256 priceToPay;
         // If msg.sender is whitelisted, he only pays the bid
         if (isWhitelisted(msg.sender)) {
@@ -278,13 +278,10 @@ contract Auction is ReentrancyGuard, DSMath {
 
         // TODO: transfer the ethers in the escrow contract
 
-        // Verify if auctionScore is not already in the tree
-        if (!_auctionTree.exists(auctionScore)) {
-            _auctionTree.insert(auctionScore);
-        }
-
-        // Insert the nodeOp in the auctionScore mapping
-        _auctionScoreToNodeOps[auctionScore].insert(msg.sender);
+        // Add auction score in the tree
+        _auctionTree.insert(auctionScore);
+        // Update auctionScore mapping
+        _auctionScoreToNodeOp[auctionScore] = msg.sender;
 
         // Fill or update the nodeOpDetails
         _nodeOpsInfo[msg.sender] = NodeOpDetails({
@@ -355,6 +352,9 @@ contract Auction is ReentrancyGuard, DSMath {
         uint256 newBidPrice = _calculateBidPrice(_newTimeInDays, newDailyVcPrice);
         uint256 newAuctionScore = _calculateAuctionScore(newDailyVcPrice, _newTimeInDays, reputationScore);
 
+        // Verify if new Auction score doesn't already exist
+        require(!_auctionTree.exists(newAuctionScore), "Auction Score already exists");
+
         if (newBidPrice > previousBidPrice) {
             // TODO: gas optimization with unchecked
             uint256 ethersToAdd = newBidPrice - previousBidPrice;
@@ -372,17 +372,15 @@ contract Auction is ReentrancyGuard, DSMath {
             // TODO: Ask the escrow to send back the ethers
         }
 
-        // If msg.sender is the only one with that Auction score, remove it from the tree and the mapping
-        if (_auctionScoreToNodeOps[previousAuctionScore].count() == 1) {
-            _auctionTree.remove(previousAuctionScore);
-            delete _auctionScoreToNodeOps[previousAuctionScore];
-        } else {
-            // remove node op from the auction score mapping
-            _auctionScoreToNodeOps[previousAuctionScore].remove(msg.sender);
-        }
+        // Verify auctionScore of msg.sender and remove it from the tree and the mapping
+        require(_auctionScoreToNodeOp[previousAuctionScore] == msg.sender);
+        _auctionTree.remove(previousAuctionScore);
+        delete _auctionScoreToNodeOp[previousAuctionScore];
 
-        // Add node op to new auction score mapping
-        _auctionScoreToNodeOps[newAuctionScore].insert(msg.sender);
+        // Add new auction score in the tree
+        _auctionTree.insert(newAuctionScore);
+        // Update auctionScore mapping
+        _auctionScoreToNodeOp[newAuctionScore] = msg.sender;
 
         // Update the nodeOpDetails
         _nodeOpsInfo[msg.sender] = NodeOpDetails({
@@ -406,15 +404,10 @@ contract Auction is ReentrancyGuard, DSMath {
         // Get the paid bid and auction score of msg.sender
         (,uint256 bidToRefund,uint256 auctionScore,,) = getNodeOpDetails(msg.sender);
 
-        // Check if other node ops doesn't have the same auction score
-        if (_auctionScoreToNodeOps[auctionScore].count() == 1) {
-            // Remove auction score from the tree and the mapping
-            _auctionTree.remove(auctionScore);
-            delete _auctionScoreToNodeOps[auctionScore];
-        } else {
-            // remove node op from the auction score mapping
-            _auctionScoreToNodeOps[auctionScore].remove(msg.sender);
-        }
+        // Verify auctionScore of msg.sender and remove it from the tree and the mapping
+        require(_auctionScoreToNodeOp[auctionScore] == msg.sender);
+        _auctionTree.remove(auctionScore);
+        delete _auctionScoreToNodeOp[auctionScore];
 
         // TODO: Get the reputation score of msg.sender
         uint256 reputationScore = 1;
@@ -485,13 +478,13 @@ contract Auction is ReentrancyGuard, DSMath {
     }
 
     /**
-     * @notice Returns the array of node operators who have the `_auctionScore`
-     * @param _auctionScore The auction score to get the node operators array
+     * @notice Returns the node operator who have the `_auctionScore`
+     * @param _auctionScore The auction score to get the node operator
      */
-    function getAuctionScoreToNodeOps(
+    function getAuctionScoreToNodeOp(
         uint256 _auctionScore
-    ) public view returns (address[] memory) {
-        return _auctionScoreToNodeOps[_auctionScore].addrList;
+    ) public view returns (address) {
+        return _auctionScoreToNodeOp[_auctionScore];
     }
 
     /**
