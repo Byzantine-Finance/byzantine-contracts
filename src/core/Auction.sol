@@ -118,83 +118,34 @@ contract Auction is ReentrancyGuard, DSMath {
     }
 
     /**
-     * @notice Function triggered by the StrategyModuleManeger every time a staker deposit 32ETH.
-     * It sorts the node operators by their auction score and returns a new memory array.
-     * The status of the node operators in the topWinners array is updated to auctionWinner.
-     * @dev The length of return array varies depending on the cluster size.
-     * @dev The _nodeOpArray does not alter the storage array _nodeOpSet.addrList.
+     * @notice Function triggered by the StrategyModuleManager every time a staker deposit 32ETH and ask for a DV.
+     * It finds the `_clusterSize` node operators with the highest auction scores and put them in a DV.
+     * @dev The status of the winners is updated to `inDV`.
+     * @dev Reverts if not enough node operators are available.
      */
-    function sortAndGetTopWinners()
-        external
-        onlyOwner
-        nonReentrant
-        returns (address[] memory)
-    {
-        /*address[] memory _nodeOpArray = _nodeOpSet.addrList;
+    function createDV(
+        //address _stratModNeedingDV
+    ) external onlyStategyModuleManager nonReentrant returns (address[] memory) {
+        
+        address[] memory auctionWinners = _getAuctionWinners();
 
-        // BUG: Should compare the length of node op with the status inProtocol
-        require(
-            _nodeOpArray.length >= _clusterSize,
-            "No enough operators for the cluser."
-        );
+        // TODO: Ask the escrow contract to debit the bid of the winners
+        // BUG If payments fail, auction tree and auction score mapping already updated....
 
-        /// @notice Initialize the topWinners memory array
-        address[] memory topWinners = new address[](_clusterSize);
-
-        /// @notice Initialize the new array with the first n elements, no sorting here
-        uint256 initializedCount; // = 0
-        for (
-            uint256 i = 0;
-            i < _clusterSize && initializedCount < _clusterSize;
-            i++
-        ) {
-            if (
-                _nodeOpStructs[_nodeOpArray[i]].nodeStatus ==
-                NodeOpStatus.inProtocol
-            ) {
-                topWinners[initializedCount++] = _nodeOpArray[i];
+        // Updates the details of the winners
+        for (uint256 i = 0; i < _clusterSize;) {
+            _nodeOpsInfo[auctionWinners[i]].nodeStatus = NodeOpStatus.inDV;
+            _nodeOpsInfo[auctionWinners[i]].bidPrice = 0;
+            _nodeOpsInfo[auctionWinners[i]].auctionScore = 0;
+            unchecked {
+                ++i;
             }
         }
 
-        /// @notice Iterate through the operator array to find the n largest numbers
-        for (uint256 i = _clusterSize; i < _nodeOpArray.length; i++) {
-            NodeOpStruct storage nodeOpStruct = _nodeOpStructs[_nodeOpArray[i]];
-            if (
-                nodeOpStruct.nodeStatus == NodeOpStatus.auctionWinner ||
-                nodeOpStruct.nodeStatus == NodeOpStatus.pendingForDvt ||
-                nodeOpStruct.nodeStatus == NodeOpStatus.activeInDvt
-            ) continue;
+        return auctionWinners;
 
-            /// @notice Get the score to compare with the scores in topWinners array
-            uint256 scoreToCompare = _nodeOpStructs[_nodeOpArray[i]]
-                .auctionScore;
+        // TODO: Call StrategyModuleManager to fill the DV details
 
-            /// @notice Initialize the lowest score in the topWinners array
-            uint256 lowestScoreIndex = 0;
-            uint256 lowestScore = _nodeOpStructs[topWinners[0]].auctionScore;
-
-            /// @notice Find the lowest score in the topWinners array
-            for (uint256 j = 1; j < _clusterSize; j++) {
-                uint256 score = _nodeOpStructs[topWinners[j]].auctionScore;
-                if (score < lowestScore) {
-                    lowestScoreIndex = j; // 1
-                    lowestScore = score;
-                }
-            }
-
-            /// @notice Replace the lowest score with the current score if it is higher
-            if (scoreToCompare > lowestScore) {
-                topWinners[lowestScoreIndex] = _nodeOpArray[i];
-            }
-        }
-
-        for (uint256 i = 0; i < topWinners.length; i++) {
-            _nodeOpStructs[topWinners[i]].nodeStatus = NodeOpStatus
-                .auctionWinner;
-        }
-        emit TopWinners(topWinners);
-
-        return topWinners;*/
     }
 
     /**
@@ -552,10 +503,55 @@ contract Auction is ReentrancyGuard, DSMath {
         return DSMath.rpow(fixedPoint, _timeIndays) / 1e9;
     }
 
+    /**
+     * @notice Function to get the auction winners. It returns the node operators with the highest auction score.
+     * @dev Reverts if not enough node operators in the auction to create a DV.
+     * @dev Reverts if a winner address is null.
+     * @dev We assume the winners directly accept to join the DV, therefore this function cleans the auction tree and auctionScore mapping.
+     */
+    function _getAuctionWinners() internal returns (address[] memory) {
+        uint256 empty = BokkyPooBahsRedBlackTreeLibrary.getEmpty();
+
+        uint256[] memory topAuctionScores = new uint256[](_clusterSize);
+        address[] memory auctionWinners = new address[](_clusterSize);
+
+        // Get the first `_clusterSize` biggest score and winners.
+        // Reverts if not enough node operators in the auction.
+        topAuctionScores[0] = _auctionTree.last();
+        require(topAuctionScores[0] != empty, "Not enough node operators in Auction");
+        auctionWinners[0] = _auctionScoreToNodeOp[topAuctionScores[0]];
+        require(auctionWinners[0] != address(0), "Invalid winner address");
+        for (uint256 i = 1; i < _clusterSize;) {
+            topAuctionScores[i] = _auctionTree.prev(topAuctionScores[i - 1]);
+            require(topAuctionScores[i] != empty, "Not enough node operators in Auction");
+            auctionWinners[i] = _auctionScoreToNodeOp[topAuctionScores[i]];
+            require(auctionWinners[i] != address(0), "Invalid winner address");
+            unchecked {
+                ++i;
+            }
+        }
+
+        // If function didn't revert, we can clean the auction tree and auctionScore mapping.
+        for (uint256 i = 0; i < _clusterSize;) {
+            _auctionTree.remove(topAuctionScores[i]);
+            delete _auctionScoreToNodeOp[topAuctionScores[i]];
+            unchecked {
+                ++i;
+            }
+        }
+
+        return auctionWinners;
+    }
+
     /* ===================== MODIFIERS ===================== */
 
     modifier onlyOwner() {
         require(msg.sender == byzantineFinance, "Not the owner.");
+        _;
+    }
+
+    modifier onlyStategyModuleManager() {
+        // TODO
         _;
     }
 }
