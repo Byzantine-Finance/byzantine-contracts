@@ -4,12 +4,13 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "ds-math/math.sol";
 
+import "../interfaces/IAuction.sol";
 import "../libraries/BokkyPooBahsRedBlackTreeLibrary.sol";
 
 /// TODO: Calculation of the reputation score of node operators
 /// TODO: Create escrow contract to pay directly the bid
 
-contract Auction is ReentrancyGuard, DSMath {
+contract Auction is ReentrancyGuard, DSMath, IAuction {
     using BokkyPooBahsRedBlackTreeLibrary for BokkyPooBahsRedBlackTreeLibrary.Tree;
 
     /* ================= CONSTANTS + IMMUTABLES ================= */
@@ -43,42 +44,7 @@ contract Auction is ReentrancyGuard, DSMath {
     mapping(uint256 => address) private _auctionScoreToNodeOp;
 
     /// @notice Mapping for the whitelisted node operators
-    mapping(address => bool) private _nodeOpsWhitelist;
-
-    /* ===================== TO PUT IN CONTRACT INTERFACE ===================== */
-
-    enum NodeOpStatus {
-        inactive, // has left the auction or has finished his work
-        inAuction, // bid set, seeking for work
-        inDV // auction won. We assume he has accepted to join the DV
-    }
-
-    /// @notice Stores auction details of node operators
-    struct NodeOpDetails {
-        uint256 vcNumber;
-        uint256 bidPrice;
-        uint256 auctionScore;
-        uint256 reputationScore;
-        NodeOpStatus nodeStatus;
-    }
-
-    event NodeOpJoined(address nodeOpAddress);
-    event NodeOpLeft(address nodeOpAddress);
-    event BidUpdated(
-        address nodeOpAddress,
-        uint256 bidPrice,
-        uint256 auctionScore,
-        uint256 reputationScore
-    );
-    event AuctionConfigUpdated(
-        uint256 _expectedDailyReturnWei,
-        uint256 _maxDiscountRate,
-        uint256 _minDuration
-    );
-    event ClusterSizeUpdated(uint256 _clusterSize);
-    event TopWinners(address[] winners);
-    event BidPaid(address nodeOpAddress, uint256 bidPrice);
-    event ListOfNodeOps(address[] nodeOps);
+    mapping(address => bool) private _nodeOpsWhitelist;    
 
     /* ===================== CONSTRUCTOR ===================== */
 
@@ -103,7 +69,7 @@ contract Auction is ReentrancyGuard, DSMath {
      * @dev Revert if the node operator is already whitelisted.
      */
     function addNodeOpToWhitelist(address _nodeOpAddr) external onlyOwner {
-        require(!isWhitelisted(_nodeOpAddr), "Address already whitelisted");
+        if (isWhitelisted(_nodeOpAddr)) revert AlreadyWhitelisted();
         _nodeOpsWhitelist[_nodeOpAddr] = true;
     }
 
@@ -113,7 +79,7 @@ contract Auction is ReentrancyGuard, DSMath {
      * @dev Revert if the node operator is not whitelisted.
      */
     function removeNodeOpFromWhitelist(address _nodeOpAddr) external onlyOwner {
-        require(isWhitelisted(_nodeOpAddr), "Address is not whitelisted");
+        if (!isWhitelisted(_nodeOpAddr)) revert NotWhitelisted();
         _nodeOpsWhitelist[_nodeOpAddr] = false;
     }
 
@@ -161,8 +127,8 @@ contract Auction is ReentrancyGuard, DSMath {
         uint256 _timeInDays
     ) public view returns (uint256) {
         // Verify the standing bid parameters
-        require(_discountRate <= _maxDiscountRate, "Discount rate too high");
-        require(_timeInDays >= _minDuration, "Validating duration too short");
+        if (_discountRate > _maxDiscountRate) revert DiscountRateTooHigh();
+        if (_timeInDays < _minDuration) revert DurationTooShort();
 
         /// @notice Calculate operator's bid price
         uint256 dailyVcPrice = _calculateDailyVcPrice(_discountRate);
@@ -194,11 +160,11 @@ contract Auction is ReentrancyGuard, DSMath {
         uint256 _timeInDays
     ) external payable nonReentrant {
         // Verify if the sender is not already in auction
-        require(_nodeOpsInfo[msg.sender].nodeStatus != NodeOpStatus.inAuction, "Already in auction, call updateBid function");
+        if (_nodeOpsInfo[msg.sender].nodeStatus == NodeOpStatus.inAuction) revert AlreadyInAuction();
 
         // Verify the standing bid parameters
-        require(_discountRate <= _maxDiscountRate, "Discount rate too high");
-        require(_timeInDays >= _minDuration, "Validating duration too short");
+        if (_discountRate > _maxDiscountRate) revert DiscountRateTooHigh();
+        if (_timeInDays < _minDuration) revert DurationTooShort();
 
         /// TODO: Get the reputation score of msg.sender
         uint256 reputationScore = 1;
@@ -208,7 +174,7 @@ contract Auction is ReentrancyGuard, DSMath {
         uint256 bidPrice = _calculateBidPrice(_timeInDays, dailyVcPrice);
         uint256 auctionScore = _calculateAuctionScore(dailyVcPrice, _timeInDays, reputationScore);
 
-        require(!_auctionTree.exists(auctionScore), "Auction Score already exists");
+        if (_auctionTree.exists(auctionScore)) revert BidAlreadyExists();
 
         uint256 priceToPay;
         // If msg.sender is whitelisted, he only pays the bid
@@ -219,7 +185,7 @@ contract Auction is ReentrancyGuard, DSMath {
         }
 
         // Verify if the sender has sent enough ethers
-        require(msg.value >= priceToPay, "Not enough ethers sent");
+        if (msg.value < priceToPay) revert NotEnoughEtherSent();
 
         // If to many ethers has been sent, refund the sender
         uint256 amountToRefund = msg.value - priceToPay;
@@ -257,8 +223,8 @@ contract Auction is ReentrancyGuard, DSMath {
         uint256 _timeInDays
     ) public view returns (uint256) {
         // Verify the standing bid parameters
-        require(_discountRate <= _maxDiscountRate, "Discount rate too high");
-        require(_timeInDays >= _minDuration, "Validating duration too short");
+        if (_discountRate > _maxDiscountRate) revert DiscountRateTooHigh();
+        if (_timeInDays < _minDuration) revert DurationTooShort();
 
         // Get what the node op has already paid
         uint256 previousBidPrice = _nodeOpsInfo[_nodeOpAddr].bidPrice;
@@ -286,11 +252,11 @@ contract Auction is ReentrancyGuard, DSMath {
         uint256 _newTimeInDays
     ) external payable nonReentrant {
         // Verify if the sender is in the auction
-        require(_nodeOpsInfo[msg.sender].nodeStatus == NodeOpStatus.inAuction, "Not in auction, call bid function");
+        if (_nodeOpsInfo[msg.sender].nodeStatus != NodeOpStatus.inAuction) revert NotInAuction();
 
         // Verify the standing bid parameters
-        require(_newDiscountRate <= _maxDiscountRate, "Discount rate too high");
-        require(_newTimeInDays >= _minDuration, "Validating duration too short");
+        if (_newDiscountRate > _maxDiscountRate) revert DiscountRateTooHigh();
+        if (_newTimeInDays < _minDuration) revert DurationTooShort();
 
         // Get the previous bid price and auction score of msg.sender
         (,uint256 previousBidPrice,uint256 previousAuctionScore,,) = getNodeOpDetails(msg.sender);
@@ -304,13 +270,13 @@ contract Auction is ReentrancyGuard, DSMath {
         uint256 newAuctionScore = _calculateAuctionScore(newDailyVcPrice, _newTimeInDays, reputationScore);
 
         // Verify if new Auction score doesn't already exist
-        require(!_auctionTree.exists(newAuctionScore), "Auction Score already exists");
+        if (_auctionTree.exists(newAuctionScore)) revert BidAlreadyExists();
 
         if (newBidPrice > previousBidPrice) {
             // TODO: gas optimization with unchecked
             uint256 ethersToAdd = newBidPrice - previousBidPrice;
             // Verify if the sender has sent the difference
-            require(msg.value >= ethersToAdd, "Not enough ethers sent to outbid");
+            if (msg.value < ethersToAdd) revert NotEnoughEtherSent();
             // If to many ethers has been sent, refund the sender
             uint256 amountToRefund = msg.value - ethersToAdd;
             if (amountToRefund > 0) {
@@ -350,7 +316,7 @@ contract Auction is ReentrancyGuard, DSMath {
      */
     function withdrawBid() external {
         // Verify if the sender is in the auction
-        require(_nodeOpsInfo[msg.sender].nodeStatus == NodeOpStatus.inAuction, "Not in auction, cannot withdraw");
+        if (_nodeOpsInfo[msg.sender].nodeStatus != NodeOpStatus.inAuction) revert NotInAuction();
 
         // Get the paid bid and auction score of msg.sender
         (,uint256 bidToRefund,uint256 auctionScore,,) = getNodeOpDetails(msg.sender);
@@ -518,12 +484,12 @@ contract Auction is ReentrancyGuard, DSMath {
         // Get the first `_clusterSize` biggest score and winners.
         // Reverts if not enough node operators in the auction.
         topAuctionScores[0] = _auctionTree.last();
-        require(topAuctionScores[0] != empty, "Not enough node operators in Auction");
+        if (topAuctionScores[0] == empty) revert NotEnoughNodeOps();
         auctionWinners[0] = _auctionScoreToNodeOp[topAuctionScores[0]];
         require(auctionWinners[0] != address(0), "Invalid winner address");
         for (uint256 i = 1; i < _clusterSize;) {
             topAuctionScores[i] = _auctionTree.prev(topAuctionScores[i - 1]);
-            require(topAuctionScores[i] != empty, "Not enough node operators in Auction");
+            if (topAuctionScores[i] == empty) revert NotEnoughNodeOps();
             auctionWinners[i] = _auctionScoreToNodeOp[topAuctionScores[i]];
             require(auctionWinners[i] != address(0), "Invalid winner address");
             unchecked {
@@ -546,7 +512,7 @@ contract Auction is ReentrancyGuard, DSMath {
     /* ===================== MODIFIERS ===================== */
 
     modifier onlyOwner() {
-        require(msg.sender == byzantineFinance, "Not the owner.");
+        if (msg.sender != byzantineFinance) revert OnlyByzantine();
         _;
     }
 

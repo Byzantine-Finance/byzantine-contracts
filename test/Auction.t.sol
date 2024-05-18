@@ -8,6 +8,8 @@ pragma solidity ^0.8.20;
 import {Test, console} from "forge-std/Test.sol";
 import {Auction} from "../src/core/Auction.sol";
 
+import "../src/interfaces/IAuction.sol";
+
 contract AuctionTest is Test {
     Auction auction;
 
@@ -61,7 +63,7 @@ contract AuctionTest is Test {
     function test_AddToWhitelist() external {
         // First, nodeOps[0] wants to add himself to the whitelist
         vm.prank(nodeOps[0]);
-        vm.expectRevert(bytes("Not the owner."));
+        vm.expectRevert(IAuction.OnlyByzantine.selector);
         auction.addNodeOpToWhitelist(nodeOps[0]);
 
         // Byzantine adds nodeOps[0] to the whitelist
@@ -69,7 +71,7 @@ contract AuctionTest is Test {
         assertTrue(auction.isWhitelisted(nodeOps[0]));
 
         // Should revert if Byzantine add a second time nodeOps[0] to the whitelist
-        vm.expectRevert(bytes("Address already whitelisted"));
+        vm.expectRevert(IAuction.AlreadyWhitelisted.selector);
         auction.addNodeOpToWhitelist(nodeOps[0]);
     }
 
@@ -78,7 +80,7 @@ contract AuctionTest is Test {
         auction.addNodeOpToWhitelist(nodeOps[0]);
 
         // Should revert if Byzantine remove a non-whitelisted address
-        vm.expectRevert(bytes("Address is not whitelisted"));
+        vm.expectRevert(IAuction.NotWhitelisted.selector);
         auction.removeNodeOpFromWhitelist(nodeOps[1]);
 
         // Byzantine removes nodeOps[0] from the whitelist
@@ -93,24 +95,24 @@ contract AuctionTest is Test {
         // nodeOps[0] does a second bid (15%, 45 days)
         uint256 priceToPay = auction.getPriceToPay(nodeOps[0], 15e2, 45);
         vm.prank(nodeOps[0]);
-        vm.expectRevert(bytes("Already in auction, call updateBid function"));
+        vm.expectRevert(IAuction.AlreadyInAuction.selector);
         auction.bid{value: priceToPay}(15e2, 45);
     }
 
     function testBid_RevertWhen_WrongBidParameters() external {
         // nodeOps[0] bids with invalid duration (15%, 10 days)
         vm.startPrank(nodeOps[0]);
-        vm.expectRevert(bytes("Validating duration too short"));
+        vm.expectRevert(IAuction.DurationTooShort.selector);
         auction.getPriceToPay(nodeOps[0], 15e2, 10);
-        vm.expectRevert(bytes("Validating duration too short"));
+        vm.expectRevert(IAuction.DurationTooShort.selector);
         auction.bid{value: 9 ether}(15e2, 10);
         vm.stopPrank();
 
         // nodeOps[1] bids with invalid discount rate (16%, 30 days)
         vm.startPrank(nodeOps[1]);
-        vm.expectRevert(bytes("Discount rate too high"));
+        vm.expectRevert(IAuction.DiscountRateTooHigh.selector);
         auction.getPriceToPay(nodeOps[1], 16e2, 30);
-        vm.expectRevert(bytes("Discount rate too high"));
+        vm.expectRevert(IAuction.DiscountRateTooHigh.selector);
         auction.bid{value: 9 ether}(16e2, 30);
         vm.stopPrank();
     }
@@ -119,7 +121,7 @@ contract AuctionTest is Test {
         // nodeOps[0] bids (15%, 45 days)
         uint256 priceToPay = auction.getPriceToPay(nodeOps[0], 15e2, 45);
         vm.prank(nodeOps[0]);
-        vm.expectRevert(bytes("Not enough ethers sent"));
+        vm.expectRevert(IAuction.NotEnoughEtherSent.selector);
         auction.bid{value: (priceToPay - 0.1 ether)}(15e2, 45);
     }
 
@@ -153,13 +155,13 @@ contract AuctionTest is Test {
         // Revert if nodeOps[2] bids the same as nodeOps[1]
         uint256 priceToPay = auction.getPriceToPay(nodeOps[2], 11e2, 30);
         vm.prank(nodeOps[2]);
-        vm.expectRevert(bytes("Auction Score already exists"));
+        vm.expectRevert(IAuction.BidAlreadyExists.selector);
         auction.bid{value: priceToPay}(11e2, 30);
     }
 
     function testUpdateBid_RevertWhen_NodeOpNotInAuction() external {
         // nodeOps[0] updates its bid but hasn't bid
-        vm.expectRevert(bytes("Not in auction, call bid function"));
+        vm.expectRevert(IAuction.NotInAuction.selector);
         auction.updateBid{value: 8 ether}(15e2, 45);
     }
 
@@ -170,7 +172,7 @@ contract AuctionTest is Test {
         // nodeOps[9] updates its bid (5%, 3 days)
         uint256 amountToAdd = auction.getUpdateBidPrice(nodeOps[9], 5e2, 30);
         vm.prank(nodeOps[9]);
-        vm.expectRevert(bytes("Not enough ethers sent to outbid"));
+        vm.expectRevert(IAuction.NotEnoughEtherSent.selector);
         auction.updateBid{value: (amountToAdd - 0.001 ether)}(5e2, 30);
     }
 
@@ -225,7 +227,7 @@ contract AuctionTest is Test {
         // nodeOps[8] updates its bid to the same as nodeOps[9] (14%, 90 days)
         uint256 priceToPay = auction.getUpdateBidPrice(nodeOps[8], 14e2, 90);
         vm.prank(nodeOps[8]);
-        vm.expectRevert(bytes("Auction Score already exists"));
+        vm.expectRevert(IAuction.BidAlreadyExists.selector);
         auction.updateBid{value: priceToPay}(14e2, 90);
     }
 
@@ -340,7 +342,7 @@ contract AuctionTest is Test {
 
     function testWithdrawBid_RevertWhen_NotInAuction() external {
         // nodeOps[0] withdraws its bid but hasn't had bid
-        vm.expectRevert(bytes("Not in auction, cannot withdraw"));
+        vm.expectRevert(IAuction.NotInAuction.selector);
         auction.withdrawBid();
     }
 
@@ -400,7 +402,7 @@ contract AuctionTest is Test {
         // Alice bids like nodeOps[0] (verify if tree leaf has been deleted)
         _nodeOpBid(NodeOpBid(alice, 13e2, 1000));
 
-        vm.expectRevert(bytes("Not enough node operators in Auction"));
+        vm.expectRevert(IAuction.NotEnoughNodeOps.selector);
         auction.createDV();
 
         // Bob bids just under Alice's bid
