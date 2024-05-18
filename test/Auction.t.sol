@@ -7,11 +7,9 @@ pragma solidity ^0.8.20;
 
 import {Test, console} from "forge-std/Test.sol";
 import {Auction} from "../src/core/Auction.sol";
-import {AuctionMock} from "./mocks/AuctionMock.sol";
 
 contract AuctionTest is Test {
     Auction auction;
-    AuctionMock mock;
 
     uint256 constant BOND = 1 ether;
     uint256 constant STARTING_BALANCE = 10 ether;
@@ -49,8 +47,6 @@ contract AuctionTest is Test {
             MAX_DISCOUNT_RATE,
             MIN_DURATION
         );
-
-        mock = new AuctionMock(payable(msg.sender));
 
         for (uint i = 0; i < nodeOps.length; i++) {
             vm.deal(nodeOps[i], STARTING_BALANCE);
