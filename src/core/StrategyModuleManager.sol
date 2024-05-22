@@ -1,59 +1,47 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "@openzeppelin/contracts/utils/Create2.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin-upgrades/contracts/proxy/utils/Initializable.sol";
+import "@openzeppelin-upgrades/contracts/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
+
 import "eigenlayer-contracts/interfaces/IEigenPodManager.sol";
 import "eigenlayer-contracts/interfaces/IDelegationManager.sol";
 
-import "../tokens/ByzNft.sol";
-import "./Auction.sol";
-import "./StrategyModule.sol";
+import "./StrategyModuleManagerStorage.sol";
 
 import "../interfaces/IByzNft.sol";
 import "../interfaces/IAuction.sol";
 import "../interfaces/IStrategyModule.sol";
-import "../interfaces/IStrategyModuleManager.sol";
 
 // TODO: Emit events to notify what happened
 
-contract StrategyModuleManager is IStrategyModuleManager, Ownable {
+contract StrategyModuleManager is 
+    Initializable,
+    OwnableUpgradeable,
+    StrategyModuleManagerStorage
+{
+    /* =============== CONSTRUCTOR & INITIALIZER =============== */
 
-    /* ============== CONSTANTS + IMMUTABLES ============== */
-
-    /// @notice ByzNft contract
-    IByzNft public immutable byzNft;
-
-    /// @notice Auction contract
-    IAuction public immutable auction;
-
-    /// @notice EigenLayer's EigenPodManager contract
-    IEigenPodManager public immutable eigenPodManager;
-
-    /// @notice EigenLayer's DelegationManager contract
-    IDelegationManager public immutable delegationManager;
-
-    /* ============== STATE VARIABLES ============== */
-
-    /// @notice Staker to its owned StrategyModules
-    mapping(address => address[]) public stakerToStratMods;
-
-    /// @notice ByzNft tokenId to its tied StrategyModule
-    mapping(uint256 => address) public nftIdToStratMod;
-
-    /// @notice The number of StratMods that have been deployed
-    uint256 public numStratMods; // This is also the number of ByzNft minted   
-
-    /* =============== CONSTRUCTOR =============== */
-
+    /// @custom:oz-upgrades-unsafe-allow constructor
     constructor(
+        IBeacon _stratModBeacon,
+        IAuction _auction,
+        IByzNft _byzNft,
         IEigenPodManager _eigenPodManager,
         IDelegationManager _delegationManager
-    ) {
-        byzNft = IByzNft(address(new ByzNft()));
-        auction = IAuction(address(new Auction()));
-        eigenPodManager = _eigenPodManager;
-        delegationManager = _delegationManager;
+    ) StrategyModuleManagerStorage(_stratModBeacon, _auction, _byzNft, _eigenPodManager, _delegationManager) {
+        // Disable initializer in the context of the implementation contract
+        _disableInitializers();
+    }
+
+    /**
+     * @dev Initializes the address of the initial owner
+     */
+    function initialize(
+        address initialOwner
+    ) external initializer {
+        _transferOwnership(initialOwner);
     }
 
     /* ================== MODIFIERS ================== */
@@ -253,16 +241,8 @@ contract StrategyModuleManager is IStrategyModuleManager, Ownable {
         uint256 nftId = byzNft.mint(msg.sender, numStratMods);
 
         // create the stratMod
-        address stratMod = address(
-            new StrategyModule(
-                address(this),
-                address(auction),
-                byzNft,
-                nftId,
-                address(eigenPodManager),
-                address(delegationManager)
-            )
-        );
+        address stratMod = address(new BeaconProxy(address(stratModBeacon), ""));
+        IStrategyModule(stratMod).initialize(nftId);
 
         // store the stratMod in the nftId mapping
         nftIdToStratMod[nftId] = stratMod;

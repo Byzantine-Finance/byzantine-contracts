@@ -35,6 +35,12 @@ interface IStrategyModule {
   }
 
   /**
+   * @notice Used to initialize the  nftId of that StrategyModule.
+   * @dev Called on construction by the StrategyModuleManager.
+   */
+  function initialize(uint256 _nftId) external;
+
+  /**
    * @notice Returns the owner of this StrategyModule
    */
   function stratModNftId() external view returns (uint256);

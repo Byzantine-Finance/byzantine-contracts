@@ -1,14 +1,33 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin-upgrades/contracts/proxy/utils/Initializable.sol";
+import "@openzeppelin-upgrades/contracts/token/ERC721/ERC721Upgradeable.sol";
+import "@openzeppelin-upgrades/contracts/access/OwnableUpgradeable.sol";
 
 import "../interfaces/IByzNft.sol";
+import "../interfaces/IStrategyModuleManager.sol";    
 
-contract ByzNft is IByzNft, ERC721, Ownable {
+contract ByzNft is
+    Initializable,
+    OwnableUpgradeable,
+    ERC721Upgradeable,
+    IByzNft
+{
 
-    constructor() ERC721("Byzantine NFT", "byzNFT") {}
+    // Unsafe to have a constructor in the context of a proxy contract
+    //constructor() ERC721("Byzantine NFT", "byzNFT") {}
+
+    /**
+     * @dev Initializes name, symbol and owner of the ERC721 collection.
+     * @dev owner is the StrategyModuleManager proxy contract
+     */
+    function initialize(
+        IStrategyModuleManager _strategyModuleManager
+    ) external initializer {
+        __ERC721_init("Byzantine NFT", "byzNFT");
+        _transferOwnership(address(_strategyModuleManager));
+    }
 
     /**
      * @notice Gets called when a full staker creates a Strategy Module

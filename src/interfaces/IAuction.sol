@@ -185,9 +185,6 @@ interface IAuction {
     /// @dev Error when unauthorized call to a function callable only by the StrategyModuleManager.
     error OnlyStrategyModuleManager();
 
-    /// @dev Error when unauthorized call to a function callable only by Byzantine Admin.
-    error OnlyByzantine();
-
     /// @dev Error when address already whitelisted
     error AlreadyWhitelisted();
 
