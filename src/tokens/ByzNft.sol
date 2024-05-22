@@ -41,4 +41,15 @@ contract ByzNft is
         return tokenId;
     }
 
+    /**
+     * @dev Overrides `_beforeTokenTransfer` to restrict token transfers to the StrategyModuleManager contract.
+     */
+    function _beforeTokenTransfer(
+        address from,
+        address to,
+        uint256 tokenId
+    ) internal override view {
+        require(msg.sender == owner(), "ByzNft._transfer: Token transfer can only be initiated by the StrategyModuleManager, call StrategyModuleManager.transferStratModOwnership");
+    }
+
 }

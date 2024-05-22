@@ -96,6 +96,18 @@ contract StrategyModuleManagerTest is ProofParsing, ByzantineDeployer {
     function testStratModTransfer() public {
         // Alice creates a StrategyModule
         address stratModAddrAlice = _createStratMod(alice);
+        uint256 nftId = IStrategyModule(stratModAddrAlice).stratModNftId();
+
+        // Verify Alice owns the nft
+        ByzNft byzNftContract = _getByzNftContract();
+        assertEq(byzNftContract.ownerOf(nftId), alice);
+
+        // Alice tries to transfer the StrategyModule by call the ERC721 `safeTransferFrom` function
+        // It's forbidden because the nft owner will change but the mapping `stakerToStratMods` won't be updated
+        vm.startPrank(alice);
+        vm.expectRevert(bytes("ByzNft._transfer: Token transfer can only be initiated by the StrategyModuleManager, call StrategyModuleManager.transferStratModOwnership"));
+        byzNftContract.safeTransferFrom(alice, bob, nftId);
+        vm.stopPrank();
 
         // Alice approves the StrategyModuleManager to transfer to Bob
         _approveNftTransferByStratModManager(alice, IStrategyModule(stratModAddrAlice).stratModNftId());
