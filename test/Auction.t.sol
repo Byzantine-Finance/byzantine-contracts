@@ -5,21 +5,12 @@ pragma solidity ^0.8.20;
 // solhint-disable var-name-mixedcase
 // solhint-disable func-name-mixedcase
 
-import {Test, console} from "forge-std/Test.sol";
-import {Auction} from "../src/core/Auction.sol";
-
+import "./ByzantineDeployer.t.sol";
 import "../src/interfaces/IAuction.sol";
 
-contract AuctionTest is Test {
-    Auction auction;
+contract AuctionTest is ByzantineDeployer {
 
-    uint256 constant BOND = 1 ether;
     uint256 constant STARTING_BALANCE = 10 ether;
-
-    address ESCROW = makeAddr("escrow");
-    uint256 EXPECTED_DAILY_RETURN = (uint256(32 ether) * 37) / 1000 / 365; //3243835616438356
-    uint256 MAX_DISCOUNT_RATE = 15e2;
-    uint256 MIN_DURATION = 30;
 
     address[] public nodeOps = [
         makeAddr("node_operator_0"),
@@ -42,14 +33,11 @@ contract AuctionTest is Test {
         uint256 timeInDays;
     }
 
-    function setUp() external {
-        auction = new Auction(
-            ESCROW,
-            EXPECTED_DAILY_RETURN,
-            MAX_DISCOUNT_RATE,
-            MIN_DURATION
-        );
+    function setUp() public override {
+        // deploy locally EigenLayer and Byzantine contracts
+        ByzantineDeployer.setUp();
 
+        // Fill the node operators' balance
         for (uint i = 0; i < nodeOps.length; i++) {
             vm.deal(nodeOps[i], STARTING_BALANCE);
         }
@@ -63,7 +51,7 @@ contract AuctionTest is Test {
     function test_AddToWhitelist() external {
         // First, nodeOps[0] wants to add himself to the whitelist
         vm.prank(nodeOps[0]);
-        vm.expectRevert(IAuction.OnlyByzantine.selector);
+        vm.expectRevert(bytes("Ownable: caller is not the owner"));
         auction.addNodeOpToWhitelist(nodeOps[0]);
 
         // Byzantine adds nodeOps[0] to the whitelist
@@ -266,9 +254,9 @@ contract AuctionTest is Test {
         ) = auction.getAuctionConfigValues();
 
         // Check if the initial values are correct
-        assertEq(_expectedDailyReturnWei, EXPECTED_DAILY_RETURN);
-        assertEq(_maxDiscountRate, MAX_DISCOUNT_RATE);
-        assertEq(_minDuration, MIN_DURATION);
+        assertEq(_expectedDailyReturnWei, currentPoSDailyReturnWei);
+        assertEq(_maxDiscountRate, maxDiscountRate);
+        assertEq(_minDuration, minValidationDuration);
         assertEq(_clusterSize, 4);
 
         // Update auction configuration

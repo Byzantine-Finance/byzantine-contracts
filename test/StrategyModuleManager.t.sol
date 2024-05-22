@@ -2,25 +2,22 @@
 pragma solidity ^0.8.12;
 
 import "@openzeppelin/contracts/utils/Create2.sol";
-import "./eigenlayer-helper/EigenLayerDeployer.t.sol";
 import "eigenlayer-contracts/interfaces/IEigenPod.sol";
 import "eigenlayer-contracts/interfaces/IDelegationManager.sol";
 import "eigenlayer-contracts/interfaces/IStrategy.sol";
 import "eigenlayer-contracts/libraries/BeaconChainProofs.sol";
 import "./utils/ProofParsing.sol";
 
-import "../src/core/StrategyModuleManager.sol";
-import "../src/core/StrategyModule.sol";
+import "./ByzantineDeployer.t.sol";
+
 import "../src/tokens/ByzNft.sol";
 import "../src/core/Auction.sol";
 
 import "../src/interfaces/IStrategyModule.sol";
 import "../src/interfaces/IStrategyModuleManager.sol";
 
-contract StrategyModuleManagerTest is ProofParsing, EigenLayerDeployer {
+contract StrategyModuleManagerTest is ProofParsing, ByzantineDeployer {
     using BeaconChainProofs for *;
-
-    StrategyModuleManager public strategyModuleManager;
 
     /// @notice Canonical, virtual beacon chain ETH strategy
     IStrategy public constant beaconChainETHStrategy = IStrategy(0xbeaC0eeEeeeeEEeEeEEEEeeEEeEeeeEeeEEBEaC0);
@@ -30,15 +27,8 @@ contract StrategyModuleManagerTest is ProofParsing, EigenLayerDeployer {
     address ELOperator1 = address(0x1516171819);
 
     function setUp() public override {
-        // deploy locally EigenLayer contracts
-        EigenLayerDeployer.setUp();
-
-        // deploy StrategyModuleManager
-        strategyModuleManager = new StrategyModuleManager(
-            eigenPodManager,
-            delegation
-        );
-        
+        // deploy locally EigenLayer and Byzantine contracts
+        ByzantineDeployer.setUp();
     }
 
     function testStratModManagerOwner() public view {
