@@ -1,64 +1,54 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.20;
 
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin-upgrades/contracts/proxy/utils/Initializable.sol";
+import "@openzeppelin-upgrades/contracts/access/OwnableUpgradeable.sol";
+import "@openzeppelin-upgrades/contracts/security/ReentrancyGuardUpgradeable.sol";
 import "ds-math/math.sol";
 
-import "../interfaces/IAuction.sol";
 import "../libraries/BokkyPooBahsRedBlackTreeLibrary.sol";
+
+import "./AuctionStorage.sol";
 
 /// TODO: Calculation of the reputation score of node operators
 /// TODO: Create escrow contract to pay directly the bid
 
-contract Auction is ReentrancyGuard, DSMath, IAuction {
-    using BokkyPooBahsRedBlackTreeLibrary for BokkyPooBahsRedBlackTreeLibrary.Tree;
+contract Auction is
+    Initializable,
+    OwnableUpgradeable,
+    ReentrancyGuardUpgradeable,
+    AuctionStorage,
+    DSMath
+{
+    using BokkyPooBahsRedBlackTreeLibrary for BokkyPooBahsRedBlackTreeLibrary.Tree;  
 
-    /* ================= CONSTANTS + IMMUTABLES ================= */
+    /* ===================== CONSTRUCTOR & INITIALIZER ===================== */
 
-    uint256 private constant _WAD = 1e18;
-    uint256 private constant _BOND = 1 ether;
-
-    /* ===================== STATE VARIABLES ===================== */
-
-    /// @notice Auction scores stored in a Red-Black tree (complexity O(log n))
-    BokkyPooBahsRedBlackTreeLibrary.Tree private _auctionTree;
-
-    /// @notice Daily rewards of Ethereum Pos (in WEI)
-    uint256 private _expectedDailyReturnWei;
-    /// @notice Minimum duration to be part of a DV (in days)
-    uint256 private _minDuration;
-    /// @notice Maximum discount rate (i.e the max profit margin of node op) in percentage (from 0 to 10000 -> 100%)
-    uint256 private _maxDiscountRate;
-    /// @notice Number of nodes in a Distributed Validator
-    uint256 private _clusterSize = 4;
-
-    /// @notice Escrow contract address where the bids and the bonds are sent and stored
-    address payable public escrowAddr;
-    /// @notice Smart contract admin
-    address public byzantineFinance;
-
-    /// @notice Node operator address => node operator auction details
-    mapping(address => NodeOpDetails) private _nodeOpsInfo;
-
-    /// @notice Auction score => node operator address
-    mapping(uint256 => address) private _auctionScoreToNodeOp;
-
-    /// @notice Mapping for the whitelisted node operators
-    mapping(address => bool) private _nodeOpsWhitelist;    
-
-    /* ===================== CONSTRUCTOR ===================== */
-
+    /// @custom:oz-upgrades-unsafe-allow constructor
     constructor(
-        address _escrowAddr,
+        IEscrow _escrow,
+        IStrategyModuleManager _strategyModuleManager
+    ) AuctionStorage(_escrow, _strategyModuleManager) {
+        // Disable initializer in the context of the implementation contract
+        _disableInitializers();
+    }
+
+    /**
+     * @dev Initializes the address of the initial owner
+     */
+    function initialize(
+        address _initialOwner,
         uint256 __expectedDailyReturnWei,
         uint256 __maxDiscountRate,
-        uint256 __minDuration
-    ) {
-        byzantineFinance = msg.sender;
-        escrowAddr = payable(_escrowAddr);
+        uint256 __minDuration,
+        uint256 __clusterSize
+    ) external initializer {
+        _transferOwnership(_initialOwner);
+        __ReentrancyGuard_init();
         _expectedDailyReturnWei = __expectedDailyReturnWei;
         _maxDiscountRate = __maxDiscountRate;
         _minDuration = __minDuration;
+        _clusterSize = __clusterSize;
     }
 
     /* ===================== EXTERNAL FUNCTIONS ===================== */
@@ -86,20 +76,27 @@ contract Auction is ReentrancyGuard, DSMath, IAuction {
     /**
      * @notice Function triggered by the StrategyModuleManager every time a staker deposit 32ETH and ask for a DV.
      * It finds the `_clusterSize` node operators with the highest auction scores and put them in a DV.
+     * @param _stratModNeedingDV: the strategy module asking for a DV.
      * @dev The status of the winners is updated to `inDV`.
      * @dev Reverts if not enough node operators are available.
      */
     function createDV(
-        //address _stratModNeedingDV
-    ) external onlyStategyModuleManager nonReentrant returns (address[] memory) {
+        IStrategyModule _stratModNeedingDV
+    ) external onlyStategyModuleManager nonReentrant {
         
         address[] memory auctionWinners = _getAuctionWinners();
 
         // TODO: Ask the escrow contract to debit the bid of the winners
         // BUG If payments fail, auction tree and auction score mapping already updated....
 
-        // Updates the details of the winners
+        // Create the Node structure and updates the details of the winners
+        IStrategyModule.Node[] memory nodes = new IStrategyModule.Node[](_clusterSize);
         for (uint256 i = 0; i < _clusterSize;) {
+            nodes[i] = IStrategyModule.Node(
+                _nodeOpsInfo[auctionWinners[i]].vcNumber, // Validation Credits number of the node
+                _nodeOpsInfo[auctionWinners[i]].reputationScore, // Reputation score of the node
+                auctionWinners[i] // Winner address
+            );
             _nodeOpsInfo[auctionWinners[i]].nodeStatus = NodeOpStatus.inDV;
             _nodeOpsInfo[auctionWinners[i]].bidPrice = 0;
             _nodeOpsInfo[auctionWinners[i]].auctionScore = 0;
@@ -107,10 +104,11 @@ contract Auction is ReentrancyGuard, DSMath, IAuction {
                 ++i;
             }
         }
+        // The cluster manager is the last node among the winners
+        address clusterManager = auctionWinners[_clusterSize - 1];
 
-        return auctionWinners;
-
-        // TODO: Call StrategyModuleManager to fill the DV details
+        // update `ClusterDetails` of the StrategyModule
+        _stratModNeedingDV.updateClusterDetails(nodes, clusterManager);
 
     }
 
@@ -511,13 +509,8 @@ contract Auction is ReentrancyGuard, DSMath, IAuction {
 
     /* ===================== MODIFIERS ===================== */
 
-    modifier onlyOwner() {
-        if (msg.sender != byzantineFinance) revert OnlyByzantine();
-        _;
-    }
-
     modifier onlyStategyModuleManager() {
-        // TODO
+        if (msg.sender != address(strategyModuleManager)) revert OnlyStrategyModuleManager();
         _;
     }
 }

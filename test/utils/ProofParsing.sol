@@ -8,6 +8,7 @@ contract ProofParsing is Test {
     string internal proofConfigJson;
     string prefix;
 
+    address[4] dvNodesAddr;
     bytes32[18] blockHeaderProof;
     bytes32[3] slotProof;
     bytes32[10] withdrawalProofDeneb;
@@ -26,65 +27,78 @@ contract ProofParsing is Test {
         proofConfigJson = vm.readFile(path);
     }
 
-    function getDVPubKey() public returns(bytes memory) {
+    function getDVPubKeyDeposit() public view returns(bytes memory) {
         return stdJson.readBytes(proofConfigJson, "[0].pubkey");
     }
 
-    function getDVSignature() public returns(bytes memory) {
+    function getDVPubKeyLock() public view returns(bytes memory) {
+        return stdJson.readBytes(proofConfigJson, ".distributed_validators[0].deposit_data.pubkey");
+    }
+
+    function getDVSignature() public view returns(bytes memory) {
         return stdJson.readBytes(proofConfigJson, "[0].signature");
     }
 
-    function getDVDepositDataRoot() public returns(bytes32) {
+    function getDVDepositDataRoot() public view returns(bytes32) {
         return stdJson.readBytes32(proofConfigJson, "[0].deposit_data_root");
     }
 
-    function getSlot() public returns(uint256) {
+    function getSlot() public view returns(uint256) {
         return stdJson.readUint(proofConfigJson, ".slot");
     }
 
-    function getValidatorIndex() public returns(uint256) {
+    function getValidatorIndex() public view returns(uint256) {
         return stdJson.readUint(proofConfigJson, ".validatorIndex");
     }
 
-    function getValidatorPubkeyHash() public returns(bytes32) {
+    function getValidatorPubkeyHash() public view returns(bytes32) {
         return stdJson.readBytes32(proofConfigJson, ".ValidatorFields[0]");
     }
 
-    function getWithdrawalIndex() public returns(uint256) {
+    function getWithdrawalIndex() public view returns(uint256) {
         return stdJson.readUint(proofConfigJson, ".withdrawalIndex");
     }
 
-    function getBlockRootIndex() public returns(uint256) {
+    function getBlockRootIndex() public view returns(uint256) {
         return stdJson.readUint(proofConfigJson, ".blockHeaderRootIndex");
     }
 
-    function getHistoricalSummaryIndex() public returns(uint256) {
+    function getHistoricalSummaryIndex() public view returns(uint256) {
         return stdJson.readUint(proofConfigJson, ".historicalSummaryIndex");
     }
 
-    function getBeaconStateRoot() public returns(bytes32) {
+    function getBeaconStateRoot() public view returns(bytes32) {
         return stdJson.readBytes32(proofConfigJson, ".beaconStateRoot");
     }
 
-    function getBlockRoot() public returns(bytes32) {
+    function getBlockRoot() public view returns(bytes32) {
         return stdJson.readBytes32(proofConfigJson, ".blockHeaderRoot");
     }
 
-    function getSlotRoot() public returns(bytes32) {
+    function getSlotRoot() public view returns(bytes32) {
         return stdJson.readBytes32(proofConfigJson, ".slotRoot");
     }
 
-    function getTimestampRoot() public returns(bytes32) {
+    function getTimestampRoot() public view returns(bytes32) {
         return stdJson.readBytes32(proofConfigJson, ".timestampRoot");
     }
 
-    function getExecutionPayloadRoot() public returns(bytes32) {
+    function getExecutionPayloadRoot() public view returns(bytes32) {
         return stdJson.readBytes32(proofConfigJson, ".executionPayloadRoot");
     }
 
-    function getLatestBlockRoot() public returns(bytes32) {
+    function getLatestBlockRoot() public view returns(bytes32) {
         return stdJson.readBytes32(proofConfigJson, ".latestBlockHeaderRoot");
     }
+
+    function getDVNodesAddr() public returns(address[4] memory) {
+        for (uint i = 0; i < 4; i++) {
+            prefix = string.concat(".cluster_definition.operators[", string.concat(vm.toString(i), "].address"));
+            dvNodesAddr[i] = (stdJson.readAddress(proofConfigJson, prefix));
+        }
+        return dvNodesAddr;
+    }
+
     function getExecutionPayloadProof () public returns(bytes32[7] memory) {
         for (uint i = 0; i < 7; i++) {
             prefix = string.concat(".ExecutionPayloadProof[", string.concat(vm.toString(i), "]"));

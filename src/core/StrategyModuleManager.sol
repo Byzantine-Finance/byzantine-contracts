@@ -1,51 +1,54 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "@openzeppelin/contracts/utils/Create2.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin-upgrades/contracts/proxy/utils/Initializable.sol";
+import "@openzeppelin-upgrades/contracts/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
+
 import "eigenlayer-contracts/interfaces/IEigenPodManager.sol";
 import "eigenlayer-contracts/interfaces/IDelegationManager.sol";
 
-import "./StrategyModule.sol";
+import "./StrategyModuleManagerStorage.sol";
 
+import "../interfaces/IByzNft.sol";
+import "../interfaces/IAuction.sol";
 import "../interfaces/IStrategyModule.sol";
-import "../interfaces/IStrategyModuleManager.sol";
 
 // TODO: Emit events to notify what happened
-// TODO: Implement the possibility to delegate to an operator on behalf of the StrategyModule owner -> delegationManager.delegateToBySignature
-//       Create a function in StrategyModule to have a signature from the StrategyModule (function callable only by stratModOwner)
 
-contract StrategyModuleManager is IStrategyModuleManager, Ownable {
+contract StrategyModuleManager is 
+    Initializable,
+    OwnableUpgradeable,
+    StrategyModuleManagerStorage
+{
+    /* =============== CONSTRUCTOR & INITIALIZER =============== */
 
-    /* ============== STATE VARIABLES ============== */
-
-    /// @notice EigenLayer's EigenPodManager contract
-    IEigenPodManager public immutable eigenPodManager;
-
-    /// @notice EigenLayer's DelegationManager contract
-    IDelegationManager public immutable delegationManager;
-
-    /// @notice StratMod owner to deployed StratMod address
-    mapping(address => address[]) public ownerToStratMods;
-
-    /// @notice The number of StratMods that have been deployed
-    uint256 public numStratMods;
-
-    /* =============== CONSTRUCTOR =============== */
-
+    /// @custom:oz-upgrades-unsafe-allow constructor
     constructor(
+        IBeacon _stratModBeacon,
+        IAuction _auction,
+        IByzNft _byzNft,
         IEigenPodManager _eigenPodManager,
         IDelegationManager _delegationManager
-    ) {
-        eigenPodManager = _eigenPodManager;
-        delegationManager = _delegationManager;
+    ) StrategyModuleManagerStorage(_stratModBeacon, _auction, _byzNft, _eigenPodManager, _delegationManager) {
+        // Disable initializer in the context of the implementation contract
+        _disableInitializers();
+    }
+
+    /**
+     * @dev Initializes the address of the initial owner
+     */
+    function initialize(
+        address initialOwner
+    ) external initializer {
+        _transferOwnership(initialOwner);
     }
 
     /* ================== MODIFIERS ================== */
 
-    modifier checkStratModOwnerAndIndex(address stratModOwner, uint256 stratModIndex) {
-        if (!hasStratMods(stratModOwner)) revert DoNotHaveStratMod(stratModOwner);
-        if (stratModIndex + 1 > ownerToStratMods[stratModOwner].length) revert InvalidStratModIndex(stratModIndex);
+    modifier onlyStratModOwner(address owner, address stratMod) {
+        uint256 stratModNftId = IStrategyModule(stratMod).stratModNftId();
+        if (byzNft.ownerOf(stratModNftId) != owner) revert NotStratModOwner();
         _;
     }
 
@@ -61,119 +64,128 @@ contract StrategyModuleManager is IStrategyModuleManager, Ownable {
     }
 
     /**
-     * @notice Create a StrategyModule for the sender and then stake native ETH for a new beacon chain validator
-     * on that newly created StrategyModule. Also creates an EigenPod for the StrategyModule.
-     * @param pubkey The 48 bytes public key of the beacon chain validator.
-     * @param signature The validator's signature of the deposit data.
-     * @param depositDataRoot The root/hash of the deposit data for the validator's deposit.
+     * @notice A 32ETH staker create a Strategy Module and deposit in its smart contract its stake.
+     * @return The addresses of the newly created StrategyModule AND the address of its associated EigenPod (for the DV withdrawal address)
+     * @dev This action triggers an auction to select node operators to create a Distributed Validator.
+     * @dev One node operator of the DV (the DV manager) will have to deposit the 32ETH in the Beacon Chain.
      * @dev Function will revert if not exactly 32 ETH are sent with the transaction.
      */
-    function createStratModAndStakeNativeETH(
-        bytes calldata pubkey, 
-        bytes calldata signature,
-        bytes32 depositDataRoot
-    ) external payable returns (address) {
-        address stratMod = _deployStratMod();
-        IStrategyModule(stratMod).callEigenPodManager{value: msg.value}(abi.encodeWithSignature("stake(bytes,bytes,bytes32)", pubkey, signature, depositDataRoot));
-        return stratMod;
+    function createStratModAndStakeNativeETH() external payable returns (address, address) {
+        // TODO: Verify that at least 4 node ops are in Auction
+        require(msg.value == 32 ether, "StrategyModuleManager.createStratModAndStakeNativeETH: must initially stake for any validator with 32 ether");
+
+        // Create a StrategyModule and an EigenPod
+        address newStratMod = _deployStratMod();
+        address newEigenPod = IStrategyModule(newStratMod).createPod();
+
+        // Transfer the stake in the newly created StrategyModule => the sender keep the ownership of its ETH.
+        payable(newStratMod).transfer(msg.value);
+
+        // Call Auction Smart Contract, trigger an auction to find a DV and fill `ClusterDetails` in the StrategyModule
+        // We assume all the winners has accepted to join the DV.
+        auction.createDV(IStrategyModule(newStratMod));
+
+        return (newStratMod, newEigenPod);
+    }
+
+    /**
+     * @notice Strategy Module owner can transfer its Strategy Module to another address.
+     * Under the hood, he transfers the ByzNft associated to the StrategyModule.
+     * That action makes him give the ownership of the StrategyModule and all the token it owns.
+     * @param stratModAddr The address of the StrategyModule the owner will transfer.
+     * @param newOwner The address of the new owner of the StrategyModule.
+     * @dev The ByzNft owner must first call the `approve` function to allow the StrategyModuleManager to transfer the ByzNft.
+     * @dev Function will revert if not called by the ByzNft holder.
+     * @dev Function will revert if the new owner is the same as the old owner.
+     */
+    function transferStratModOwnership(address stratModAddr, address newOwner) external onlyStratModOwner(msg.sender, stratModAddr) {
+        
+        require(newOwner != msg.sender, "StrategyModuleManager.transferStratModOwnership: cannot transfer ownership to the same address");
+        
+        // Transfer the ByzNft
+        byzNft.safeTransferFrom(msg.sender, newOwner, IStrategyModule(stratModAddr).stratModNftId());
+
+        // Delete stratMod from owner's portfolio
+        address[] storage stratMods = stakerToStratMods[msg.sender];
+        for (uint256 i = 0; i < stratMods.length;) {
+            if (stratMods[i] == stratModAddr) {
+                stratMods[i] = stratMods[stratMods.length - 1];
+                stratMods.pop();
+                break;
+            }
+            unchecked {
+                ++i;
+            }
+        }
+
+        // Add stratMod to newOwner's portfolio
+        stakerToStratMods[newOwner].push(stratModAddr);
+    }
+
+    /**
+     * @notice Byzantine owner fill the expected/ trusted public key for a DV (retrievable from the Obol SDK/API).
+     * @dev Protection against a trustless cluster manager trying to deposit the 32ETH in another ethereum validator.
+     * @param stratModAddr The address of the Strategy Module to set the trusted DV pubkey
+     * @param pubKey The public key of the DV retrieved with the Obol SDK/API from a configHash
+     * @dev Revert if not callable by StrategyModuleManager owner.
+     */
+    function setTrustedDVPubKey(address stratModAddr, bytes calldata pubKey) external onlyOwner {
+        IStrategyModule(stratModAddr).setTrustedDVPubKey(pubKey);
     }
 
     /* ============== VIEW FUNCTIONS ============== */
 
     /**
      * @notice Returns the number of StrategyModules owned by an address.
-     * @param stratModOwner The address you want to know the number of Strategy Modules it owns.
+     * @param staker The address you want to know the number of Strategy Modules it owns.
      */
-    function getStratModNumber(address stratModOwner) public view returns (uint256) {
-        return ownerToStratMods[stratModOwner].length;
+    function getStratModNumber(address staker) public view returns (uint256) {
+        return stakerToStratMods[staker].length;
     }
 
     /**
-     * @notice Pre-calculate the address of a new StrategyModule `stratModOwner` will deploy.
-     * @dev The salt will be the address of the creator (`stratModOwner`) and the index of the new StrategyModule in creator's portfolio.
-     * @param stratModOwner The address of the future StrategyModule owner.
+     * @notice Returns the StrategyModule address by its bound ByzNft ID.
+     * @param nftId The ByzNft ID you want to know the attached Strategy Module.
+     * @dev Returns address(0) if the nftId is not bound to a Strategy Module (nftId is not a ByzNft)
      */
-    function computeStratModAddr(address stratModOwner) public view returns (address) {
-        uint256 stratModIndex = getStratModNumber(stratModOwner);
-
-        return Create2.computeAddress(
-            keccak256(abi.encodePacked(stratModOwner, stratModIndex)), //salt
-            keccak256(abi.encodePacked(type(StrategyModule).creationCode, abi.encode(address(this),address(eigenPodManager),address(delegationManager),stratModOwner))) //bytecode
-        );
+    function getStratModByNftId(uint256 nftId) public view returns (address) {
+        return nftIdToStratMod[nftId];
     }
 
     /**
-     * @notice Pre-calculate the address of a new EigenPod `stratModOwner` will deploy (via a new StrategyModule).
-     * @dev The pod will be deployed on a new StrategyModule owned by `stratModOwner`.
-     * @param stratModOwner The address of the future StrategyModule owner.
+     * @notice Returns the addresses of the `staker`'s StrategyModules
+     * @param staker The staker address you want to know the Strategy Modules it owns.
+     * @dev Returns an empty array if the staker has no Strategy Modules.
      */
-    function computePodAddr(address stratModOwner) public view returns (address) {
-        return address(eigenPodManager.getPod(computeStratModAddr(stratModOwner)));
+    function getStratMods(address staker) public view returns (address[] memory) {
+        if (!hasStratMods(staker)) {
+            return new address[](0);
+        }
+        return stakerToStratMods[staker];
     }
 
     /**
-     * @notice Returns the addresses of the `stratModOwner`'s StrategyModules
-     * @param stratModOwner The address you want to know the Strategy Modules it owns.
+     * @notice Returns 'true' if the `staker` owns at least one StrategyModule, and 'false' otherwise.
+     * @param staker The address you want to know if it owns at least a StrategyModule.
      */
-    function getStratMods(address stratModOwner) public view returns (address[] memory) {
-        if (!hasStratMods(stratModOwner)) revert DoNotHaveStratMod(stratModOwner);
-        return ownerToStratMods[stratModOwner];
-    }
-
-    /**
-     * @notice Returns the StrategyModule address of an owner by its index.
-     * @param stratModOwner The address of the StrategyModule's owner.
-     * @param stratModIndex The index of the StrategyModule.
-     * @dev Revert if owner doesn't have StrategyModule or if index is invalid.
-     */
-    function getStratModByIndex(
-        address stratModOwner,
-        uint256 stratModIndex
-    ) public view checkStratModOwnerAndIndex(stratModOwner,stratModIndex) returns (address) {
-        return ownerToStratMods[stratModOwner][stratModIndex];
-    }
-
-    /**
-     * @notice Returns 'true' if the `stratModOwner` has created at least one StrategyModule, and 'false' otherwise.
-     * @param stratModOwner The address you want to know if it owns at least a StrategyModule.
-     */
-    function hasStratMods(address stratModOwner) public view returns (bool) {
-        if (ownerToStratMods[stratModOwner].length == 0) {
+    function hasStratMods(address staker) public view returns (bool) {
+        if (getStratModNumber(staker) == 0) {
             return false;
         }
         return true;
     }
 
-    /**
-     * @notice Returns the address of the `stratMod`'s EigenPod (whether it is deployed yet or not).
-     * @param stratMod The address of the StrategyModule contract you want to know the EigenPod address.
-     * @dev If the `stratMod` is not an instance of a StrategyModule contract, the function will all the same 
-     * returns the EigenPod of the input address. So use that function carefully.
-     */
-    function getPodByStratModAddr(address stratMod) public view returns (address) {
-        return address(eigenPodManager.getPod(stratMod));
-    }
+    /* ============== EIGEN LAYER INTERACTION ============== */
 
     /**
-     * @notice Returns 'true' if the `stratMod` has created an EigenPod, and 'false' otherwise.
-     * @param stratModOwner The owner of the StrategyModule
-     * @param stratModIndex The index of the `stratModOwner` StrategyModules you want to know if it has an EigenPod.
-     * @dev Revert if owner doesn't have StrategyModule or if index is invalid.
+     * @notice Specify which `staker`'s StrategyModules are delegated.
+     * @param staker The address of the StrategyModules' owner.
+     * @dev Revert if the `staker` doesn't have any StrategyModule.
      */
-    function hasPod(
-        address stratModOwner,
-        uint256 stratModIndex
-    ) public view checkStratModOwnerAndIndex(stratModOwner,stratModIndex) returns (bool) {
-        return eigenPodManager.hasPod(ownerToStratMods[stratModOwner][stratModIndex]);
-    }
+    function isDelegated(address staker) public view returns (bool[] memory) {
+        if (!hasStratMods(staker)) revert DoNotHaveStratMod(staker);
 
-    /**
-     * @notice Specify which `stratModOwner`'s StrategyModules are delegated.
-     * @param stratModOwner The address of the StrategyModules' owner.
-     * @dev Revert if the `stratModOwner` doesn't have any StrategyModule.
-     */
-    function isDelegated(address stratModOwner) public view returns (bool[] memory) {
-        address[] memory stratMods = getStratMods(stratModOwner);
+        address[] memory stratMods = getStratMods(staker);
         bool[] memory stratModsDelegated = new bool[](stratMods.length);
         for (uint256 i = 0; i < stratMods.length;) {
             stratModsDelegated[i] = delegationManager.isDelegated(stratMods[i]);
@@ -185,12 +197,14 @@ contract StrategyModuleManager is IStrategyModuleManager, Ownable {
     }
 
     /**
-     * @notice Specify to which operators `stratModOwner`'s StrategyModules are delegated to.
-     * @param stratModOwner The address of the StrategyModules' owner.
-     * @dev Revert if the `stratModOwner` doesn't have any StrategyModule.
+     * @notice Specify to which operators `staker`'s StrategyModules are delegated to.
+     * @param staker The address of the StrategyModules' owner.
+     * @dev Revert if the `staker` doesn't have any StrategyModule.
      */
-    function delegateTo(address stratModOwner) public view returns (address[] memory) {
-        address[] memory stratMods = getStratMods(stratModOwner);
+    function delegateTo(address staker) public view returns (address[] memory) {
+        if (!hasStratMods(staker)) revert DoNotHaveStratMod(staker);
+
+        address[] memory stratMods = getStratMods(staker);
         address[] memory stratModsDelegateTo = new address[](stratMods.length);
         for (uint256 i = 0; i < stratMods.length;) {
             stratModsDelegateTo[i] = delegationManager.delegatedTo(stratMods[i]);
@@ -201,23 +215,44 @@ contract StrategyModuleManager is IStrategyModuleManager, Ownable {
         return stratModsDelegateTo;
     }
 
+    /**
+     * @notice Returns the address of the Strategy Module's EigenPod (whether it is deployed yet or not).
+     * @param stratModAddr The address of the StrategyModule contract you want to know the EigenPod address.
+     * @dev If the `stratModAddr` is not an instance of a StrategyModule contract, the function will all the same 
+     * returns the EigenPod of the input address. SO USE THAT FUNCTION CARREFULLY.
+     */
+    function getPodByStratModAddr(address stratModAddr) public view returns (address) {
+        return address(eigenPodManager.getPod(stratModAddr));
+    }
+
+    /**
+     * @notice Returns 'true' if the `stratModAddr` has created an EigenPod, and 'false' otherwise.
+     * @param stratModAddr The StrategyModule Address you want to know if it has created an EigenPod.
+     * @dev If the `stratModAddr` is not an instance of a StrategyModule contract, the function will all the same 
+     * returns the EigenPod of the input address. SO USE THAT FUNCTION CARREFULLY.
+     */
+    function hasPod(address stratModAddr) public view returns (bool) {
+        return eigenPodManager.hasPod(stratModAddr);
+    }
+
     /* ============== INTERNAL FUNCTIONS ============== */
 
     function _deployStratMod() internal returns (address) {
         ++numStratMods;
 
-        // number of stratMods `msg.sender` has already created
-        uint256 stratModIndex = getStratModNumber(msg.sender);
+        // mint a byzNft for the Strategy Module's creator
+        uint256 nftId = byzNft.mint(msg.sender, numStratMods);
 
         // create the stratMod
-        address stratMod = Create2.deploy(
-            0,
-            keccak256(abi.encodePacked(msg.sender, stratModIndex)),
-            abi.encodePacked(type(StrategyModule).creationCode, abi.encode(address(this), address(eigenPodManager), address(delegationManager), msg.sender))
-        );
+        address stratMod = address(new BeaconProxy(address(stratModBeacon), ""));
+        IStrategyModule(stratMod).initialize(nftId);
 
-        // store the stratMod in the mapping
-        ownerToStratMods[msg.sender].push(stratMod);
+        // store the stratMod in the nftId mapping
+        nftIdToStratMod[nftId] = stratMod;
+
+        // store the stratMod in the staker mapping
+        stakerToStratMods[msg.sender].push(stratMod);
+
         return stratMod;
     }
 

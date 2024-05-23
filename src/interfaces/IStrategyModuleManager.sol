@@ -13,94 +13,95 @@ interface IStrategyModuleManager {
     function createStratMod() external returns (address);
 
     /**
-     * @notice Create a StrategyModule for the sender and then stake native ETH for a new beacon chain validator
-     * on that newly created StrategyModule. Also creates an EigenPod for the StrategyModule.
-     * @param pubkey The 48 bytes public key of the beacon chain validator.
-     * @param signature The validator's signature of the deposit data.
-     * @param depositDataRoot The root/hash of the deposit data for the validator's deposit.
+     * @notice A 32ETH staker create a Strategy Module and deposit in its smart contract its stake.
+     * @return The addresses of the newly created StrategyModule AND the address of its associated EigenPod (for the DV withdrawal address)
+     * @dev This action triggers an auction to select node operators to create a Distributed Validator.
+     * @dev One node operator of the DV (the DV manager) will have to deposit the 32ETH in the Beacon Chain.
      * @dev Function will revert if not exactly 32 ETH are sent with the transaction.
      */
-    function createStratModAndStakeNativeETH(
-        bytes calldata pubkey, 
-        bytes calldata signature, 
-        bytes32 depositDataRoot
-    ) 
-        external payable returns (address);
+    function createStratModAndStakeNativeETH() external payable returns (address, address);
+
+    /**
+     * @notice Strategy Module owner can transfer its Strategy Module to another address.
+     * Under the hood, he transfers the ByzNft associated to the StrategyModule.
+     * That action makes him give the ownership of the StrategyModule and all the token it owns.
+     * @param stratModAddr The address of the StrategyModule the owner will transfer.
+     * @param newOwner The address of the new owner of the StrategyModule.
+     * @dev The ByzNft owner must first call the `approve` function to allow the StrategyModuleManager to transfer the ByzNft.
+     * @dev Function will revert if not called by the ByzNft holder.
+     * @dev Function will revert if the new owner is the same as the old owner.
+     */
+    function transferStratModOwnership(address stratModAddr, address newOwner) external;
+
+    /**
+     * @notice Byzantine owner fill the expected/ trusted public key for a DV (retrievable from the Obol SDK/API).
+     * @dev Protection against a trustless cluster manager trying to deposit the 32ETH in another ethereum validator.
+     * @param stratModAddr The address of the Strategy Module to set the trusted DV pubkey
+     * @param pubKey The public key of the DV retrieved with the Obol SDK/API from a configHash
+     * @dev Revert if not callable by StrategyModuleManager owner.
+     */
+    function setTrustedDVPubKey(address stratModAddr, bytes calldata pubKey) external;
 
     /**
      * @notice Returns the number of StrategyModules owned by an address.
-     * @param stratModOwner The address you want to know the number of Strategy Modules it owns.
+     * @param staker The address you want to know the number of Strategy Modules it owns.
      */
-    function getStratModNumber(address stratModOwner) external view returns (uint256);
+    function getStratModNumber(address staker) external view returns (uint256);
 
     /**
-     * @notice Pre-calculate the address of a new StrategyModule `stratModOwner` will deploy.
-     * @dev The salt will be the address of the creator (`stratModOwner`) and the index of the new StrategyModule in creator's portfolio.
-     * @param stratModOwner The address of the future StrategyModule owner.
+     * @notice Returns the StrategyModule address by its bound ByzNft ID.
+     * @param nftId The ByzNft ID you want to know the attached Strategy Module.
+     * @dev Returns address(0) if the nftId is not bound to a Strategy Module (nftId is not a ByzNft)
      */
-    function computeStratModAddr(address stratModOwner) external view returns (address);
+    function getStratModByNftId(uint256 nftId) external view returns (address);
 
     /**
-     * @notice Pre-calculate the address of a new EigenPod `stratModOwner` will deploy (via a new StrategyModule).
-     * @dev The pod will be deployed on a new StrategyModule owned by `stratModOwner`.
-     * @param stratModOwner The address of the future StrategyModule owner.
+     * @notice Returns the addresses of the `staker`'s StrategyModules
+     * @param staker The staker address you want to know the Strategy Modules it owns.
+     * @dev Returns an empty array if the staker has no Strategy Modules.
      */
-    function computePodAddr(address stratModOwner) external view returns (address);
+    function getStratMods(address staker) external view returns (address[] memory);
 
     /**
-     * @notice Returns the addresses of the `stratModOwner`'s StrategyModules
-     * @param stratModOwner The address you want to know the Strategy Modules it owns.
-     */      
-    function getStratMods(address stratModOwner) external view returns (address[] memory);
+     * @notice Returns the address of the Strategy Module's EigenPod (whether it is deployed yet or not).
+     * @param stratModAddr The address of the StrategyModule contract you want to know the EigenPod address.
+     * @dev If the `stratModAddr` is not an instance of a StrategyModule contract, the function will all the same 
+     * returns the EigenPod of the input address. SO USE THAT FUNCTION CARREFULLY.
+     */
+    function getPodByStratModAddr(address stratModAddr) external view returns (address);
 
     /**
-     * @notice Returns the StrategyModule address of an owner by its index.
-     * @param stratModOwner The address of the StrategyModule's owner.
-     * @param stratModIndex The index of the StrategyModule.
-     * @dev Revert if owner doesn't have StrategyModule or if index is invalid.
+     * @notice Returns 'true' if the `staker` owns at least one StrategyModule, and 'false' otherwise.
+     * @param staker The address you want to know if it owns at least a StrategyModule.
      */
-    function getStratModByIndex(address stratModOwner, uint256 stratModIndex) external view returns (address);
-    
-    /**
-     * @notice Returns 'true' if the `stratModOwner` has created at least one StrategyModule, and 'false' otherwise.
-     * @param stratModOwner The address you want to know if it owns at least a StrategyModule.
-     */       
-    function hasStratMods(address stratModOwner) external view returns (bool);
-    
-    /**
-     * @notice Returns the address of the `stratMod`'s EigenPod (whether it is deployed yet or not).
-     * @param stratMod The address of the StrategyModule contract you want to know the EigenPod address.
-     * @dev If the `stratMod` is not an instance of a StrategyModule contract, the function will all the same 
-     * returns the EigenPod of the input address. So use that function carefully.
-     */     
-    function getPodByStratModAddr(address stratMod) external view returns (address);
+    function hasStratMods(address staker) external view returns (bool);
 
     /**
-     * @notice Returns 'true' if the `stratMod` has created an EigenPod, and 'false' otherwise.
-     * @param stratModOwner The owner of the StrategyModule
-     * @param stratModIndex The index of the `stratModOwner` StrategyModules you want to know if it has an EigenPod.
-     * @dev Revert if owner doesn't have StrategyModule or if index is invalid.
+     * @notice Specify which `staker`'s StrategyModules are delegated.
+     * @param staker The address of the StrategyModules' owner.
+     * @dev Revert if the `staker` doesn't have any StrategyModule.
      */
-    function hasPod(address stratModOwner, uint256 stratModIndex) external view returns (bool);
+    function isDelegated(address staker) external view returns (bool[] memory);
 
     /**
-     * @notice Specify which `stratModOwner`'s StrategyModules are delegated.
-     * @param stratModOwner The address of the StrategyModules' owner.
-     * @dev Revert if the `stratModOwner` doesn't have any StrategyModule.
+     * @notice Specify to which operators `staker`'s StrategyModules are delegated to.
+     * @param staker The address of the StrategyModules' owner.
+     * @dev Revert if the `staker` doesn't have any StrategyModule.
      */
-    function isDelegated(address stratModOwner) external view returns (bool[] memory);
+    function delegateTo(address staker) external view returns (address[] memory);
 
     /**
-     * @notice Specify to which operators `stratModOwner`'s StrategyModules are delegated to.
-     * @param stratModOwner The address of the StrategyModules' owner.
-     * @dev Revert if the `stratModOwner` doesn't have any StrategyModule.
+     * @notice Returns 'true' if the `stratModAddr` has created an EigenPod, and 'false' otherwise.
+     * @param stratModAddr The StrategyModule Address you want to know if it has created an EigenPod.
+     * @dev If the `stratModAddr` is not an instance of a StrategyModule contract, the function will all the same 
+     * returns the EigenPod of the input address. SO USE THAT FUNCTION CARREFULLY.
      */
-    function delegateTo(address stratModOwner) external view returns (address[] memory);
+    function hasPod(address stratModAddr) external view returns (bool);
 
     /// @dev Returned when a specific address doesn't have a StrategyModule
     error DoNotHaveStratMod(address);
 
-    /// @dev Returned if sender sender doesn't have StrategyModule at `stratModIndex`
-    error InvalidStratModIndex(uint256);
+    /// @dev Returned when unauthorized call to a function only callable by the StrategyModule owner
+    error NotStratModOwner();
     
 }
