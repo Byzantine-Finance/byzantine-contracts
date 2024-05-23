@@ -31,6 +31,35 @@ contract ByzantineDeployer is EigenLayerDeployer {
     uint256 public maxDiscountRate = 15e2; // 15%
     uint256 public minValidationDuration = 30; // 30 days
 
+    /* =============== TEST VARIABLES AND STRUCT =============== */
+   
+    // Eigen Layer operator securing AVS
+    address ELOperator1 = address(0x1516171819);
+    
+    // Tests protagonists
+    address alice = makeAddr("alice");
+    address bob = makeAddr("bob");
+
+    // Node operators seeking for a DV in Byzantine
+    address[] public nodeOps = [
+        makeAddr("node_operator_0"),
+        makeAddr("node_operator_1"),
+        makeAddr("node_operator_2"),
+        makeAddr("node_operator_3"),
+        makeAddr("node_operator_4"),
+        makeAddr("node_operator_5"),
+        makeAddr("node_operator_6"),
+        makeAddr("node_operator_7"),
+        makeAddr("node_operator_8"),
+        makeAddr("node_operator_9")
+    ];
+
+    struct NodeOpBid {
+        address nodeOp;
+        uint256 discountRate;
+        uint256 timeInDays;
+    }
+
     function setUp() public virtual override {
         // deploy locally EigenLayer contracts
         EigenLayerDeployer.setUp();

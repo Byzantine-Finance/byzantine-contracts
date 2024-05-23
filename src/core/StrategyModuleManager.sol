@@ -71,6 +71,7 @@ contract StrategyModuleManager is
      * @dev Function will revert if not exactly 32 ETH are sent with the transaction.
      */
     function createStratModAndStakeNativeETH() external payable returns (address, address) {
+        // TODO: Verify that at least 4 node ops are in Auction
         require(msg.value == 32 ether, "StrategyModuleManager.createStratModAndStakeNativeETH: must initially stake for any validator with 32 ether");
 
         // Create a StrategyModule and an EigenPod
@@ -80,7 +81,9 @@ contract StrategyModuleManager is
         // Transfer the stake in the newly created StrategyModule => the sender keep the ownership of its ETH.
         payable(newStratMod).transfer(msg.value);
 
-        // TODO: Call Auction Smart Contract and trigger an auction to find a DV
+        // Call Auction Smart Contract, trigger an auction to find a DV and fill `ClusterDetails` in the StrategyModule
+        // We assume all the winners has accepted to join the DV.
+        auction.createDV(IStrategyModule(newStratMod));
 
         return (newStratMod, newEigenPod);
     }

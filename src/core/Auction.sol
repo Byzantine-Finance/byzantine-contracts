@@ -10,9 +10,6 @@ import "../libraries/BokkyPooBahsRedBlackTreeLibrary.sol";
 
 import "./AuctionStorage.sol";
 
-import "../interfaces/IStrategyModuleManager.sol";
-import "../interfaces/IEscrow.sol";
-
 /// TODO: Calculation of the reputation score of node operators
 /// TODO: Create escrow contract to pay directly the bid
 
@@ -79,20 +76,27 @@ contract Auction is
     /**
      * @notice Function triggered by the StrategyModuleManager every time a staker deposit 32ETH and ask for a DV.
      * It finds the `_clusterSize` node operators with the highest auction scores and put them in a DV.
+     * @param _stratModNeedingDV: the strategy module asking for a DV.
      * @dev The status of the winners is updated to `inDV`.
      * @dev Reverts if not enough node operators are available.
      */
     function createDV(
-        //address _stratModNeedingDV
-    ) external onlyStategyModuleManager nonReentrant returns (address[] memory) {
+        IStrategyModule _stratModNeedingDV
+    ) external onlyStategyModuleManager nonReentrant {
         
         address[] memory auctionWinners = _getAuctionWinners();
 
         // TODO: Ask the escrow contract to debit the bid of the winners
         // BUG If payments fail, auction tree and auction score mapping already updated....
 
-        // Updates the details of the winners
+        // Create the Node structure and updates the details of the winners
+        IStrategyModule.Node[] memory nodes = new IStrategyModule.Node[](_clusterSize);
         for (uint256 i = 0; i < _clusterSize;) {
+            nodes[i] = IStrategyModule.Node(
+                _nodeOpsInfo[auctionWinners[i]].vcNumber, // Validation Credits number of the node
+                _nodeOpsInfo[auctionWinners[i]].reputationScore, // Reputation score of the node
+                auctionWinners[i] // Winner address
+            );
             _nodeOpsInfo[auctionWinners[i]].nodeStatus = NodeOpStatus.inDV;
             _nodeOpsInfo[auctionWinners[i]].bidPrice = 0;
             _nodeOpsInfo[auctionWinners[i]].auctionScore = 0;
@@ -100,10 +104,11 @@ contract Auction is
                 ++i;
             }
         }
+        // The cluster manager is the last node among the winners
+        address clusterManager = auctionWinners[_clusterSize - 1];
 
-        return auctionWinners;
-
-        // TODO: Call StrategyModuleManager to fill the DV details
+        // update `ClusterDetails` of the StrategyModule
+        _stratModNeedingDV.updateClusterDetails(nodes, clusterManager);
 
     }
 
@@ -505,7 +510,7 @@ contract Auction is
     /* ===================== MODIFIERS ===================== */
 
     modifier onlyStategyModuleManager() {
-        // TODO
+        if (msg.sender != address(strategyModuleManager)) revert OnlyStrategyModuleManager();
         _;
     }
 }

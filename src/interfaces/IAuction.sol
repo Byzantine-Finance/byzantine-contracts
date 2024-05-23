@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+import "./IStrategyModule.sol";
+
 interface IAuction {
 
     enum NodeOpStatus {
@@ -53,13 +55,14 @@ interface IAuction {
     /**
      * @notice Function triggered by the StrategyModuleManager every time a staker deposit 32ETH and ask for a DV.
      * It finds the `_clusterSize` node operators with the highest auction scores and put them in a DV.
+     * @param _stratModNeedingDV: the strategy module asking for a DV.
      * @dev The status of the winners is updated to `inDV`.
      * @dev Reverts if not enough node operators are available.
      */
     function createDV(
-        //address _stratModNeedingDV
+        IStrategyModule _stratModNeedingDV
     ) 
-        external returns (address[] memory);
+        external;
 
     /**
      * @notice Fonction to determine the auction price for a validator according to its bid parameters

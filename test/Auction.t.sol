@@ -7,31 +7,11 @@ pragma solidity ^0.8.20;
 
 import "./ByzantineDeployer.t.sol";
 import "../src/interfaces/IAuction.sol";
+import "../src/interfaces/IStrategyModule.sol";
 
 contract AuctionTest is ByzantineDeployer {
 
     uint256 constant STARTING_BALANCE = 10 ether;
-
-    address[] public nodeOps = [
-        makeAddr("node_operator_0"),
-        makeAddr("node_operator_1"),
-        makeAddr("node_operator_2"),
-        makeAddr("node_operator_3"),
-        makeAddr("node_operator_4"),
-        makeAddr("node_operator_5"),
-        makeAddr("node_operator_6"),
-        makeAddr("node_operator_7"),
-        makeAddr("node_operator_8"),
-        makeAddr("node_operator_9")
-    ];
-    address alice = makeAddr("alice");
-    address bob = makeAddr("bob");
-
-    struct NodeOpBid {
-        address nodeOp;
-        uint256 discountRate;
-        uint256 timeInDays;
-    }
 
     function setUp() public override {
         // deploy locally EigenLayer and Byzantine contracts
@@ -367,14 +347,24 @@ contract AuctionTest is ByzantineDeployer {
     }
 
     function testCreateDVs() external {
+        // Alice creates a StrategyModule
+        vm.prank(alice);
+        IStrategyModule aliceStratMod = IStrategyModule(strategyModuleManager.createStratMod());
+
         // 10 node ops bids
         _10NodeOpsBid();
         // Get nodeOPs[0] auction score
         (,,uint256 auctionScore0,,) = auction.getNodeOpDetails(nodeOps[0]);
         assertEq(auction.getAuctionScoreToNodeOp(auctionScore0), nodeOps[0]);
 
+        // Revert if not SrategyModuleManager calls createDV
+        vm.expectRevert(IAuction.OnlyStrategyModuleManager.selector);
+        auction.createDV(aliceStratMod);
+
         // First DV: nodeOps[0], nodeOps[2], nodeOps[4], nodeOps[6]
-        address[] memory winnersDV1 = auction.createDV();
+        vm.prank(address(strategyModuleManager));
+        auction.createDV(aliceStratMod);
+        address [] memory winnersDV1 = aliceStratMod.getDVNodesAddr();
         for (uint i = 0; i < winnersDV1.length; i++) {
             assertEq(winnersDV1[i], nodeOps[2 * i]);
         }
@@ -382,22 +372,27 @@ contract AuctionTest is ByzantineDeployer {
         assertEq(auction.getAuctionScoreToNodeOp(auctionScore0), address(0));
 
         // Second DV: nodeOps[1], nodeOps[3], nodeOps[5], nodeOps[7]
-        address[] memory winnersDV2 = auction.createDV();
+        vm.prank(address(strategyModuleManager));
+        auction.createDV(aliceStratMod);
+        address [] memory winnersDV2 = aliceStratMod.getDVNodesAddr();
         for (uint i = 0; i < winnersDV2.length; i++) {
             assertEq(winnersDV2[i], nodeOps[(2 * i) + 1]);
         }
 
         // Alice bids like nodeOps[0] (verify if tree leaf has been deleted)
         _nodeOpBid(NodeOpBid(alice, 13e2, 1000));
-
+        
+        vm.prank(address(strategyModuleManager));
         vm.expectRevert(IAuction.NotEnoughNodeOps.selector);
-        auction.createDV();
+        auction.createDV(aliceStratMod);
 
         // Bob bids just under Alice's bid
         _nodeOpBid(NodeOpBid(bob, 13e2, 999));
 
         // Third DV: alice, bob, nodeOps[8], nodeOps[9]
-        address[] memory winnersDV3 = auction.createDV();
+        vm.prank(address(strategyModuleManager));
+        auction.createDV(aliceStratMod);
+        address [] memory winnersDV3 = aliceStratMod.getDVNodesAddr();
         assertEq(winnersDV3[0], alice);
         assertEq(winnersDV3[1], bob);
         assertEq(winnersDV3[2], nodeOps[8]);

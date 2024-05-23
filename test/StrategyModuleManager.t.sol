@@ -22,13 +22,18 @@ contract StrategyModuleManagerTest is ProofParsing, ByzantineDeployer {
     /// @notice Canonical, virtual beacon chain ETH strategy
     IStrategy public constant beaconChainETHStrategy = IStrategy(0xbeaC0eeEeeeeEEeEeEEEEeeEEeEeeeEeeEEBEaC0);
 
-    address alice = address(0x123456789);
-    address bob = address(0x1011121314);
-    address ELOperator1 = address(0x1516171819);
+    /// @notice Initial balance of all the node operators
+    uint256 constant STARTING_BALANCE = 10 ether;
 
     function setUp() public override {
         // deploy locally EigenLayer and Byzantine contracts
         ByzantineDeployer.setUp();
+
+        // For the context of these tests, we assume 10 node ops are waiting to join a cluster
+        for (uint i = 0; i < nodeOps.length; i++) {
+            vm.deal(nodeOps[i], STARTING_BALANCE);
+        }
+        _10NodeOpsBid();
     }
 
     function testStratModManagerOwner() public view {
@@ -327,17 +332,15 @@ contract StrategyModuleManagerTest is ProofParsing, ByzantineDeployer {
         // Alice create StrategyModule and stake 32 ETH in the contract
         (address stratModAddr,) = _createStratModAndStakeNativeETH(alice, 32 ether);
 
-        // An auction is triggered and fill the cluster details of StrategyModule
-        _simulateAuction(stratModAddr);
-
         // Verify the cluster details of the StrategyModule
         address[] memory clusterDetailsNodesAddr = IStrategyModule(stratModAddr).getDVNodesAddr();
-        address[4] memory selectedNodes = _getDVNodesAddr(abi.encodePacked("./test/test-data/cluster-lock-DV0-noPod.json"));
-        assertEq(clusterDetailsNodesAddr.length, selectedNodes.length);
-        for (uint i = 0; i < selectedNodes.length; i++) {
-            assertEq(selectedNodes[i], clusterDetailsNodesAddr[i]);
+        //address[4] memory selectedNodes = _getDVNodesAddr(abi.encodePacked("./test/test-data/cluster-lock-DV0-noPod.json"));
+        (,,, uint256 _clusterSize) = auction.getAuctionConfigValues(); 
+        assertEq(clusterDetailsNodesAddr.length, _clusterSize);
+        for (uint i = 0; i < _clusterSize; i++) {
+            assertEq(nodeOps[2 * i], clusterDetailsNodesAddr[i]);
         }
-        assertEq(selectedNodes[0], IStrategyModule(stratModAddr).getClusterManager());
+        assertEq(nodeOps[6], IStrategyModule(stratModAddr).getClusterManager());
 
         // Verify the status of the DV
         IStrategyModule.DVStatus dvStatus = IStrategyModule(stratModAddr).getDVStatus();
@@ -351,9 +354,6 @@ contract StrategyModuleManagerTest is ProofParsing, ByzantineDeployer {
 
         // Alice create StrategyModule and stake 32 ETH in the contract
         (address stratModAddr,) = _createStratModAndStakeNativeETH(alice, 32 ether);
-
-        // An auction is triggered and fill the cluster details of StrategyModule
-        _simulateAuction(stratModAddr);
 
         // Get the DV deposit data
         (bytes memory pubkey, bytes memory signature, bytes32 depositDataRoot) = 
@@ -398,9 +398,6 @@ contract StrategyModuleManagerTest is ProofParsing, ByzantineDeployer {
         // Alice creates a Strategy Module and stake ETH
         (address stratModAddr,) = _createStratModAndStakeNativeETH(alice, 32 ether);
 
-        // An auction is triggered and fill the cluster details of StrategyModule
-        _simulateAuction(stratModAddr);
-
         // Byzantine admin set the trusted DV pubKey
         strategyModuleManager.setTrustedDVPubKey(stratModAddr, trustedPubkey);
 
@@ -441,9 +438,6 @@ contract StrategyModuleManagerTest is ProofParsing, ByzantineDeployer {
 
         // Alice creates a Strategy Module and stake ETH
         (address stratModAddr,) = _createStratModAndStakeNativeETH(alice, 32 ether);
-
-        // An auction is triggered and fill the cluster details of StrategyModule
-        _simulateAuction(stratModAddr);
 
         // Byzantine admin set the trusted DV pubKey
         strategyModuleManager.setTrustedDVPubKey(stratModAddr, trustedPubkey);
@@ -501,9 +495,6 @@ contract StrategyModuleManagerTest is ProofParsing, ByzantineDeployer {
         // Alice creates a Strategy Module and stake ETH
         (address stratModAddr,) = _createStratModAndStakeNativeETH(alice, 32 ether);
 
-        // An auction is triggered and fill the cluster details of StrategyModule
-        _simulateAuction(stratModAddr);
-
         // Byzantine admin set the trusted DV pubKey
         strategyModuleManager.setTrustedDVPubKey(stratModAddr, trustedPubkey);
 
@@ -541,7 +532,7 @@ contract StrategyModuleManagerTest is ProofParsing, ByzantineDeployer {
             stakerOptOutWindowBlocks: 0
         });
 
-        _registerAsOperator(ELOperator1, operatorDetails);
+        _registerAsELOperator(ELOperator1, operatorDetails);
 
         // Create a restaking strategy: only beacon chain ETH Strategy
         IStrategy[] memory strategies = new IStrategy[](1);
@@ -666,7 +657,7 @@ contract StrategyModuleManagerTest is ProofParsing, ByzantineDeployer {
         beaconChainOracle.setOracleBlockRootAtTimestamp(latestBlockRoot);
     }
 
-    function _registerAsOperator(
+    function _registerAsELOperator(
         address operator,
         IDelegationManager.OperatorDetails memory operatorDetails
     ) internal {
@@ -676,40 +667,72 @@ contract StrategyModuleManagerTest is ProofParsing, ByzantineDeployer {
         delegation.registerAsOperator(operatorDetails, emptyStringForMetadataURI);
         vm.stopPrank();
 
-        assertTrue(delegation.isOperator(operator), "_registerAsOperator: failed to resgister `operator` as an EL operator");
+        assertTrue(delegation.isOperator(operator), "_registerAsELOperator: failed to resgister `operator` as an EL operator");
         assertTrue(
             keccak256(abi.encode(delegation.operatorDetails(operator))) == keccak256(abi.encode(operatorDetails)),
-            "_registerAsOperator: operatorDetails not set appropriately"
+            "_registerAsELOperator: operatorDetails not set appropriately"
         );
-        assertTrue(delegation.isDelegated(operator), "_registerAsOperator: operator doesn't delegate itself");
+        assertTrue(delegation.isDelegated(operator), "_registerAsELOperator: operator doesn't delegate itself");
     }
 
-    function _simulateAuction(
-        address stratModAddrNeedingDV
+    function _nodeOpBid(
+        NodeOpBid memory nodeOpBid
     ) internal {
-        // Get the 4 winners of the auction (no auction takes place as it's a simulation)
-        address[4] memory nodesAddr = _getDVNodesAddr(abi.encodePacked("./test/test-data/cluster-lock-DV0-noPod.json"));
-
-        IStrategyModule.Node[] memory nodes = new IStrategyModule.Node[](4);
-        for (uint256 i = 0; i < 4; i++) {
-            nodes[i] = IStrategyModule.Node(
-                365, // We assume all the nodes have 365 Validation Credits
-                100, // We assume all the nodes have 100 reputation score
-                nodesAddr[i]
-            );
-        }
-
-        // Define nodesAddr[0] as the cluster manager
-        address clusterManager = nodesAddr[0];
-
-        // Bob try to update Alice's cluster details
-        vm.prank(bob);
-        vm.expectRevert(IStrategyModule.OnlyAuctionContract.selector);
-        IStrategyModule(stratModAddrNeedingDV).updateClusterDetails(nodes, clusterManager);
-
-        Auction auctionContract = Auction(address(strategyModuleManager.auction()));
-        vm.prank(address(auctionContract));
-        IStrategyModule(stratModAddrNeedingDV).updateClusterDetails(nodes, clusterManager);
+        // Get price to pay
+        uint256 priceToPay = auction.getPriceToPay(nodeOpBid.nodeOp, nodeOpBid.discountRate, nodeOpBid.timeInDays);
+        vm.prank(nodeOpBid.nodeOp);
+        auction.bid{value: priceToPay}(nodeOpBid.discountRate, nodeOpBid.timeInDays);
     }
+
+    function _nodeOpsBid(
+        NodeOpBid[] memory nodeOpBids
+    ) internal {
+        for (uint i = 0; i < nodeOpBids.length; i++) {
+            _nodeOpBid(nodeOpBids[i]);
+        }
+    }
+
+    function _10NodeOpsBid() internal {
+        NodeOpBid[] memory nodeOpBids = new NodeOpBid[](10);
+        nodeOpBids[0] = NodeOpBid(nodeOps[0], 13e2, 1000); // 1st
+        nodeOpBids[1] = NodeOpBid(nodeOps[1], 13e2, 600);  // 5th
+        nodeOpBids[2] = NodeOpBid(nodeOps[2], 13e2, 900);  // 2nd
+        nodeOpBids[3] = NodeOpBid(nodeOps[3], 13e2, 500);  // 6th
+        nodeOpBids[4] = NodeOpBid(nodeOps[4], 13e2, 800);  // 3rd
+        nodeOpBids[5] = NodeOpBid(nodeOps[5], 13e2, 400);  // 7th
+        nodeOpBids[6] = NodeOpBid(nodeOps[6], 13e2, 700);  // 4th
+        nodeOpBids[7] = NodeOpBid(nodeOps[7], 13e2, 300);  // 8th
+        nodeOpBids[8] = NodeOpBid(nodeOps[8], 13e2, 200);  // 9th
+        nodeOpBids[9] = NodeOpBid(nodeOps[9], 13e2, 100);  // 10th
+        _nodeOpsBid(nodeOpBids);
+    }
+
+    // function _simulateAuction(
+    //     address stratModAddrNeedingDV
+    // ) internal {
+    //     // Get the 4 winners of the auction (no auction takes place as it's a simulation)
+    //     address[4] memory nodesAddr = _getDVNodesAddr(abi.encodePacked("./test/test-data/cluster-lock-DV0-noPod.json"));
+
+    //     IStrategyModule.Node[] memory nodes = new IStrategyModule.Node[](4);
+    //     for (uint256 i = 0; i < 4; i++) {
+    //         nodes[i] = IStrategyModule.Node(
+    //             365, // We assume all the nodes have 365 Validation Credits
+    //             100, // We assume all the nodes have 100 reputation score
+    //             nodesAddr[i]
+    //         );
+    //     }
+
+    //     // Define nodesAddr[0] as the cluster manager
+    //     address clusterManager = nodesAddr[0];
+
+    //     // Bob try to update Alice's cluster details
+    //     vm.prank(bob);
+    //     vm.expectRevert(IStrategyModule.OnlyAuctionContract.selector);
+    //     IStrategyModule(stratModAddrNeedingDV).updateClusterDetails(nodes, clusterManager);
+
+    //     Auction auctionContract = Auction(address(strategyModuleManager.auction()));
+    //     vm.prank(address(auctionContract));
+    //     IStrategyModule(stratModAddrNeedingDV).updateClusterDetails(nodes, clusterManager);
+    // }
 
 }
