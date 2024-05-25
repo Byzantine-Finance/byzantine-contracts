@@ -6,7 +6,7 @@ pragma solidity ^0.8.20;
 // solhint-disable func-name-mixedcase
 
 import {Test, console} from "forge-std/Test.sol";
-import {Escrow} from "../src/core/Escrow.sol";
+import {Escrow} from "../src/vault/Escrow.sol";
 
 contract EscrowTest is Test {
     Escrow escrow;
