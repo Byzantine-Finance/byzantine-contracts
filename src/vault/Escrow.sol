@@ -21,7 +21,7 @@ contract Escrow is IEscrow {
      * @param _auction The auction proxy contract
      */
     constructor(address _bidPriceReceiver, IAuction _auction) {
-        bidPriceReceiver = payable(_bidPriceReceiver);
+        bidPriceReceiver = _bidPriceReceiver;
         auction = _auction;
     }
 
