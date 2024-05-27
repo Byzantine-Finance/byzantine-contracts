@@ -26,6 +26,8 @@ contract ByzantineDeployer is EigenLayerDeployer {
 
     // Byzantine Admin
     address public byzantineAdmin = address(this);
+    // Address which receives the bid of the winners (will be a smart contract in the future to distribute the rewards)
+    address public bidReceiver = makeAddr("bidReceiver");
     // Initial Auction parameters
     uint256 public currentPoSDailyReturnWei = (uint256(32 ether) * 37) / (1000 * 365); // 3.7% APY
     uint256 public maxDiscountRate = 15e2; // 15%
@@ -85,7 +87,7 @@ contract ByzantineDeployer is EigenLayerDeployer {
             address(new TransparentUpgradeableProxy(address(emptyContract), address(byzantineProxyAdmin), ""))
         );
         escrow = Escrow(
-            address(new TransparentUpgradeableProxy(address(emptyContract), address(byzantineProxyAdmin), ""))
+            payable(address(new TransparentUpgradeableProxy(address(emptyContract), address(byzantineProxyAdmin), "")))
         );
 
         // StrategyModule implementation contract
@@ -113,7 +115,10 @@ contract ByzantineDeployer is EigenLayerDeployer {
             escrow,
             strategyModuleManager
         );
-        Escrow escrowImplementation = new Escrow();
+        Escrow escrowImplementation = new Escrow(
+            bidReceiver,
+            auction
+        );
 
         // Third, upgrade the proxy contracts to use the correct implementation contracts and initialize them.
         // Upgrade StrategyModuleManager
@@ -148,11 +153,11 @@ contract ByzantineDeployer is EigenLayerDeployer {
             )
         );
         // Upgrade Escrow
-        //byzantineProxyAdmin.upgradeAndCall(
-        //    TransparentUpgradeableProxy(payable(address(escrow))),
-        //    address(escrowImplementation),
-        //    ""
-        //);
+        byzantineProxyAdmin.upgradeAndCall(
+            TransparentUpgradeableProxy(payable(address(escrow))),
+            address(escrowImplementation),
+            ""
+        );
     }
 
     function testByzantineContractsInitialization() public view {
