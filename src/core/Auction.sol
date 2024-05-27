@@ -11,7 +11,6 @@ import "../libraries/BokkyPooBahsRedBlackTreeLibrary.sol";
 import "./AuctionStorage.sol";
 
 /// TODO: Calculation of the reputation score of node operators
-/// TODO: Create escrow contract to pay directly the bid
 
 contract Auction is
     Initializable,
@@ -86,12 +85,12 @@ contract Auction is
         
         address[] memory auctionWinners = _getAuctionWinners();
 
-        // TODO: Ask the escrow contract to debit the bid of the winners
-        // BUG If payments fail, auction tree and auction score mapping already updated....
+        // BUG If node op payments fail, auction tree and auction score mapping already updated....
 
         // Create the Node structure and updates the details of the winners
         IStrategyModule.Node[] memory nodes = new IStrategyModule.Node[](_clusterSize);
         for (uint256 i = 0; i < _clusterSize;) {
+            escrow.releaseFunds(_nodeOpsInfo[auctionWinners[i]].bidPrice);
             nodes[i] = IStrategyModule.Node(
                 _nodeOpsInfo[auctionWinners[i]].vcNumber, // Validation Credits number of the node
                 _nodeOpsInfo[auctionWinners[i]].reputationScore, // Reputation score of the node
@@ -151,6 +150,7 @@ contract Auction is
      * @dev Revert if the node op is already in auction. Call `updateBid` instead.
      * @dev Revert if `_discountRate` or `_timeInDays` don't respect the values set by the byzantine.
      * @dev Revert if the ethers sent by the node op are not enough to pay for the bid (and the bond).
+     * @dev Reverts if the transfer of the funds to the Escrow contract failed.
      * @dev If too many ethers has been sent the function give back the excess to the sender.
      */
     function bid(
@@ -191,7 +191,9 @@ contract Auction is
             payable(msg.sender).transfer(amountToRefund);
         }
 
-        // TODO: transfer the ethers in the escrow contract
+        // Transfer the ethers in the escrow contract
+        (bool success,) = address(escrow).call{value: priceToPay}("");
+        if (!success) revert EscrowTransferFailed();
 
         // Add auction score in the tree
         _auctionTree.insert(auctionScore);
@@ -243,6 +245,7 @@ contract Auction is
      * @param _newDiscountRate: new discount rate (i.e the desired profit margin) in percentage (scale from 0 to 10000)
      * @param _newTimeInDays: new duration of being a validator, in days
      * @dev To call that function, the node op has to be inAuction.
+     * @dev Reverts if the transfer of the funds to the Escrow contract failed.
      * @dev Revert if `_discountRate` or `_timeInDays` don't respect the values set by the byzantine.
      */
     function updateBid(
@@ -280,11 +283,18 @@ contract Auction is
             if (amountToRefund > 0) {
                 payable(msg.sender).transfer(amountToRefund);
             }
-            // TODO: transfer the ethers in the escrow contract
+            // Transfer the ethers in the escrow contract
+            (bool success,) = address(escrow).call{value: ethersToAdd}("");
+            if (!success) revert EscrowTransferFailed();
         } else {
+            // Knowing that the node op doesn't have to pay more, send him back all the ethers he has sent
+            if (msg.value > 0) {
+                payable(msg.sender).transfer(msg.value);
+            }
             // TODO: gas optimization with unchecked
             uint256 ethersToSendBack = previousBidPrice - newBidPrice;
-            // TODO: Ask the escrow to send back the ethers
+            // Ask the Escrow to send back the ethers
+            escrow.refund(msg.sender, ethersToSendBack);
         }
 
         // Verify auctionScore of msg.sender and remove it from the tree and the mapping
@@ -313,6 +323,7 @@ contract Auction is
      * @dev Status is set to inactive and auction details to 0 unless the reputation which is unmodified
      */
     function withdrawBid() external {
+        // BUG: Possibility to withdraw bid when a node op has won an auction
         // Verify if the sender is in the auction
         if (_nodeOpsInfo[msg.sender].nodeStatus != NodeOpStatus.inAuction) revert NotInAuction();
 
@@ -336,7 +347,13 @@ contract Auction is
             nodeStatus: NodeOpStatus.inactive
         });
 
-        // TODO: Ask the Escrow contract to refund the node op
+        // Ask the Escrow contract to refund the node op
+        if (isWhitelisted(msg.sender)) {
+            escrow.refund(msg.sender, bidToRefund);
+        } else {
+            escrow.refund(msg.sender, bidToRefund + _BOND);
+        }
+        
     }
 
     /**

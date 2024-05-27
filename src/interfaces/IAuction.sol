@@ -90,6 +90,7 @@ interface IAuction {
      * @dev Revert if the node op is already in auction. Call `updateBid` instead.
      * @dev Revert if `_discountRate` or `_timeInDays` don't respect the values set by the byzantine.
      * @dev Revert if the ethers sent by the node op are not enough to pay for the bid (and the bond).
+     * @dev Reverts if the transfer of the funds to the Escrow contract failed.
      * @dev If too many ethers has been sent the function give back the excess to the sender.
      */
     function bid(
@@ -118,6 +119,7 @@ interface IAuction {
      * @param _newDiscountRate: new discount rate (i.e the desired profit margin) in percentage (scale from 0 to 10000)
      * @param _newTimeInDays: new duration of being a validator, in days
      * @dev To call that function, the node op has to be inAuction.
+     * @dev Reverts if the transfer of the funds to the Escrow contract failed.
      * @dev Revert if `_discountRate` or `_timeInDays` don't respect the values set by the byzantine.
      */
     function updateBid(
@@ -214,4 +216,7 @@ interface IAuction {
 
     /// @dev Returned when trying to create a DV but not enough node operators are in auction
     error NotEnoughNodeOps();
+
+    /// @dev Returned when the deposit to the Escrow contract failed
+    error EscrowTransferFailed();
 }
