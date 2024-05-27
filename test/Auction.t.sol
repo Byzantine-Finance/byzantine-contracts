@@ -103,8 +103,8 @@ contract AuctionTest is ByzantineDeployer {
 
         // Verify the balance of nodeOps[0]
         assertEq(nodeOps[0].balance, STARTING_BALANCE - priceToPay);
-        // Verify the balance of the auction contract
-        assertEq(address(auction).balance, priceToPay);
+        // Verify the balance of the Escrow contract
+        assertEq(address(escrow).balance, priceToPay);
     }
 
     function testBid_AuctionScoreMapping() external {
@@ -154,22 +154,28 @@ contract AuctionTest is ByzantineDeployer {
 
         // Verify the balance of nodeOps[9] after bidding
         assertEq(nodeOps[9].balance, STARTING_BALANCE - bidPrice);
-        // Verify the balance of auction contract after nodeOps[9] bid
-        assertEq(address(auction).balance, bidPrice);
+        // Verify the balance of escrow contract after nodeOps[9] bid
+        assertEq(address(escrow).balance, bidPrice);
 
-        // nodeOps[9] updates its bid (14%, 3 days)
+        // nodeOps[9] updates its bid (14%, 45 days)
         uint256 amountToAdd = auction.getUpdateBidPrice(nodeOps[9], 14e2, 45);
         vm.prank(nodeOps[9]);
         auction.updateBid{value: (amountToAdd + 2 ether)}(14e2, 45);
 
         // Verify the balance of nodeOps[9] after updating its bid
         assertEq(nodeOps[9].balance, STARTING_BALANCE - (bidPrice + amountToAdd));
-        // Verify the balance of auction contract after nodeOps[9] updates its bid
-        assertEq(address(auction).balance, bidPrice + amountToAdd);
-    }
+        // Verify the balance of escrow contract after nodeOps[9] updates its bid
+        assertEq(address(escrow).balance, bidPrice + amountToAdd);
 
-    function testUpdateBid_DecreaseBid() external {
-        // TODO: Wait for Escrow contract to refund the bidder
+        // nodeOps[9] decreases its bid (15%, 35 days)
+        uint256 amountToAdd2 = auction.getUpdateBidPrice(nodeOps[9], 15e2, 35); // 0 ether
+        vm.prank(nodeOps[9]);
+        auction.updateBid{value: amountToAdd2 + 0.001 ether}(15e2, 35);
+        // Verify if nodeOps[9] has been refunded
+        uint256 refundAmount = (bidPrice + amountToAdd) - auction.getPriceToPay(nodeOps[9], 15e2, 35); // nodeOps[9] is whitelisted
+        assertEq(nodeOps[9].balance, STARTING_BALANCE - (bidPrice + amountToAdd + amountToAdd2) + refundAmount);
+        // Verify the balance of escrow contract after nodeOps[9] updates its bid
+        assertEq(address(escrow).balance, bidPrice + amountToAdd - refundAmount);
     }
 
     function testUpdateBid_AuctionScoreMapping() external {
@@ -317,7 +323,9 @@ contract AuctionTest is ByzantineDeployer {
     function testWithdrawBid() external {
         // nodeOps[0] bids with discountRate = 13% and timeInDays = 100
         _nodeOpBid(NodeOpBid(nodeOps[0], 13e2, 100));
+        uint256 bidPrice = auction.getPriceToPay(nodeOps[0], 13e2, 100);
         (,,uint256 auctionScoreBeforeWithdrawal,,) = auction.getNodeOpDetails(nodeOps[0]);
+        assertEq(nodeOps[0].balance, STARTING_BALANCE - bidPrice);
 
         // nodeOps[0] withdraw its bid
         _nodeOpWithdrawBid(nodeOps[0]);
@@ -340,7 +348,8 @@ contract AuctionTest is ByzantineDeployer {
         assertEq(reputationScore_0, 1);
         assertEq(uint(opStatus_0), 0);
 
-        // TODO: Verify nodeOps[0] balance once Escrow contract is implemented
+        // Verify nodeOps[0] balance once node ops has withdrawn its bid
+        assertEq(nodeOps[0].balance, STARTING_BALANCE);
 
         // Verify if nodeOps[1] can bid with the same parameters after withdrawal
         _nodeOpBid(NodeOpBid(nodeOps[0], 13e2, 100));
@@ -352,7 +361,14 @@ contract AuctionTest is ByzantineDeployer {
         IStrategyModule aliceStratMod = IStrategyModule(strategyModuleManager.createStratMod());
 
         // 10 node ops bids
-        _10NodeOpsBid();
+        uint256[10] memory bidPrices = _10NodeOpsBid();
+        uint256 totalBidPrices;
+        uint256 totalBonds = 9 ether; // Only 1 node op is whitelisted
+        for (uint i = 0; i < 10; i++) {
+            totalBidPrices += bidPrices[i];
+        }
+        // Verify escrow received bid prices + bonds
+        assertEq(address(escrow).balance, totalBidPrices + totalBonds);
         // Get nodeOPs[0] auction score
         (,,uint256 auctionScore0,,) = auction.getNodeOpDetails(nodeOps[0]);
         assertEq(auction.getAuctionScoreToNodeOp(auctionScore0), nodeOps[0]);
@@ -370,6 +386,8 @@ contract AuctionTest is ByzantineDeployer {
         }
         // Verify if auctionScore mapping is updated correctly
         assertEq(auction.getAuctionScoreToNodeOp(auctionScore0), address(0));
+        // Verify the balance of Escrow contract
+        assertEq(address(escrow).balance, (totalBidPrices + totalBonds) - (bidPrices[0] + bidPrices[2] + bidPrices[4] + bidPrices[6]));
 
         // Second DV: nodeOps[1], nodeOps[3], nodeOps[5], nodeOps[7]
         vm.prank(address(strategyModuleManager));
@@ -378,6 +396,8 @@ contract AuctionTest is ByzantineDeployer {
         for (uint i = 0; i < winnersDV2.length; i++) {
             assertEq(winnersDV2[i], nodeOps[(2 * i) + 1]);
         }
+        // Verify the balance of Escrow contract
+        assertEq(address(escrow).balance, (totalBidPrices + totalBonds) - (bidPrices[0] + bidPrices[2] + bidPrices[4] + bidPrices[6] + bidPrices[1] + bidPrices[3] + bidPrices[5] + bidPrices[7]));
 
         // Alice bids like nodeOps[0] (verify if tree leaf has been deleted)
         _nodeOpBid(NodeOpBid(alice, 13e2, 1000));
@@ -447,7 +467,7 @@ contract AuctionTest is ByzantineDeployer {
         }
     }
 
-    function _10NodeOpsBid() internal {
+    function _10NodeOpsBid() internal returns (uint256[10] memory) {
         NodeOpBid[] memory nodeOpBids = new NodeOpBid[](10);
         nodeOpBids[0] = NodeOpBid(nodeOps[0], 13e2, 1000); // 1st
         nodeOpBids[1] = NodeOpBid(nodeOps[1], 13e2, 600);  // 5th
@@ -460,6 +480,18 @@ contract AuctionTest is ByzantineDeployer {
         nodeOpBids[8] = NodeOpBid(nodeOps[8], 13e2, 200);  // 9th
         nodeOpBids[9] = NodeOpBid(nodeOps[9], 13e2, 100);  // 10th
         _nodeOpsBid(nodeOpBids);
+        uint256[10] memory bidPrices;
+        bidPrices[0] = auction.getPriceToPay(nodeOps[0], 13e2, 1000) - 1 ether;
+        bidPrices[1] = auction.getPriceToPay(nodeOps[1], 13e2, 600) - 1 ether;
+        bidPrices[2] = auction.getPriceToPay(nodeOps[2], 13e2, 900) - 1 ether;
+        bidPrices[3] = auction.getPriceToPay(nodeOps[3], 13e2, 500) - 1 ether;
+        bidPrices[4] = auction.getPriceToPay(nodeOps[4], 13e2, 800) - 1 ether;
+        bidPrices[5] = auction.getPriceToPay(nodeOps[5], 13e2, 400) - 1 ether;
+        bidPrices[6] = auction.getPriceToPay(nodeOps[6], 13e2, 700) - 1 ether;
+        bidPrices[7] = auction.getPriceToPay(nodeOps[7], 13e2, 300) - 1 ether;
+        bidPrices[8] = auction.getPriceToPay(nodeOps[8], 13e2, 200) - 1 ether;
+        bidPrices[9] = auction.getPriceToPay(nodeOps[9], 13e2, 100); // is whitelisted
+        return bidPrices;
     }
 
 }
