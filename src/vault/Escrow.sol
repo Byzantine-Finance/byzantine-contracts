@@ -2,37 +2,32 @@
 pragma solidity ^0.8.20;
 
 import {IEscrow} from "../interfaces/IEscrow.sol";
-import "@openzeppelin/contracts/access/AccessControl.sol";
+import {IAuction} from "../interfaces/IAuction.sol";
 
-contract Escrow is IEscrow, AccessControl {
-    /// @notice Address which receives the final bid prices
-    address payable public bidPriceReceiver;
-
-    /// @notice Set an access control role
-    bytes32 public constant AUCTION_ROLE = keccak256("AUCTION_ROLE");
+contract Escrow is IEscrow {
 
     /**
-     * @notice Constructor to set the bidPriceReceiver address and set the DEFAULT_ADMIN_ROLE to the deployer
-     * @param _bidPriceReceiver Address which receives the final bid prices
+     * @notice Address which receives the bid of the auction winners
+     * @dev This will be updated to a smart contract vault in the future to distribute the stakers rewards
      */
-    constructor(address _bidPriceReceiver) {
+    address public immutable bidPriceReceiver;
+
+    /// @notice Auction contract
+    IAuction public immutable auction;
+
+    /**
+     * @notice Constructor to set the bidPriceReceiver address and the auction contract
+     * @param _bidPriceReceiver Address which receives the bid of the winners and distribute it to the stakers
+     * @param _auction The auction proxy contract
+     */
+    constructor(address _bidPriceReceiver, IAuction _auction) {
         bidPriceReceiver = payable(_bidPriceReceiver);
-        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        auction = _auction;
     }
 
     /**
-     * @notice Function to be called once the contract is deployed to grant AUCTION_ROLE to the auction contract
-     * @param _auctionAddr Address of the auction contract
-     */
-    function grantRoleToAuction(
-        address _auctionAddr
-    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        grantRole(AUCTION_ROLE, _auctionAddr);
-    }
-
-    /**
-     * @notice Function to receive funds of the node operator at the time of joining the protocol
-     * Same function to receive new funds after a node operator updates the bid
+     * @notice Fallback function which receives funds of the node operator when they bid
+     * Also receives new funds after a node operator updates its bid
      * @dev The funds are locked in the escrow
      */
     receive() external payable {
@@ -40,34 +35,32 @@ contract Escrow is IEscrow, AccessControl {
     }
 
     /**
-     * @notice Function to approve the pid price of the winner operator to be released to the final bid price receiver
+     * @notice Function to approve the bid price of the winner operator to be released to the bid price receiver
      * @param _bidPrice Bid price of the node operator
      */
-    function releaseFunds(uint256 _bidPrice) public onlyRole(AUCTION_ROLE) {
-        require(
-            address(this).balance >= _bidPrice,
-            "Insufficient funds in escrow"
-        );
-        (bool success, ) = bidPriceReceiver.call{value: _bidPrice}("");
+    function releaseFunds(uint256 _bidPrice) public onlyAuction {
+        if (address(this).balance < _bidPrice) revert InsufficientFundsInEscrow();
+        (bool success, ) = payable(bidPriceReceiver).call{value: _bidPrice}("");
         require(success, "Failed to send Ether");
     }
 
     /**
-     * @notice Function to refund the overpaid amount to the node operator after updating the bid or
-     * refund the total amount to the node operator if the operator leaves the protocol
-     * @param _amountToRefund Funds to be refunded to the node operator if the newBidPrice < oldBidPrice
+     * @notice Function to refund the overpaid amount to the node operator after bidding or updating its bid.
+     * Also used to refund the node operator when he withdraws
+     * @param _nodeOpAddr Address of the node operator to refund
+     * @param _amountToRefund Funds to be refunded to the node operator if necessary
      */
     function refund(
         address _nodeOpAddr,
         uint256 _amountToRefund
-    ) public onlyRole(AUCTION_ROLE) {
-        require(
-            address(this).balance >= _amountToRefund,
-            "Insufficient funds in escrow"
-        );
-        (bool success, ) = payable(_nodeOpAddr).call{value: _amountToRefund}(
-            ""
-        );
+    ) public onlyAuction {
+        if (address(this).balance < _amountToRefund) revert InsufficientFundsInEscrow();
+        (bool success, ) = payable(_nodeOpAddr).call{value: _amountToRefund}("");
         require(success, "Failed to send Ether");
+    }
+
+    modifier onlyAuction() {
+        if (msg.sender != address(auction)) revert OnlyAuction();
+        _;
     }
 }
