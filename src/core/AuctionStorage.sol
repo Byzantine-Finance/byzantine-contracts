@@ -33,9 +33,6 @@ abstract contract AuctionStorage is IAuction {
     /// @notice Number of nodes in a Distributed Validator
     uint256 internal _clusterSize;
 
-    /// @notice Escrow contract address where the bids and the bonds are sent and stored
-    address payable public escrowAddr;
-
     /// @notice Node operator address => node operator auction details
     mapping(address => NodeOpDetails) internal _nodeOpsInfo;
 

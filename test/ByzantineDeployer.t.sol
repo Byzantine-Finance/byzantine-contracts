@@ -19,7 +19,7 @@ contract ByzantineDeployer is EigenLayerDeployer {
     // Byzantine contracts
     ProxyAdmin public byzantineProxyAdmin;
     StrategyModuleManager public strategyModuleManager;
-    IBeacon public strategyModuleBeacon;
+    UpgradeableBeacon public strategyModuleBeacon;
     ByzNft public byzNft;
     Auction public auction;
     Escrow public escrow;
