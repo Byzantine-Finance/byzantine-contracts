@@ -1,5 +1,5 @@
 # AuctionStorage
-[Git Source](https://github.com/Byzantine-Finance/byzantine-contracts/blob/a175940c55bcb788c83621ba4e22c28c3fbfcb7d/src/core/AuctionStorage.sol)
+[Git Source](https://github.com/Byzantine-Finance/byzantine-contracts/blob/039f6bfc2d98b2c720b4f881f44b17511a859648/src/core/AuctionStorage.sol)
 
 **Inherits:**
 [IAuction](/src/interfaces/IAuction.sol/interface.IAuction.md)
@@ -80,15 +80,6 @@ Number of nodes in a Distributed Validator
 
 ```solidity
 uint256 internal _clusterSize;
-```
-
-
-### escrowAddr
-Escrow contract address where the bids and the bonds are sent and stored
-
-
-```solidity
-address payable public escrowAddr;
 ```
 
 
