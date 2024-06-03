@@ -1,0 +1,24 @@
+{
+  "addresses": {
+    "auction": "0x2E311c8018634910D5ce236e72D92683A7A85A1e",
+    "auctionImplementation": "0x195A22ed47B7567FD6Be5B724CaD045Cf4188765",
+    "byzNft": "0x0e00e37D48B214dA408bb4d4706aCb3F1B22B91D",
+    "byzNftImplementation": "0x22e623c70c776f894cEb284F4A4EFfA853C81215",
+    "byzantineProxyAdmin": "0x4c1F7171e6A23E5ea9E2176EF0546f2E66A01175",
+    "emptyContract": "0x680658e1aaC31f461500D92f3b2F3EFf7DF20c92",
+    "escrow": "0x07e4e0391661C1D7B48b503BE8B02E8B93461d80",
+    "escrowImplementation": "0x04311fa86EaAE2CF657D8E2c8a58E98bFd3CcF48",
+    "strategyModuleBeacon": "0x32df4D3C1624b6Ed6f87b7931acC80bd46748eAD",
+    "strategyModuleImplementation": "0x06492BAc2abC1E6543314EeB5F4e1d9a105D1FE4",
+    "strategyModuleManager": "0xCfaa14b36E64CB8e4F11b0EFa28DC8E017A8C52f",
+    "strategyModuleManagerImplementation": "0xE59132C95972FecE8D1686A304C983798fd022Ff"
+  },
+  "chainInfo": {
+    "chainId": 17000,
+    "deploymentBlock": 1664276
+  },
+  "parameters": {
+    "bidReceiver": "0x9c475A3FB5E0ee61B049516b7e1186Cc3F1362C0",
+    "byzantineAdmin": "0x5c27a880ec9024F006A70B8f1fB91b82d94ef4D4"
+  }
+}
