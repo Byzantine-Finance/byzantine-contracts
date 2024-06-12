@@ -168,11 +168,10 @@ contract ByzantineDeployer is EigenLayerDeployer {
         assertEq(byzNft.symbol(), "byzNFT");
         // Auction
         assertEq(auction.owner(), byzantineAdmin);
-        (uint256 _expectedDailyReturnWei, uint256 _maxDiscountRate, uint256 _minDuration, uint256 _clusterSize) = auction.getAuctionConfigValues();
-        assertEq(_expectedDailyReturnWei, currentPoSDailyReturnWei);
-        assertEq(_maxDiscountRate, maxDiscountRate);
-        assertEq(_minDuration, minValidationDuration);
-        assertEq(_clusterSize, 4);
+        assertEq(auction.expectedDailyReturnWei(), currentPoSDailyReturnWei);
+        assertEq(auction.maxDiscountRate(), maxDiscountRate);
+        assertEq(auction.minDuration(), minValidationDuration);
+        assertEq(auction.clusterSize(), 4);
     }
 
 } 

@@ -25,15 +25,15 @@ abstract contract AuctionStorage is IAuction {
     HitchensOrderStatisticsTreeLib.Tree internal _auctionTree;
 
     /// @notice Daily rewards of Ethereum Pos (in WEI)
-    uint256 internal _expectedDailyReturnWei;
+    uint256 public expectedDailyReturnWei;
     /// @notice Minimum duration to be part of a DV (in days)
-    uint168 internal _minDuration;
+    uint168 public minDuration;
     /// @notice Number of node operators in auction and seeking for a DV
     uint64 public numNodeOpsInAuction;    
-    /// @notice Maximum discount rate (i.e the max profit margin of node op) in percentage (from 0 to 10000 -> 100%)
-    uint16 internal _maxDiscountRate;
+    /// @notice Maximum discount rate (i.e the max profit margin of node op) in percentage
+    uint16 public maxDiscountRate;
     /// @notice Number of nodes in a Distributed Validator
-    uint8 internal _clusterSize;
+    uint8 public clusterSize;
 
     /// @notice Node operator address => node operator auction details
     mapping(address => AuctionDetails) internal _nodeOpsInfo;

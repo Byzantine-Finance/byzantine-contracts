@@ -37,17 +37,17 @@ contract Auction is
      */
     function initialize(
         address _initialOwner,
-        uint256 __expectedDailyReturnWei,
-        uint16 __maxDiscountRate,
-        uint168 __minDuration,
-        uint8 __clusterSize
+        uint256 _expectedDailyReturnWei,
+        uint16 _maxDiscountRate,
+        uint168 _minDuration,
+        uint8 _clusterSize
     ) external initializer {
         _transferOwnership(_initialOwner);
         __ReentrancyGuard_init();
-        _expectedDailyReturnWei = __expectedDailyReturnWei;
-        _maxDiscountRate = __maxDiscountRate;
-        _minDuration = __minDuration;
-        _clusterSize = __clusterSize;
+        expectedDailyReturnWei = _expectedDailyReturnWei;
+        maxDiscountRate = _maxDiscountRate;
+        minDuration = _minDuration;
+        clusterSize = _clusterSize;
     }
 
     /* ===================== EXTERNAL FUNCTIONS ===================== */
@@ -74,7 +74,7 @@ contract Auction is
 
     /**
      * @notice Function triggered by the StrategyModuleManager every time a staker deposit 32ETH and ask for a DV.
-     * It finds the `_clusterSize` node operators with the highest auction scores and put them in a DV.
+     * It finds the `clusterSize` node operators with the highest auction scores and put them in a DV.
      * @param _stratModNeedingDV: the strategy module asking for a DV.
      * @dev Reverts if not enough node operators are available.
      */
@@ -83,13 +83,13 @@ contract Auction is
     ) external onlyStategyModuleManager nonReentrant {
 
         // Check if enough node ops in the auction to create a DV
-        if (numNodeOpsInAuction < _clusterSize) revert NotEnoughNodeOps();
+        if (numNodeOpsInAuction < clusterSize) revert NotEnoughNodeOps();
         
         // Create the Node structure and updates the details of the winners
         IStrategyModule.Node[] memory nodes = _getAuctionWinners();
 
         // The cluster manager is the last node among the winners
-        address clusterManager = nodes[_clusterSize - 1].eth1Addr;
+        address clusterManager = nodes[clusterSize - 1].eth1Addr;
 
         // update `ClusterDetails` of the StrategyModule
         _stratModNeedingDV.updateClusterDetails(nodes, clusterManager);
@@ -117,8 +117,8 @@ contract Auction is
 
         for (uint256 i = 0; i < _discountRates.length;) {
             // Verify the standing bid parameters
-            if (_discountRates[i] > _maxDiscountRate) revert DiscountRateTooHigh();
-            if (_timesInDays[i] < _minDuration) revert DurationTooShort();
+            if (_discountRates[i] > maxDiscountRate) revert DiscountRateTooHigh();
+            if (_timesInDays[i] < minDuration) revert DurationTooShort();
 
             // Calculate operator's bid price and add it to the total price
             dailyVcPrice = _calculateDailyVcPrice(_discountRates[i]);
@@ -179,8 +179,8 @@ contract Auction is
         // Iterate over the number of bids
         for (uint256 i = 0; i < _discountRates.length;) {
             // Verify the standing bid parameters
-            if (_discountRates[i] > _maxDiscountRate) revert DiscountRateTooHigh();
-            if (_timesInDays[i] < _minDuration) revert DurationTooShort();
+            if (_discountRates[i] > maxDiscountRate) revert DiscountRateTooHigh();
+            if (_timesInDays[i] < minDuration) revert DurationTooShort();
 
             /// @notice Calculate operator's bid details
             dailyVcPrice = _calculateDailyVcPrice(_discountRates[i]);
@@ -248,8 +248,8 @@ contract Auction is
         require (getNodeOpAuctionScoreBidPrices(_nodeOpAddr, _auctionScore).length > 0, "Wrong node op auctionScore");
 
         // Verify the standing bid parameters
-        if (_discountRate > _maxDiscountRate) revert DiscountRateTooHigh();
-        if (_timeInDays < _minDuration) revert DurationTooShort();
+        if (_discountRate > maxDiscountRate) revert DiscountRateTooHigh();
+        if (_timeInDays < minDuration) revert DurationTooShort();
 
         // Get the number of bids with this `_auctionScore`
         uint256 numSameBids = getNodeOpAuctionScoreBidPrices(_nodeOpAddr, _auctionScore).length;
@@ -289,8 +289,8 @@ contract Auction is
         require (getNodeOpAuctionScoreBidPrices(msg.sender, _auctionScore).length > 0, "Wrong node op auctionScore");
 
         // Verify the standing bid parameters
-        if (_newDiscountRate > _maxDiscountRate) revert DiscountRateTooHigh();
-        if (_newTimeInDays < _minDuration) revert DurationTooShort();
+        if (_newDiscountRate > maxDiscountRate) revert DiscountRateTooHigh();
+        if (_newTimeInDays < minDuration) revert DurationTooShort();
 
         // Convert msg.sender address in bytes32
         bytes32 bidder = bytes32(uint256(uint160(msg.sender)));
@@ -400,27 +400,27 @@ contract Auction is
 
     /**
      * @notice Update the auction configuration except cluster size
-     * @param __expectedDailyReturnWei: the new expected daily return of Ethereum staking (in wei)
-     * @param __maxDiscountRate: the new maximum discount rate (i.e the max profit margin of node op) (from 0 to 10000 -> 100%)
-     * @param __minDuration: the new minimum duration of beeing a validator in a DV (in days)
+     * @param _expectedDailyReturnWei: the new expected daily return of Ethereum staking (in wei)
+     * @param _maxDiscountRate: the new maximum discount rate (i.e the max profit margin of node op) (from 0 to 10000 -> 100%)
+     * @param _minDuration: the new minimum duration of beeing a validator in a DV (in days)
      */
     function updateAuctionConfig(
-        uint256 __expectedDailyReturnWei,
-        uint16 __maxDiscountRate,
-        uint168 __minDuration
+        uint256 _expectedDailyReturnWei,
+        uint16 _maxDiscountRate,
+        uint168 _minDuration
     ) external onlyOwner {
-        _expectedDailyReturnWei = __expectedDailyReturnWei;
-        _maxDiscountRate = __maxDiscountRate;
-        _minDuration = __minDuration;
+        expectedDailyReturnWei = _expectedDailyReturnWei;
+        maxDiscountRate = _maxDiscountRate;
+        minDuration = _minDuration;
     }
 
     /**
      * @notice Update the cluster size (i.e the number of node operators in a DV)
-     * @param __clusterSize: the new cluster size
+     * @param _clusterSize: the new cluster size
      */
-    function updateClusterSize(uint8 __clusterSize) external onlyOwner {
-        require(__clusterSize >= 4, "Cluster size must be at least 4.");
-        _clusterSize = __clusterSize;
+    function updateClusterSize(uint8 _clusterSize) external onlyOwner {
+        require(_clusterSize >= 4, "Cluster size must be at least 4.");
+        clusterSize = _clusterSize;
     }
 
     /* ===================== GETTER FUNCTIONS ===================== */
@@ -465,30 +465,16 @@ contract Auction is
         return _nodeOpsInfo[_nodeOpAddr].auctionScoreToVcNumbers[_auctionScore];
     }
 
-    /**
-     * @notice Returns the auction configuration values.
-     * @dev Function callable only by the owner.
-     * @return (_expectedDailyReturnWei, _maxDiscountRate, _minDuration, _clusterSize)
-     */
-    function getAuctionConfigValues() external view onlyOwner returns (uint256, uint256, uint256, uint256) {
-        return (
-            _expectedDailyReturnWei,
-            _maxDiscountRate,
-            _minDuration,
-            _clusterSize
-        );
-    }
-
     /* ===================== INTERNAL FUNCTIONS ===================== */
 
     /**
      * @notice Calculate and returns the daily Validation Credit price (in WEI)
      * @param _discountRate: discount rate (i.e the desired profit margin) in percentage (scale from 0 to 10000)
      * @dev vc_price = Re*(1 - D)/cluster_size
-     * @dev The `_expectedDailyReturnWei` is set by Byzantine and corresponds to the Ethereum daily staking return.
+     * @dev The `expectedDailyReturnWei` is set by Byzantine and corresponds to the Ethereum daily staking return.
      */
     function _calculateDailyVcPrice(uint256 _discountRate) internal view returns (uint256) {
-        return (_expectedDailyReturnWei * (10000 - _discountRate)) / (_clusterSize * 10000);
+        return (expectedDailyReturnWei * (10000 - _discountRate)) / (clusterSize * 10000);
     }
 
     /**
@@ -538,10 +524,10 @@ contract Auction is
     function _getAuctionWinners() internal returns (IStrategyModule.Node[] memory) {
 
         // Create the Node structure array for the Strategy Module
-        IStrategyModule.Node[] memory auctionWinners = new IStrategyModule.Node[](_clusterSize);
+        IStrategyModule.Node[] memory auctionWinners = new IStrategyModule.Node[](clusterSize);
 
         // Create the best auctionScores array
-        uint256[] memory bestAuctionScores = new uint256[](_clusterSize);
+        uint256[] memory bestAuctionScores = new uint256[](clusterSize);
 
         // Variables usefull for the algorithm
         uint256 i;
@@ -553,16 +539,16 @@ contract Auction is
 
         /* ===================== BEST AUCTION SCORE WINNER(S) ===================== */
 
-        // Get the `_clusterSize` biggest AuctionScores (can be 0 if not enough different auction scores)
+        // Get the `clusterSize` biggest AuctionScores (can be 0 if not enough different auction scores)
         bestAuctionScores[0] = _auctionTree.last();
-        for (i = 1; i < _clusterSize;) {
+        for (i = 1; i < clusterSize;) {
             bestAuctionScores[i] = _auctionTree.prev(bestAuctionScores[i - 1]);
             unchecked {
                 ++i;
             }
         }
 
-        for (i = 0; i < _clusterSize;) {
+        for (i = 0; i < clusterSize;) {
             // Get all the node ops with this auctionScore
             (,,,,uint256 _keyCount,) = _auctionTree.getNode(bestAuctionScores[i]);
 
@@ -613,7 +599,7 @@ contract Auction is
                     if (_nodeOpsInfo[winnerAddr].numBids == 0) --numNodeOpsInAuction;
 
                     // End function if enough winners
-                    if (count == _clusterSize) return auctionWinners;
+                    if (count == clusterSize) return auctionWinners;
                 }
 
                 unchecked {

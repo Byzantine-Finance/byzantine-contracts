@@ -381,82 +381,26 @@ contract AuctionTest is ByzantineDeployer {
         // Verify nodeOps[5] balance
         uint256 remainingBidPrice = 2 * (bidPrices_five_SameDiffBids[2] + bidPrices_five_SameDiffBids[3]);
         assertEq(nodeOps[5].balance, STARTING_BALANCE - (remainingBidPrice + 4 * BOND));
-
-
-        // // nodeOps[0] bids with discountRate = 13% and timeInDays = 100
-        // _nodeOpBid(NodeOpBid(nodeOps[0], 13e2, 100));
-        // uint256 bidPrice = auction.getPriceToPay(nodeOps[0], 13e2, 100);
-        // (,,uint256 auctionScoreBeforeWithdrawal,,) = auction.getNodeOpDetails(nodeOps[0]);
-        // assertEq(nodeOps[0].balance, STARTING_BALANCE - bidPrice);
-
-        // // nodeOps[0] withdraw its bid
-        // _nodeOpWithdrawBid(nodeOps[0]);
-
-        // // Verify auctionScore mapping
-        // address auctionScoreMapping = auction.getAuctionScoreToNodeOp(auctionScoreBeforeWithdrawal);
-        // assertEq(auctionScoreMapping, address(0));
-
-        // // Verify nodeOps[0] auction details
-        // (
-        //     uint256 vcNumber_0,
-        //     uint256 bidPrice_0,
-        //     uint256 auctionScore_0,
-        //     uint256 reputationScore_0,
-        //     Auction.NodeOpStatus opStatus_0
-        // ) = auction.getNodeOpDetails(nodeOps[0]);
-        // assertEq(vcNumber_0, 0);
-        // assertEq(bidPrice_0, 0);
-        // assertEq(auctionScore_0, 0);
-        // assertEq(reputationScore_0, 1);
-        // assertEq(uint(opStatus_0), 0);
-
-        // // Verify nodeOps[0] balance once node ops has withdrawn its bid
-        // assertEq(nodeOps[0].balance, STARTING_BALANCE);
-
-        // // Verify if nodeOps[1] can bid with the same parameters after withdrawal
-        // _nodeOpBid(NodeOpBid(nodeOps[0], 13e2, 100));
     }
 
     function test_UpdateAuctionConfig() external {
-        (
-            uint256 _expectedDailyReturnWei,
-            uint256 _maxDiscountRate,
-            uint256 _minDuration,
-            uint256 _clusterSize
-        ) = auction.getAuctionConfigValues();
-
-        // Check if the initial values are correct
-        assertEq(_expectedDailyReturnWei, currentPoSDailyReturnWei);
-        assertEq(_maxDiscountRate, maxDiscountRate);
-        assertEq(_minDuration, minValidationDuration);
-        assertEq(_clusterSize, 4);
-
         // Update auction configuration
         uint256 newExpectedDailyReturnWei = 0.0003 ether;
         uint16 newMaxDiscountRate = 10e2;
         uint168 newMinDuration = 60;
         auction.updateAuctionConfig(newExpectedDailyReturnWei, newMaxDiscountRate, newMinDuration);
 
-        (
-            uint256 _newExpectedDailyReturnWei,
-            uint256 _newMaxDiscountRate,
-            uint256 _newMinDuration,
-            uint256 _newClusterSize
-        ) = auction.getAuctionConfigValues();
-
         // Check if the auction configuration is updated correctly
-        assertEq(_newExpectedDailyReturnWei, newExpectedDailyReturnWei);
-        assertEq(_newMaxDiscountRate, newMaxDiscountRate);
-        assertEq(_newMinDuration, newMinDuration);
-        assertEq(_newClusterSize, 4);
+        assertEq(auction.expectedDailyReturnWei(), newExpectedDailyReturnWei);
+        assertEq(auction.maxDiscountRate(), newMaxDiscountRate);
+        assertEq(auction.minDuration(), newMinDuration);
+        assertEq(auction.clusterSize(), 4);
     }
 
     function test_updateClusterSize() external {
         // Update cluster size to 7
         auction.updateClusterSize(7);
-
-        (,,,uint256 _newClusterSize) = auction.getAuctionConfigValues();
-        assertEq(_newClusterSize, 7);
+        assertEq(auction.clusterSize(), 7);
     }
 
     function test_createDV_FourDiffBids() external {

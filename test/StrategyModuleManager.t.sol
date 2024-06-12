@@ -335,9 +335,9 @@ contract StrategyModuleManagerTest is ProofParsing, ByzantineDeployer {
         // Verify the cluster details of the StrategyModule
         address[] memory clusterDetailsNodesAddr = IStrategyModule(stratModAddr).getDVNodesAddr();
         //address[4] memory selectedNodes = _getDVNodesAddr(abi.encodePacked("./test/test-data/cluster-lock-DV0-noPod.json"));
-        (,,, uint256 _clusterSize) = auction.getAuctionConfigValues(); 
-        assertEq(clusterDetailsNodesAddr.length, _clusterSize);
-        for (uint i = 0; i < _clusterSize; i++) {
+        uint8 clusterSize = auction.clusterSize(); 
+        assertEq(clusterDetailsNodesAddr.length, clusterSize);
+        for (uint i = 0; i < clusterSize; i++) {
             assertEq(nodeOps[i], clusterDetailsNodesAddr[i]);
         }
         assertEq(nodeOps[3], IStrategyModule(stratModAddr).getClusterManager());

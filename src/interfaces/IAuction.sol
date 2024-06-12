@@ -16,6 +16,18 @@ interface IAuction {
     /// @notice Getter of the state variable `numNodeOpsInAuction`
     function numNodeOpsInAuction() external view returns (uint64);
 
+    /// @notice Get the daily rewards of Ethereum Pos (in WEI)
+    function expectedDailyReturnWei() external view returns (uint256);
+
+    /// @notice Get the maximum discount rate (i.e the max profit margin of node op) in percentage (upscale 1e2)
+    function maxDiscountRate() external view returns (uint16);
+
+    /// @notice Get the minimum duration to be part of a DV (in days)
+    function minDuration() external view returns (uint168);
+
+    /// @notice Getter the cluster size of a DV (i.e the number of nodes in a DV)
+    function clusterSize() external view returns (uint8);
+
     /**
      * @notice Add a node operator to the the whitelist to not make him pay the bond.
      * @param _nodeOpAddr: the node operator to whitelist.
@@ -32,7 +44,7 @@ interface IAuction {
 
     /**
      * @notice Function triggered by the StrategyModuleManager every time a staker deposit 32ETH and ask for a DV.
-     * It finds the `_clusterSize` node operators with the highest auction scores and put them in a DV.
+     * It finds the `clusterSize` node operators with the highest auction scores and put them in a DV.
      * @param _stratModNeedingDV: the strategy module asking for a DV.
      * @dev Reverts if not enough node operators are available.
      */
@@ -122,22 +134,22 @@ interface IAuction {
 
     /**
      * @notice Update the auction configuration except cluster size
-     * @param __expectedDailyReturnWei: the new expected daily return of Ethereum staking (in wei)
-     * @param __maxDiscountRate: the new maximum discount rate (i.e the max profit margin of node op) (from 0 to 10000 -> 100%)
-     * @param __minDuration: the new minimum duration of beeing a validator in a DV (in days)
+     * @param _expectedDailyReturnWei: the new expected daily return of Ethereum staking (in wei)
+     * @param _maxDiscountRate: the new maximum discount rate (i.e the max profit margin of node op) (from 0 to 10000 -> 100%)
+     * @param _minDuration: the new minimum duration of beeing a validator in a DV (in days)
      */
     function updateAuctionConfig(
-        uint256 __expectedDailyReturnWei,
-        uint16 __maxDiscountRate,
-        uint168 __minDuration
+        uint256 _expectedDailyReturnWei,
+        uint16 _maxDiscountRate,
+        uint168 _minDuration
     )
         external;
 
     /**
      * @notice Update the cluster size (i.e the number of node operators in a DV)
-     * @param __clusterSize: the new cluster size
+     * @param _clusterSize: the new cluster size
      */
-    function updateClusterSize(uint8 __clusterSize) external;
+    function updateClusterSize(uint8 _clusterSize) external;
 
     /// @notice Return true if the `_nodeOpAddr` is whitelisted, false otherwise.
     function isWhitelisted(address _nodeOpAddr) external view returns (bool);
@@ -170,13 +182,6 @@ interface IAuction {
         uint256 _auctionScore
     )
         external view returns (uint256[] memory);
-
-    /**
-     * @notice Returns the auction configuration values.
-     * @dev Function callable only by the owner.
-     * @return (_expectedDailyReturnWei, _maxDiscountRate, _minDuration, _clusterSize)
-     */
-    function getAuctionConfigValues() external view returns (uint256, uint256, uint256, uint256);
 
     /// @dev Error when unauthorized call to a function callable only by the StrategyModuleManager.
     error OnlyStrategyModuleManager();
