@@ -5,38 +5,16 @@ import "./IStrategyModule.sol";
 
 interface IAuction {
 
-    enum NodeOpStatus {
-        inactive, // has left the auction or has finished his work
-        inAuction, // bid set, seeking for work
-        inDV // auction won. We assume he has accepted to join the DV
-    }
-
     /// @notice Stores auction details of node operators
-    struct NodeOpDetails {
-        uint256 vcNumber;
-        uint256 bidPrice;
-        uint256 auctionScore;
-        uint256 reputationScore;
-        NodeOpStatus nodeStatus;
+    struct AuctionDetails {
+        uint128 numBids;
+        uint128 reputationScore;
+        mapping(uint256 => uint256[]) auctionScoreToBidPrices;
+        mapping(uint256 => uint256[]) auctionScoreToVcNumbers;
     }
 
-    event NodeOpJoined(address nodeOpAddress);
-    event NodeOpLeft(address nodeOpAddress);
-    event BidUpdated(
-        address nodeOpAddress,
-        uint256 bidPrice,
-        uint256 auctionScore,
-        uint256 reputationScore
-    );
-    event AuctionConfigUpdated(
-        uint256 _expectedDailyReturnWei,
-        uint256 _maxDiscountRate,
-        uint256 _minDuration
-    );
-    event ClusterSizeUpdated(uint256 _clusterSize);
-    event TopWinners(address[] winners);
-    event BidPaid(address nodeOpAddress, uint256 bidPrice);
-    event ListOfNodeOps(address[] nodeOps);
+    /// @notice Getter of the state variable `numNodeOpsInAuction`
+    function numNodeOpsInAuction() external view returns (uint256);
 
     /**
      * @notice Add a node operator to the the whitelist to not make him pay the bond.
@@ -56,7 +34,6 @@ interface IAuction {
      * @notice Function triggered by the StrategyModuleManager every time a staker deposit 32ETH and ask for a DV.
      * It finds the `_clusterSize` node operators with the highest auction scores and put them in a DV.
      * @param _stratModNeedingDV: the strategy module asking for a DV.
-     * @dev The status of the winners is updated to `inDV`.
      * @dev Reverts if not enough node operators are available.
      */
     function createDV(
@@ -65,75 +42,83 @@ interface IAuction {
         external;
 
     /**
-     * @notice Fonction to determine the auction price for a validator according to its bid parameters
-     * @param _nodeOpAddr: address of the node operator joining the auction
-     * @param _discountRate: discount rate (i.e the desired profit margin) in percentage (scale from 0 to 10000)
-     * @param _timeInDays: duration of being a validator, in days
-     * @dev Revert if `_discountRate` or `_timeInDays` don't respect the values set by the byzantine.
+     * @notice Fonction to determine the auction price for a validator according to its bids parameters
+     * @param _nodeOpAddr: address of the node operator who wants to bid
+     * @param _discountRates: array of discount rates (i.e the desired profit margin) in percentage (scale from 0 to 10000)
+     * @param _timesInDays: array of duration of being a validator, in days
+     * @dev Revert if the two entry arrays `_discountRates` and `_timesInDays` have different length
+     * @dev Revert if `_discountRates` or `_timesInDays` don't respect the values set by the byzantine.
      */
     function getPriceToPay(
         address _nodeOpAddr,
-        uint256 _discountRate,
-        uint256 _timeInDays
+        uint256[] calldata _discountRates,
+        uint256[] calldata _timesInDays
     ) 
         external view returns (uint256);
 
     /**
-     * @notice Operators set their standing bid parameters and pay their bid to an escrow smart contract.
-     * If a node op doesn't win the auction, its bid stays in the escrow contract for the next auction.
-     * An node op who hasn't won an auction can ask the escrow contract to refund its bid if he wants to leave the protocol.
+     * @notice Operators set their standing bid(s) parameters and pay their bid(s) to an escrow smart contract.
+     * If a node op doesn't win the auction, its bids stays in the escrow contract for the next auction.
+     * An node op who hasn't won an auction can ask the escrow contract to refund its bid(s) if he wants to leave the protocol.
      * If a node op wants to update its bid parameters, call `updateBid` function.
      * @notice Non-whitelisted operators will have to pay the 1ETH bond as well.
-     * @param _discountRate: discount rate (i.e the desired profit margin) in percentage (scale from 0 to 10000)
-     * @param _timeInDays: duration of being a validator, in days
-     * @dev By calling this function, the node op insert a data in the auction Binary Search Tree (sorted by auction score).
-     * @dev Revert if the node op is already in auction. Call `updateBid` instead.
-     * @dev Revert if `_discountRate` or `_timeInDays` don't respect the values set by the byzantine.
-     * @dev Revert if the ethers sent by the node op are not enough to pay for the bid (and the bond).
+     * @param _discountRates: array of discount rates (i.e the desired profit margin) in percentage (scale from 0 to 10000)
+     * @param _timesInDays: array of duration of being a validator, in days
+     * @dev By calling this function, the node op insert data in the auction Binary Search Tree (sorted by auction score).
+     * @dev Revert if `_discountRates` or `_timesInDays` don't respect the values set by the byzantine or if they don't have the same length.
+     * @dev Revert if the ethers sent by the node op are not enough to pay for the bid(s) (and the bond).
      * @dev Reverts if the transfer of the funds to the Escrow contract failed.
      * @dev If too many ethers has been sent the function give back the excess to the sender.
+     * @return The array of each bid auction score.
      */
     function bid(
-        uint256 _discountRate,
-        uint256 _timeInDays
+        uint256[] calldata _discountRates,
+        uint256[] calldata _timesInDays
     ) 
-        external payable;
+        external payable returns (uint256[] memory);
 
     /**
-     * @notice Fonction to determine the price to add in the protocol if the node operator outbids. Returns 0 if he decrease its bid.
+     * @notice Fonction to determine the price to add in the protocol if the node operator outbids. Returns 0 if he decreases its bid.
+     * @notice The bid which will be updated will be the last bid with `_auctionScore`
      * @param _nodeOpAddr: address of the node operator updating its bid
+     * @param _auctionScore: auction score of the bid to update
      * @param _discountRate: discount rate (i.e the desired profit margin) in percentage (scale from 0 to 10000)
      * @param _timeInDays: duration of being a validator, in days
+     * @dev Reverts if the node op doesn't have a bid with `_auctionScore`.
      * @dev Revert if `_discountRate` or `_timeInDays` don't respect the values set by the byzantine.
      */
-    function getUpdateBidPrice(
+    function getUpdateOneBidPrice(
         address _nodeOpAddr,
+        uint256 _auctionScore,
         uint256 _discountRate,
         uint256 _timeInDays
     ) 
         external view returns (uint256);
 
     /**
-     * @notice Update the bid of a node operator. A same address cannot have several bids, so the node op
-     * will have to pay more if he outbids. If he decreases his bid, the escrow contract will send him the difference.
+     * @notice  Update a bid of a node operator associated to `_auctionScore`. The node op will have to pay more if he outbids. 
+     *          If he decreases his bid, the escrow contract will send him back the difference.
+     * @notice  The bid which will be updated will be the last bid with `_auctionScore`
+     * @param _auctionScore: auction score of the bid to update
      * @param _newDiscountRate: new discount rate (i.e the desired profit margin) in percentage (scale from 0 to 10000)
      * @param _newTimeInDays: new duration of being a validator, in days
-     * @dev To call that function, the node op has to be inAuction.
+     * @dev Reverts if the node op doesn't have a bid with `_auctionScore`.
      * @dev Reverts if the transfer of the funds to the Escrow contract failed.
      * @dev Revert if `_discountRate` or `_timeInDays` don't respect the values set by the byzantine.
      */
-    function updateBid(
+    function updateOneBid(
+        uint256 _auctionScore,
         uint256 _newDiscountRate,
         uint256 _newTimeInDays
     ) 
-        external payable;
+        external payable returns (uint256);
 
     /**
-     * @notice Allow a node operator to abandon the auction and withdraw the bid he paid.
-     * It's not possible to withdraw if the node operator is actively validating.
-     * @dev Status is set to inactive and auction details to 0 unless the reputation which is unmodified
+     * @notice Allow a node operator to withdraw a specific bid (through its auction score).
+     * The withdrawer will be refund its bid price plus (the bond of he paid it).
+     * @param _auctionScore: auction score of the bid to withdraw. Will withdraw the last bid with this score.
      */
-    function withdrawBid() external;
+    function withdrawBid(uint256 _auctionScore) external;
 
     /**
      * @notice Update the auction configuration except cluster size
@@ -154,31 +139,37 @@ interface IAuction {
      */
     function updateClusterSize(uint256 __clusterSize) external;
 
-    /**
-     * @notice Return true if the `_nodeOpAddr` is whitelisted, false otherwise.
-     * @param _nodeOpAddr: operator address you want to know if whitelisted
-     */
+    /// @notice Return true if the `_nodeOpAddr` is whitelisted, false otherwise.
     function isWhitelisted(address _nodeOpAddr) external view returns (bool);
 
-    /**
-     * @notice Returns the auction details of a node operator
-     * @param _nodeOpAddr The node operator address to get the details
-     * @return (vcNumber, bidPrice, auctionScore, reputationScore, nodeStatus)
-     */
-    function getNodeOpDetails(
-        address _nodeOpAddr
-    ) 
-        external view returns (uint256, uint256, uint256, uint256, NodeOpStatus);
-
+    /// @notice Return the pending bid number of the `_nodeOpAddr`.
+    function getNodeOpBidNumber(address _nodeOpAddr) external view returns (uint256);
 
     /**
-     * @notice Returns the node operator who have the `_auctionScore`
-     * @param _auctionScore The auction score to get the node operator
+     * @notice Return the pending bid(s) price of the `_nodeOpAddr` corresponding to `_auctionScore`.
+     * @param _auctionScore The auction score of the node operator you want to get the corresponding bid(s) price.
+     * @return (uint256[] memory) An array of all the bid price for that specific auctionScore
+     * @dev If `_nodeOpAddr` doesn't have `_auctionScore` in his mapping, return an empty array.
+     * @dev A same `_auctionScore` can have different bid prices depending on the reputationScore variations.
      */
-    function getAuctionScoreToNodeOp(
+    function getNodeOpAuctionScoreBidPrices(
+        address _nodeOpAddr,
         uint256 _auctionScore
     ) 
-        external view returns (address);
+        external view returns (uint256[] memory);
+
+    /**
+     * @notice Return the pending VCs number of the `_nodeOpAddr` corresponding to `_auctionScore`.
+     * @param _auctionScore The auction score of the node operator you want to get the corresponding VCs numbers.
+     * @return (uint256[] memory) An array of all the VC numbers for that specific auctionScore
+     * @dev If `_nodeOpAddr` doesn't have `_auctionScore` in his mapping, return an empty array.
+     * @dev A same `_auctionScore` can have different VCs numbers depending on the reputationScore variations.
+     */
+    function getNodeOpAuctionScoreVcs(
+        address _nodeOpAddr,
+        uint256 _auctionScore
+    )
+        external view returns (uint256[] memory);
 
     /**
      * @notice Returns the auction configuration values.
@@ -201,15 +192,6 @@ interface IAuction {
 
     /// @dev Returned when node operator's duration is too short compared to the Byzantine's min duration.
     error DurationTooShort();
-
-    /// @dev Returned when a node operator is already in auction and therefore not allowed to bid again
-    error AlreadyInAuction();
-
-    /// @dev Returned when a node operator is not in auction and therefore cannot update its bid
-    error NotInAuction();
-
-    /// @dev Error when two node operators have the same auction score
-    error BidAlreadyExists();
 
     /// @dev Returned when bidder didn't pay its entire bid
     error NotEnoughEtherSent();

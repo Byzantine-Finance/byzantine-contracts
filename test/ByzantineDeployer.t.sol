@@ -58,8 +58,8 @@ contract ByzantineDeployer is EigenLayerDeployer {
 
     struct NodeOpBid {
         address nodeOp;
-        uint256 discountRate;
-        uint256 timeInDays;
+        uint256[] discountRates;
+        uint256[] timesInDays;
     }
 
     function setUp() public virtual override {

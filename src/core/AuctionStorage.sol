@@ -5,7 +5,7 @@ import "../interfaces/IAuction.sol";
 import "../interfaces/IStrategyModuleManager.sol";
 import "../interfaces/IEscrow.sol";
 
-import "../libraries/BokkyPooBahsRedBlackTreeLibrary.sol";
+import "../libraries/HitchensOrderStatisticsTreeLib.sol";
 
 abstract contract AuctionStorage is IAuction {
     /* ================= CONSTANTS + IMMUTABLES ================= */
@@ -21,9 +21,11 @@ abstract contract AuctionStorage is IAuction {
 
     /* ===================== STATE VARIABLES ===================== */
 
-    /// @notice Auction scores stored in a Red-Black tree (complexity O(log n))
-    BokkyPooBahsRedBlackTreeLibrary.Tree internal _auctionTree;
+    /// @notice Auction scores stored in a Red-Black tree (complexity O(log 2n))
+    HitchensOrderStatisticsTreeLib.Tree internal _auctionTree;
 
+    /// @notice Number of node operators in auction and seeking for a DV
+    uint256 public numNodeOpsInAuction;    
     /// @notice Daily rewards of Ethereum Pos (in WEI)
     uint256 internal _expectedDailyReturnWei;
     /// @notice Minimum duration to be part of a DV (in days)
@@ -34,10 +36,7 @@ abstract contract AuctionStorage is IAuction {
     uint256 internal _clusterSize;
 
     /// @notice Node operator address => node operator auction details
-    mapping(address => NodeOpDetails) internal _nodeOpsInfo;
-
-    /// @notice Auction score => node operator address
-    mapping(uint256 => address) internal _auctionScoreToNodeOp;
+    mapping(address => AuctionDetails) internal _nodeOpsInfo;
 
     /// @notice Mapping for the whitelisted node operators
     mapping(address => bool) internal _nodeOpsWhitelist;  

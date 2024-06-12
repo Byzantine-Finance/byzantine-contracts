@@ -29,11 +29,11 @@ contract StrategyModuleManagerTest is ProofParsing, ByzantineDeployer {
         // deploy locally EigenLayer and Byzantine contracts
         ByzantineDeployer.setUp();
 
-        // For the context of these tests, we assume 10 node ops are waiting to join a cluster
+        // For the context of these tests, we assume 4 node ops are waiting to join a cluster
         for (uint i = 0; i < nodeOps.length; i++) {
             vm.deal(nodeOps[i], STARTING_BALANCE);
         }
-        _10NodeOpsBid();
+        _4NodeOpsBid();
     }
 
     function testStratModManagerOwner() public view {
@@ -338,9 +338,9 @@ contract StrategyModuleManagerTest is ProofParsing, ByzantineDeployer {
         (,,, uint256 _clusterSize) = auction.getAuctionConfigValues(); 
         assertEq(clusterDetailsNodesAddr.length, _clusterSize);
         for (uint i = 0; i < _clusterSize; i++) {
-            assertEq(nodeOps[2 * i], clusterDetailsNodesAddr[i]);
+            assertEq(nodeOps[i], clusterDetailsNodesAddr[i]);
         }
-        assertEq(nodeOps[6], IStrategyModule(stratModAddr).getClusterManager());
+        assertEq(nodeOps[3], IStrategyModule(stratModAddr).getClusterManager());
 
         // Verify the status of the DV
         IStrategyModule.DVStatus dvStatus = IStrategyModule(stratModAddr).getDVStatus();
@@ -675,35 +675,49 @@ contract StrategyModuleManagerTest is ProofParsing, ByzantineDeployer {
         assertTrue(delegation.isDelegated(operator), "_registerAsELOperator: operator doesn't delegate itself");
     }
 
+    function _createOneBidParamArray(
+        uint256 _discountRate,
+        uint256 _timeInDays
+    ) internal pure returns (uint256[] memory, uint256[] memory) {
+        uint256[] memory discountRateArray = new uint256[](1);
+        discountRateArray[0] = _discountRate;
+
+        uint256[] memory timeInDaysArray = new uint256[](1);
+        timeInDaysArray[0] = _timeInDays;
+        
+        return (discountRateArray, timeInDaysArray);
+    }
+
     function _nodeOpBid(
         NodeOpBid memory nodeOpBid
-    ) internal {
+    ) internal returns (uint256[] memory) {
         // Get price to pay
-        uint256 priceToPay = auction.getPriceToPay(nodeOpBid.nodeOp, nodeOpBid.discountRate, nodeOpBid.timeInDays);
+        uint256 priceToPay = auction.getPriceToPay(nodeOpBid.nodeOp, nodeOpBid.discountRates, nodeOpBid.timesInDays);
         vm.prank(nodeOpBid.nodeOp);
-        auction.bid{value: priceToPay}(nodeOpBid.discountRate, nodeOpBid.timeInDays);
+        return auction.bid{value: priceToPay}(nodeOpBid.discountRates, nodeOpBid.timesInDays);
     }
 
     function _nodeOpsBid(
-        NodeOpBid[] memory nodeOpBids
-    ) internal {
-        for (uint i = 0; i < nodeOpBids.length; i++) {
-            _nodeOpBid(nodeOpBids[i]);
+        NodeOpBid[] memory nodeOpsBids
+    ) internal returns (uint256[][] memory) {
+        uint256[][] memory nodeOpsAuctionScores = new uint256[][](nodeOpsBids.length);
+        for (uint i = 0; i < nodeOpsBids.length; i++) {
+            nodeOpsAuctionScores[i] = _nodeOpBid(nodeOpsBids[i]);
         }
+        return nodeOpsAuctionScores;
     }
 
-    function _10NodeOpsBid() internal {
-        NodeOpBid[] memory nodeOpBids = new NodeOpBid[](10);
-        nodeOpBids[0] = NodeOpBid(nodeOps[0], 13e2, 1000); // 1st
-        nodeOpBids[1] = NodeOpBid(nodeOps[1], 13e2, 600);  // 5th
-        nodeOpBids[2] = NodeOpBid(nodeOps[2], 13e2, 900);  // 2nd
-        nodeOpBids[3] = NodeOpBid(nodeOps[3], 13e2, 500);  // 6th
-        nodeOpBids[4] = NodeOpBid(nodeOps[4], 13e2, 800);  // 3rd
-        nodeOpBids[5] = NodeOpBid(nodeOps[5], 13e2, 400);  // 7th
-        nodeOpBids[6] = NodeOpBid(nodeOps[6], 13e2, 700);  // 4th
-        nodeOpBids[7] = NodeOpBid(nodeOps[7], 13e2, 300);  // 8th
-        nodeOpBids[8] = NodeOpBid(nodeOps[8], 13e2, 200);  // 9th
-        nodeOpBids[9] = NodeOpBid(nodeOps[9], 13e2, 100);  // 10th
+    function _4NodeOpsBid() internal {
+        (uint256[] memory DR0, uint256[] memory time0) = _createOneBidParamArray(13e2, 999); // 1st
+        (uint256[] memory DR1, uint256[] memory time1) = _createOneBidParamArray(13e2, 900);  // 2nd
+        (uint256[] memory DR2, uint256[] memory time2) = _createOneBidParamArray(13e2, 800);  // 3rd
+        (uint256[] memory DR3, uint256[] memory time3) = _createOneBidParamArray(13e2, 700);  // 4th
+
+        NodeOpBid[] memory nodeOpBids = new NodeOpBid[](4);
+        nodeOpBids[0] = NodeOpBid(nodeOps[0], DR0, time0);
+        nodeOpBids[1] = NodeOpBid(nodeOps[1], DR1, time1); 
+        nodeOpBids[2] = NodeOpBid(nodeOps[2], DR2, time2); 
+        nodeOpBids[3] = NodeOpBid(nodeOps[3], DR3, time3); 
         _nodeOpsBid(nodeOpBids);
     }
 
