@@ -41,7 +41,7 @@ contract Escrow is IEscrow {
     function releaseFunds(uint256 _bidPrice) public onlyAuction {
         if (address(this).balance < _bidPrice) revert InsufficientFundsInEscrow();
         (bool success, ) = payable(bidPriceReceiver).call{value: _bidPrice}("");
-        require(success, "Failed to send Ether");
+        if (!success) revert FailedToSendEther();
     }
 
     /**
@@ -56,7 +56,7 @@ contract Escrow is IEscrow {
     ) public onlyAuction {
         if (address(this).balance < _amountToRefund) revert InsufficientFundsInEscrow();
         (bool success, ) = payable(_nodeOpAddr).call{value: _amountToRefund}("");
-        require(success, "Failed to send Ether");
+        if (!success) revert FailedToSendEther();
     }
 
     modifier onlyAuction() {

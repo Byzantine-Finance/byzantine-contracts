@@ -23,4 +23,7 @@ interface IEscrow {
 
     /// @dev Returned when not enough funds in the escrow to refund ops or move funds.
     error InsufficientFundsInEscrow();
+
+    /// @notice Returned when failed to send Ether to the bid price receiver or to bidder
+    error FailedToSendEther();
 }
