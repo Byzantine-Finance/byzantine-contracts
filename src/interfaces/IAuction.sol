@@ -14,7 +14,7 @@ interface IAuction {
     }
 
     /// @notice Getter of the state variable `numNodeOpsInAuction`
-    function numNodeOpsInAuction() external view returns (uint256);
+    function numNodeOpsInAuction() external view returns (uint64);
 
     /**
      * @notice Add a node operator to the the whitelist to not make him pay the bond.
@@ -128,8 +128,8 @@ interface IAuction {
      */
     function updateAuctionConfig(
         uint256 __expectedDailyReturnWei,
-        uint256 __maxDiscountRate,
-        uint256 __minDuration
+        uint16 __maxDiscountRate,
+        uint168 __minDuration
     )
         external;
 
@@ -137,7 +137,7 @@ interface IAuction {
      * @notice Update the cluster size (i.e the number of node operators in a DV)
      * @param __clusterSize: the new cluster size
      */
-    function updateClusterSize(uint256 __clusterSize) external;
+    function updateClusterSize(uint8 __clusterSize) external;
 
     /// @notice Return true if the `_nodeOpAddr` is whitelisted, false otherwise.
     function isWhitelisted(address _nodeOpAddr) external view returns (bool);

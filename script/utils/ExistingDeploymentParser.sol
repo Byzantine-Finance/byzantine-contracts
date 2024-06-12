@@ -45,8 +45,8 @@ contract ExistingDeploymentParser is Script, Test {
     address bidReceiver;
     // Initial Auction parameters
     uint256 EXPECTED_POS_DAILY_RETURN_WEI;
-    uint256 MAX_DISCOUNT_RATE;
-    uint256 MIN_VALIDATION_DURATION;
+    uint16 MAX_DISCOUNT_RATE;
+    uint168 MIN_VALIDATION_DURATION;
 
     /// @notice use for deploying a new set of Byzantine contracts
     function _parseInitialDeploymentParams(string memory initialDeploymentParamsPath) internal virtual {
@@ -63,8 +63,8 @@ contract ExistingDeploymentParser is Script, Test {
 
         // read auction config
         EXPECTED_POS_DAILY_RETURN_WEI = stdJson.readUint(initialDeploymentData, ".auctionConfig.expected_pos_daily_return_wei");
-        MAX_DISCOUNT_RATE = stdJson.readUint(initialDeploymentData, ".auctionConfig.max_discount_rate");
-        MIN_VALIDATION_DURATION = stdJson.readUint(initialDeploymentData, ".auctionConfig.min_Validation_duration");
+        MAX_DISCOUNT_RATE = uint16(stdJson.readUint(initialDeploymentData, ".auctionConfig.max_discount_rate"));
+        MIN_VALIDATION_DURATION = uint168(stdJson.readUint(initialDeploymentData, ".auctionConfig.min_Validation_duration"));
 
         // read bidReceiver address
         bidReceiver = stdJson.readAddress(initialDeploymentData, ".bidReceiver");
@@ -181,7 +181,7 @@ contract ExistingDeploymentParser is Script, Test {
         byzNft.initialize(strategyModuleManager);
         // Auction
         vm.expectRevert(bytes("Initializable: contract is already initialized"));
-        auction.initialize(byzantineAdmin, EXPECTED_POS_DAILY_RETURN_WEI, MAX_DISCOUNT_RATE, MIN_VALIDATION_DURATION, uint256(4));
+        auction.initialize(byzantineAdmin, EXPECTED_POS_DAILY_RETURN_WEI, MAX_DISCOUNT_RATE, MIN_VALIDATION_DURATION, uint8(4));
     }
 
     /// @notice Verify params based on config constants that are updated from calling `_parseInitialDeploymentParams`

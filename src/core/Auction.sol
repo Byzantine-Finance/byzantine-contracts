@@ -38,9 +38,9 @@ contract Auction is
     function initialize(
         address _initialOwner,
         uint256 __expectedDailyReturnWei,
-        uint256 __maxDiscountRate,
-        uint256 __minDuration,
-        uint256 __clusterSize
+        uint16 __maxDiscountRate,
+        uint168 __minDuration,
+        uint8 __clusterSize
     ) external initializer {
         _transferOwnership(_initialOwner);
         __ReentrancyGuard_init();
@@ -406,8 +406,8 @@ contract Auction is
      */
     function updateAuctionConfig(
         uint256 __expectedDailyReturnWei,
-        uint256 __maxDiscountRate,
-        uint256 __minDuration
+        uint16 __maxDiscountRate,
+        uint168 __minDuration
     ) external onlyOwner {
         _expectedDailyReturnWei = __expectedDailyReturnWei;
         _maxDiscountRate = __maxDiscountRate;
@@ -418,7 +418,7 @@ contract Auction is
      * @notice Update the cluster size (i.e the number of node operators in a DV)
      * @param __clusterSize: the new cluster size
      */
-    function updateClusterSize(uint256 __clusterSize) external onlyOwner {
+    function updateClusterSize(uint8 __clusterSize) external onlyOwner {
         require(__clusterSize >= 4, "Cluster size must be at least 4.");
         _clusterSize = __clusterSize;
     }

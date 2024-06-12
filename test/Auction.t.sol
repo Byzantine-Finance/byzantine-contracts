@@ -433,8 +433,8 @@ contract AuctionTest is ByzantineDeployer {
 
         // Update auction configuration
         uint256 newExpectedDailyReturnWei = 0.0003 ether;
-        uint256 newMaxDiscountRate = 10e2;
-        uint256 newMinDuration = 60;
+        uint16 newMaxDiscountRate = 10e2;
+        uint168 newMinDuration = 60;
         auction.updateAuctionConfig(newExpectedDailyReturnWei, newMaxDiscountRate, newMinDuration);
 
         (
