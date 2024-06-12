@@ -1,21 +1,21 @@
 {
   "addresses": {
-    "auction": "0x2E311c8018634910D5ce236e72D92683A7A85A1e",
-    "auctionImplementation": "0x195A22ed47B7567FD6Be5B724CaD045Cf4188765",
-    "byzNft": "0x0e00e37D48B214dA408bb4d4706aCb3F1B22B91D",
-    "byzNftImplementation": "0x22e623c70c776f894cEb284F4A4EFfA853C81215",
-    "byzantineProxyAdmin": "0x4c1F7171e6A23E5ea9E2176EF0546f2E66A01175",
-    "emptyContract": "0x680658e1aaC31f461500D92f3b2F3EFf7DF20c92",
-    "escrow": "0x07e4e0391661C1D7B48b503BE8B02E8B93461d80",
-    "escrowImplementation": "0x04311fa86EaAE2CF657D8E2c8a58E98bFd3CcF48",
-    "strategyModuleBeacon": "0x32df4D3C1624b6Ed6f87b7931acC80bd46748eAD",
-    "strategyModuleImplementation": "0x06492BAc2abC1E6543314EeB5F4e1d9a105D1FE4",
-    "strategyModuleManager": "0xCfaa14b36E64CB8e4F11b0EFa28DC8E017A8C52f",
-    "strategyModuleManagerImplementation": "0xE59132C95972FecE8D1686A304C983798fd022Ff"
+    "auction": "0x7d64D69FDA6aB71Ab71771a134a82BACAEF9796E",
+    "auctionImplementation": "0x0424C4C93f8cB3d32e7e486b873AD2EA074a9b66",
+    "byzNft": "0x087453b08B72eD622F1a8cBCFf51130999bcAcEE",
+    "byzNftImplementation": "0x9DB1e2709C185f38259A69646C7E93Cb552C900C",
+    "byzantineProxyAdmin": "0xB43EFca8a42231B24f54BFC99dF1ac1A983FE1BD",
+    "emptyContract": "0x976A8a8652d08AaC069dC7964042b5cf671E0098",
+    "escrow": "0x773c9371797Dc63b313CB187d5eDDF0422Bfaf9b",
+    "escrowImplementation": "0xfF6b7c401f4a6905d7ec6C7BAF3761aF16a3ed99",
+    "strategyModuleBeacon": "0xFef28Ca5fff9b34e2890f5cCd4f560fb18205316",
+    "strategyModuleImplementation": "0xD59bFf7007597Ed4583D914Dd8cB03bD30530D04",
+    "strategyModuleManager": "0x70f3af2d0Ce82a35A55A7C89fF4618B83c7A0169",
+    "strategyModuleManagerImplementation": "0x8732d6CD6170FC9A82D4CBDdf2C3108c0355E5f3"
   },
   "chainInfo": {
     "chainId": 17000,
-    "deploymentBlock": 1664276
+    "deploymentBlock": 1723158
   },
   "parameters": {
     "bidReceiver": "0x9c475A3FB5E0ee61B049516b7e1186Cc3F1362C0",
