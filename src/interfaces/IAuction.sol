@@ -23,10 +23,16 @@ interface IAuction {
     function maxDiscountRate() external view returns (uint16);
 
     /// @notice Get the minimum duration to be part of a DV (in days)
-    function minDuration() external view returns (uint168);
+    function minDuration() external view returns (uint160);
 
-    /// @notice Getter the cluster size of a DV (i.e the number of nodes in a DV)
+    /// @notice Get the cluster size of a DV (i.e the number of nodes in a DV)
     function clusterSize() external view returns (uint8);
+
+    /// @notice Get the time to wait before the first auction can start (in seconds)
+    function auctionCountdown() external view returns (uint256);
+
+    /// @notice Getter to know if auction countdown is finished
+    function auctionCountdownFinished() external view returns (bool);
 
     /**
      * @notice Add a node operator to the the whitelist to not make him pay the bond.
@@ -141,7 +147,7 @@ interface IAuction {
     function updateAuctionConfig(
         uint256 _expectedDailyReturnWei,
         uint16 _maxDiscountRate,
-        uint168 _minDuration
+        uint160 _minDuration
     )
         external;
 

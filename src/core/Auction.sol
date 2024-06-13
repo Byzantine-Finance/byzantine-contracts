@@ -25,9 +25,10 @@ contract Auction is
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor(
+        uint256 _auctionCountdown,
         IEscrow _escrow,
         IStrategyModuleManager _strategyModuleManager
-    ) AuctionStorage(_escrow, _strategyModuleManager) {
+    ) AuctionStorage(_auctionCountdown, _escrow, _strategyModuleManager) {
         // Disable initializer in the context of the implementation contract
         _disableInitializers();
     }
@@ -39,7 +40,7 @@ contract Auction is
         address _initialOwner,
         uint256 _expectedDailyReturnWei,
         uint16 _maxDiscountRate,
-        uint168 _minDuration,
+        uint160 _minDuration,
         uint8 _clusterSize
     ) external initializer {
         _transferOwnership(_initialOwner);
@@ -48,6 +49,7 @@ contract Auction is
         maxDiscountRate = _maxDiscountRate;
         minDuration = _minDuration;
         clusterSize = _clusterSize;
+        auctionCountdownFinished = false;
     }
 
     /* ===================== EXTERNAL FUNCTIONS ===================== */
@@ -80,7 +82,7 @@ contract Auction is
      */
     function createDV(
         IStrategyModule _stratModNeedingDV
-    ) external onlyStategyModuleManager nonReentrant {
+    ) external onlyStategyModuleManager nonReentrant isAuctionAuthorized {
 
         // Check if enough node ops in the auction to create a DV
         if (numNodeOpsInAuction < clusterSize) revert NotEnoughNodeOps();
@@ -407,7 +409,7 @@ contract Auction is
     function updateAuctionConfig(
         uint256 _expectedDailyReturnWei,
         uint16 _maxDiscountRate,
-        uint168 _minDuration
+        uint160 _minDuration
     ) external onlyOwner {
         expectedDailyReturnWei = _expectedDailyReturnWei;
         maxDiscountRate = _maxDiscountRate;
@@ -618,6 +620,14 @@ contract Auction is
 
     modifier onlyStategyModuleManager() {
         if (msg.sender != address(strategyModuleManager)) revert OnlyStrategyModuleManager();
+        _;
+    }
+
+    modifier isAuctionAuthorized() {
+        if (!auctionCountdownFinished) {
+            require(block.timestamp >= deploymentTimestamp + auctionCountdown, "Auction hasn't started");
+            auctionCountdownFinished = true;
+        }
         _;
     }
 }

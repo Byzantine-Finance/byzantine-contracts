@@ -12,6 +12,10 @@ abstract contract AuctionStorage is IAuction {
 
     uint256 internal constant _WAD = 1e18;
     uint256 internal constant _BOND = 1 ether;
+    /// @notice Interval from which it is possible to trigger auctions and create DVs
+    uint256 public immutable auctionCountdown;
+    /// @notice Timestamp of the contract deployment
+    uint256 internal immutable deploymentTimestamp;
 
     /// @notice Escrow contract
     IEscrow public immutable escrow;
@@ -27,13 +31,15 @@ abstract contract AuctionStorage is IAuction {
     /// @notice Daily rewards of Ethereum Pos (in WEI)
     uint256 public expectedDailyReturnWei;
     /// @notice Minimum duration to be part of a DV (in days)
-    uint168 public minDuration;
+    uint160 public minDuration;
     /// @notice Number of node operators in auction and seeking for a DV
     uint64 public numNodeOpsInAuction;    
     /// @notice Maximum discount rate (i.e the max profit margin of node op) in percentage
     uint16 public maxDiscountRate;
     /// @notice Number of nodes in a Distributed Validator
     uint8 public clusterSize;
+    /// @notice Variable to avoid verifying bock.timestamp once countdown is finished
+    bool public auctionCountdownFinished;
 
     /// @notice Node operator address => node operator auction details
     mapping(address => AuctionDetails) internal _nodeOpsInfo;
@@ -45,9 +51,12 @@ abstract contract AuctionStorage is IAuction {
     /* ================= CONSTRUCTOR ================= */ 
 
     constructor(
+        uint256 _auctionCountdown,
         IEscrow _escrow,
         IStrategyModuleManager _strategyModuleManager
     ) {
+        auctionCountdown = _auctionCountdown;
+        deploymentTimestamp = block.timestamp;
         escrow = _escrow;
         strategyModuleManager = _strategyModuleManager;
     }

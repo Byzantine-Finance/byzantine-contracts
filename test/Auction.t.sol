@@ -387,7 +387,7 @@ contract AuctionTest is ByzantineDeployer {
         // Update auction configuration
         uint256 newExpectedDailyReturnWei = 0.0003 ether;
         uint16 newMaxDiscountRate = 10e2;
-        uint168 newMinDuration = 60;
+        uint160 newMinDuration = 60;
         auction.updateAuctionConfig(newExpectedDailyReturnWei, newMaxDiscountRate, newMinDuration);
 
         // Check if the auction configuration is updated correctly
@@ -403,7 +403,24 @@ contract AuctionTest is ByzantineDeployer {
         assertEq(auction.clusterSize(), 7);
     }
 
-    function test_createDV_FourDiffBids() external {
+    function test_createDV_RevertWhen_CountdownNotFinished() external {
+        // Alice creates a StrategyModule
+        vm.prank(alice);
+        IStrategyModule aliceStratMod = IStrategyModule(strategyModuleManager.createStratMod());
+
+        // 4 node ops bid
+        uint256[][] memory nodeOpsAuctionScore = _4NodeOpsBidDiff();
+
+        // Verify the number of node ops in the auction
+        assertEq(auction.numNodeOpsInAuction(), 4);
+
+        // Revert if want to create DV before the countdown is finished
+        vm.expectRevert(bytes("Auction hasn't started"));
+        vm.prank(address(strategyModuleManager));
+        auction.createDV(aliceStratMod);
+    }
+
+    function test_createDV_FourDiffBids() external waitAuctionStarts {
         // Alice creates a StrategyModule
         vm.prank(alice);
         IStrategyModule aliceStratMod = IStrategyModule(strategyModuleManager.createStratMod());
@@ -465,7 +482,7 @@ contract AuctionTest is ByzantineDeployer {
 
     }
 
-    function test_createDV_EightSameBids() external {
+    function test_createDV_EightSameBids() external waitAuctionStarts {
         // Alice creates a StrategyModule
         vm.prank(alice);
         IStrategyModule aliceStratMod = IStrategyModule(strategyModuleManager.createStratMod());
@@ -529,7 +546,7 @@ contract AuctionTest is ByzantineDeployer {
 
     }
 
-    function test_createDV_ThreeSameBids_WinnerAlreadyExists() external {
+    function test_createDV_ThreeSameBids_WinnerAlreadyExists() external waitAuctionStarts {
         // Alice creates a StrategyModule
         vm.prank(alice);
         IStrategyModule aliceStratMod = IStrategyModule(strategyModuleManager.createStratMod());
@@ -578,7 +595,7 @@ contract AuctionTest is ByzantineDeployer {
         assertEq(auction.numNodeOpsInAuction(), 1);
     }
 
-    function test_CreateMultipleDVs() external {
+    function test_CreateMultipleDVs() external waitAuctionStarts {
         // Alice creates 3 StrategyModules
         vm.startPrank(alice);
         IStrategyModule aliceStratMod1 = IStrategyModule(strategyModuleManager.createStratMod());
@@ -826,4 +843,10 @@ contract AuctionTest is ByzantineDeployer {
         return _nodeOpsBid(nodeOpBids);
     }
 
+    /* ===================== MODIFIERS ===================== */
+
+    modifier waitAuctionStarts() {
+        vm.warp(block.timestamp + auctionCountdown);
+        _;
+    }
 }

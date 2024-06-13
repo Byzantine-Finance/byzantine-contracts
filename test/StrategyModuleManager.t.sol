@@ -430,7 +430,7 @@ contract StrategyModuleManagerTest is ProofParsing, ByzantineDeployer {
 
         // Start the test
 
-        uint64 timestamp = 0;
+        uint64 timestamp = uint64(block.timestamp);
         vm.warp(timestamp);
 
         // Alice get 40ETH
@@ -486,7 +486,7 @@ contract StrategyModuleManagerTest is ProofParsing, ByzantineDeployer {
 
         // Start the test
 
-        uint64 timestamp = 0;
+        uint64 timestamp = uint64(block.timestamp);
         vm.warp(timestamp);
 
         // Alice get 40ETH
@@ -523,7 +523,7 @@ contract StrategyModuleManagerTest is ProofParsing, ByzantineDeployer {
 
     // The operator shares for the beacon chain strategy hasn't been updated because alice didn't verify the withdrawal credentials
     // of its validator (DV)
-    function testDelegateTo() public {
+    function testDelegateTo() public waitAuctionStarts {
 
         // Create the operator details for the operator to delegate to
         IDelegationManager.OperatorDetails memory operatorDetails = IDelegationManager.OperatorDetails({
@@ -578,7 +578,7 @@ contract StrategyModuleManagerTest is ProofParsing, ByzantineDeployer {
         return strategyModuleManager.createStratMod();
     }
 
-    function _createStratModAndStakeNativeETH(address _staker, uint256 _stake) internal returns (address, address) {
+    function _createStratModAndStakeNativeETH(address _staker, uint256 _stake) internal waitAuctionStarts returns (address, address) {
         vm.prank(_staker);
         return strategyModuleManager.createStratModAndStakeNativeETH{value: _stake}();
     }
@@ -748,5 +748,12 @@ contract StrategyModuleManagerTest is ProofParsing, ByzantineDeployer {
     //     vm.prank(address(auctionContract));
     //     IStrategyModule(stratModAddrNeedingDV).updateClusterDetails(nodes, clusterManager);
     // }
+
+    /* ===================== MODIFIERS ===================== */
+
+    modifier waitAuctionStarts() {
+        vm.warp(block.timestamp + auctionCountdown);
+        _;
+    }
 
 }

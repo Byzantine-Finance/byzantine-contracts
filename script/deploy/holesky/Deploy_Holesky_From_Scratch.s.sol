@@ -82,6 +82,7 @@ contract Deploy_Holesky_From_Scratch is ExistingDeploymentParser {
         );
         byzNftImplementation = new ByzNft();
         auctionImplementation = new Auction(
+            AUCTION_COUNTDOWN,
             escrow,
             strategyModuleManager
         );
@@ -119,7 +120,7 @@ contract Deploy_Holesky_From_Scratch is ExistingDeploymentParser {
                 EXPECTED_POS_DAILY_RETURN_WEI,
                 MAX_DISCOUNT_RATE,
                 MIN_VALIDATION_DURATION,
-                uint256(4)
+                CLUSTER_SIZE
             )
         );
         // Upgrade Escrow

@@ -30,8 +30,11 @@ contract ByzantineDeployer is EigenLayerDeployer {
     address public bidReceiver = makeAddr("bidReceiver");
     // Initial Auction parameters
     uint256 public currentPoSDailyReturnWei = (uint256(32 ether) * 37) / (1000 * 365); // 3.7% APY
-    uint256 public maxDiscountRate = 15e2; // 15%
-    uint256 public minValidationDuration = 30; // 30 days
+    uint16 public maxDiscountRate = 15e2; // 15%
+    uint160 public minValidationDuration = 30; // 30 days
+    uint8 public clusterSize = 4;
+    // Time to wait before auction begins
+    uint256 public auctionCountdown = 7 days;
 
     /* =============== TEST VARIABLES AND STRUCT =============== */
    
@@ -112,6 +115,7 @@ contract ByzantineDeployer is EigenLayerDeployer {
         );
         ByzNft byzNftImplementation = new ByzNft();
         Auction auctionImplementation = new Auction(
+            auctionCountdown,
             escrow,
             strategyModuleManager
         );
@@ -149,7 +153,7 @@ contract ByzantineDeployer is EigenLayerDeployer {
                 currentPoSDailyReturnWei,
                 maxDiscountRate,
                 minValidationDuration,
-                uint256(4)
+                clusterSize
             )
         );
         // Upgrade Escrow
@@ -171,7 +175,7 @@ contract ByzantineDeployer is EigenLayerDeployer {
         assertEq(auction.expectedDailyReturnWei(), currentPoSDailyReturnWei);
         assertEq(auction.maxDiscountRate(), maxDiscountRate);
         assertEq(auction.minDuration(), minValidationDuration);
-        assertEq(auction.clusterSize(), 4);
+        assertEq(auction.clusterSize(), clusterSize);
     }
 
 } 
