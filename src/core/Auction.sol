@@ -76,26 +76,22 @@ contract Auction is
 
     /**
      * @notice Function triggered by the StrategyModuleManager every time a staker deposit 32ETH and ask for a DV.
+     * It allows the pre-creation of a new DV for the next staker.
      * It finds the `clusterSize` node operators with the highest auction scores and put them in a DV.
-     * @param _stratModNeedingDV: the strategy module asking for a DV.
      * @dev Reverts if not enough node operators are available.
      */
-    function createDV(
-        IStrategyModule _stratModNeedingDV
-    ) external onlyStategyModuleManager nonReentrant isAuctionAuthorized {
-
+    function getAuctionWinners()
+        external
+        onlyStategyModuleManager
+        nonReentrant
+        isAuctionAuthorized
+        returns(IStrategyModule.Node[] memory)
+    {
         // Check if enough node ops in the auction to create a DV
-        if (numNodeOpsInAuction < clusterSize) revert NotEnoughNodeOps();
+        require(numNodeOpsInAuction >= clusterSize, "Not enough node ops in auction");
         
-        // Create the Node structure and updates the details of the winners
-        IStrategyModule.Node[] memory nodes = _getAuctionWinners();
-
-        // The cluster manager is the last node among the winners
-        address clusterManager = nodes[clusterSize - 1].eth1Addr;
-
-        // update `ClusterDetails` of the StrategyModule
-        _stratModNeedingDV.updateClusterDetails(nodes, clusterManager);
-
+        // Returns the auction winners
+        return _getAuctionWinners();
     }
 
     /**

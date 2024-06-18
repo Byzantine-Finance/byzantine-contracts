@@ -403,13 +403,9 @@ contract AuctionTest is ByzantineDeployer {
         assertEq(auction.clusterSize(), 7);
     }
 
-    function test_createDV_RevertWhen_CountdownNotFinished() external {
-        // Alice creates a StrategyModule
-        vm.prank(alice);
-        IStrategyModule aliceStratMod = IStrategyModule(strategyModuleManager.createStratMod());
-
+    function test_getAuctionWinners_RevertWhen_CountdownNotFinished() external {
         // 4 node ops bid
-        uint256[][] memory nodeOpsAuctionScore = _4NodeOpsBidDiff();
+        _4NodeOpsBidDiff();
 
         // Verify the number of node ops in the auction
         assertEq(auction.numNodeOpsInAuction(), 4);
@@ -417,14 +413,10 @@ contract AuctionTest is ByzantineDeployer {
         // Revert if want to create DV before the countdown is finished
         vm.expectRevert(bytes("Auction hasn't started"));
         vm.prank(address(strategyModuleManager));
-        auction.createDV(aliceStratMod);
+        auction.getAuctionWinners();
     }
 
-    function test_createDV_FourDiffBids() external waitAuctionStarts {
-        // Alice creates a StrategyModule
-        vm.prank(alice);
-        IStrategyModule aliceStratMod = IStrategyModule(strategyModuleManager.createStratMod());
-
+    function test_getAuctionWinners_FourDiffBids() external waitAuctionStarts {
         // 4 node ops bid
         uint256[][] memory nodeOpsAuctionScore = _4NodeOpsBidDiff();
 
@@ -444,21 +436,20 @@ contract AuctionTest is ByzantineDeployer {
 
         // Revert if not SrategyModuleManager calls createDV
         vm.expectRevert(IAuction.OnlyStrategyModuleManager.selector);
-        auction.createDV(aliceStratMod);
+        auction.getAuctionWinners();
 
         // DV: nodeOps[0], nodeOps[1], nodeOps[2], nodeOps[9]
         vm.prank(address(strategyModuleManager));
-        auction.createDV(aliceStratMod);
+        IStrategyModule.Node[] memory winnersDV = auction.getAuctionWinners();
 
         // Verify Escrow contract has been drained
         assertEq(address(escrow).balance, totalBonds);
         
         // Verify the DV composition
-        address [] memory winnersDV = aliceStratMod.getDVNodesAddr();
         for (uint i = 0; i < winnersDV.length - 1; i++) {
-           assertEq(winnersDV[i], nodeOps[i]);
+           assertEq(winnersDV[i].eth1Addr, nodeOps[i]);
         }
-        assertEq(winnersDV[3], nodeOps[9]);
+        assertEq(winnersDV[3].eth1Addr, nodeOps[9]);
 
         // Verify the node ops details has been updated correctly
         for (uint256 i = 0; i < winnersDV.length - 1; i++) {
@@ -477,16 +468,12 @@ contract AuctionTest is ByzantineDeployer {
         // Revert when not enough nodeOps in Auction
         assertEq(auction.numNodeOpsInAuction(), 0);
         vm.prank(address(strategyModuleManager));
-        vm.expectRevert(IAuction.NotEnoughNodeOps.selector);
-        auction.createDV(aliceStratMod);
+        vm.expectRevert(bytes("Not enough node ops in auction"));
+        auction.getAuctionWinners();
 
     }
 
-    function test_createDV_EightSameBids() external waitAuctionStarts {
-        // Alice creates a StrategyModule
-        vm.prank(alice);
-        IStrategyModule aliceStratMod = IStrategyModule(strategyModuleManager.createStratMod());
-
+    function test_getAuctionWinners_EightSameBids() external waitAuctionStarts {
         // 4 node ops bids 2 times (all of them have the same bids)
         uint256[][] memory nodeOpsAuctionScore = _4NodeOpsBidSame();
 
@@ -506,16 +493,17 @@ contract AuctionTest is ByzantineDeployer {
         // Verify the number of node ops in the auction
         assertEq(auction.numNodeOpsInAuction(), 4);
 
+        /* ============= 1st DV ============= */
+
         // DV1: nodeOps[0], nodeOps[1], nodeOps[2], nodeOps[3]
         vm.prank(address(strategyModuleManager));
-        auction.createDV(aliceStratMod);
+        IStrategyModule.Node[] memory winnersDV1 = auction.getAuctionWinners();
 
         // Verify the DV composition
-        address [] memory winnersDV1 = aliceStratMod.getDVNodesAddr();
-        assertEq(winnersDV1[0], nodeOps[0]);
-        assertEq(winnersDV1[1], nodeOps[1]);
-        assertEq(winnersDV1[2], nodeOps[2]);
-        assertEq(winnersDV1[3], nodeOps[3]);
+        assertEq(winnersDV1[0].eth1Addr, nodeOps[0]);
+        assertEq(winnersDV1[1].eth1Addr, nodeOps[1]);
+        assertEq(winnersDV1[2].eth1Addr, nodeOps[2]);
+        assertEq(winnersDV1[3].eth1Addr, nodeOps[3]);
 
         // Verify escrow received bids price + bonds
         assertEq(address(escrow).balance, totalSecondBidPrice + totalBonds);
@@ -523,20 +511,17 @@ contract AuctionTest is ByzantineDeployer {
         // Verify the number of node ops in the auction
         assertEq(auction.numNodeOpsInAuction(), 4);
 
-        // Bob creates a StrategyModule
-        vm.prank(bob);
-        IStrategyModule bobStratMod = IStrategyModule(strategyModuleManager.createStratMod());
+        /* ============= 2nd DV ============= */
 
         // DV2: nodeOps[0], nodeOps[1], nodeOps[2], nodeOps[3]
         vm.prank(address(strategyModuleManager));
-        auction.createDV(bobStratMod);
+        IStrategyModule.Node[] memory winnersDV2 = auction.getAuctionWinners();
 
         // Verify the DV composition
-        address [] memory winnersDV2 = bobStratMod.getDVNodesAddr();
-        assertEq(winnersDV2[0], nodeOps[0]);
-        assertEq(winnersDV2[1], nodeOps[3]);
-        assertEq(winnersDV2[2], nodeOps[2]);
-        assertEq(winnersDV2[3], nodeOps[1]);
+        assertEq(winnersDV2[0].eth1Addr, nodeOps[0]);
+        assertEq(winnersDV2[1].eth1Addr, nodeOps[3]);
+        assertEq(winnersDV2[2].eth1Addr, nodeOps[2]);
+        assertEq(winnersDV2[3].eth1Addr, nodeOps[1]);
 
         // Verify the number of node ops in the auction
         assertEq(auction.numNodeOpsInAuction(), 0);
@@ -546,11 +531,7 @@ contract AuctionTest is ByzantineDeployer {
 
     }
 
-    function test_createDV_ThreeSameBids_WinnerAlreadyExists() external waitAuctionStarts {
-        // Alice creates a StrategyModule
-        vm.prank(alice);
-        IStrategyModule aliceStratMod = IStrategyModule(strategyModuleManager.createStratMod());
-
+    function test_getAuctionWinners_ThreeSameBids_WinnerAlreadyExists() external waitAuctionStarts {
         // 4 node ops bid (three bids are similar)
         uint256[][] memory nodeOpsAuctionScore = _4NodeOpsBid_ThreeSame_WinnerAlreadyExists();
 
@@ -559,14 +540,13 @@ contract AuctionTest is ByzantineDeployer {
 
         // DV: nodeOps[0], nodeOps[1], nodeOps[2], nodeOps[3]
         vm.prank(address(strategyModuleManager));
-        auction.createDV(aliceStratMod);
+        IStrategyModule.Node[] memory winnersDV = auction.getAuctionWinners();
         
         // Verify the DV composition
-        address [] memory winnersDV = aliceStratMod.getDVNodesAddr();
-        assertEq(winnersDV[0], nodeOps[0]);
-        assertEq(winnersDV[1], nodeOps[2]);
-        assertEq(winnersDV[2], nodeOps[1]);
-        assertEq(winnersDV[3], nodeOps[3]);
+        assertEq(winnersDV[0].eth1Addr, nodeOps[0]);
+        assertEq(winnersDV[1].eth1Addr, nodeOps[2]);
+        assertEq(winnersDV[2].eth1Addr, nodeOps[1]);
+        assertEq(winnersDV[3].eth1Addr, nodeOps[3]);
 
         // Verify the node ops details has been updated correctly
         for (uint256 i = 0; i < winnersDV.length; i++) {
@@ -596,19 +576,6 @@ contract AuctionTest is ByzantineDeployer {
     }
 
     function test_CreateMultipleDVs() external waitAuctionStarts {
-        // Alice creates 3 StrategyModules
-        vm.startPrank(alice);
-        IStrategyModule aliceStratMod1 = IStrategyModule(strategyModuleManager.createStratMod());
-        IStrategyModule aliceStratMod2 = IStrategyModule(strategyModuleManager.createStratMod());
-        IStrategyModule aliceStratMod3 = IStrategyModule(strategyModuleManager.createStratMod());
-        vm.stopPrank();
-
-        // Bob creates 2 StrategyModules
-        vm.startPrank(alice);
-        IStrategyModule bobStratMod1 = IStrategyModule(strategyModuleManager.createStratMod());
-        IStrategyModule bobStratMod2 = IStrategyModule(strategyModuleManager.createStratMod());
-        vm.stopPrank();
-
         // 10 node ops bid (real life example)
         uint256[][] memory nodeOpsAuctionScore = _10NodeOpsBid();
 
@@ -619,17 +586,13 @@ contract AuctionTest is ByzantineDeployer {
 
         // DV1: nodeOps[0], nodeOps[6], nodeOps[2], nodeOps[4]
         vm.prank(address(strategyModuleManager));
-        auction.createDV(aliceStratMod1);
+        IStrategyModule.Node[] memory winnersDV1 = auction.getAuctionWinners();
         
         // Verify the DV1 composition
-        address [] memory winnersDV1 = aliceStratMod1.getDVNodesAddr();
-        assertEq(winnersDV1[0], nodeOps[0]);
-        assertEq(winnersDV1[1], nodeOps[6]);
-        assertEq(winnersDV1[2], nodeOps[2]);
-        assertEq(winnersDV1[3], nodeOps[4]);
-
-        // Verify cluster manager DV1
-        assertEq(aliceStratMod1.getClusterManager(), nodeOps[4]);
+        assertEq(winnersDV1[0].eth1Addr, nodeOps[0]);
+        assertEq(winnersDV1[1].eth1Addr, nodeOps[6]);
+        assertEq(winnersDV1[2].eth1Addr, nodeOps[2]);
+        assertEq(winnersDV1[3].eth1Addr, nodeOps[4]);
 
         // Verify the number of node ops in the auction
         assertEq(auction.numNodeOpsInAuction(), 9);
@@ -638,17 +601,13 @@ contract AuctionTest is ByzantineDeployer {
 
         // DV2: nodeOps[0], nodeOps[6], nodeOps[2], nodeOps[5]
         vm.prank(address(strategyModuleManager));
-        auction.createDV(aliceStratMod2);
+        IStrategyModule.Node[] memory winnersDV2 = auction.getAuctionWinners();
         
-        // Verify the DV1 composition
-        address [] memory winnersDV2 = aliceStratMod2.getDVNodesAddr();
-        assertEq(winnersDV2[0], nodeOps[0]);
-        assertEq(winnersDV2[1], nodeOps[6]);
-        assertEq(winnersDV2[2], nodeOps[2]);
-        assertEq(winnersDV2[3], nodeOps[5]);
-
-        // Verify cluster manager DV1
-        assertEq(aliceStratMod2.getClusterManager(), nodeOps[5]);
+        // Verify the DV2 composition
+        assertEq(winnersDV2[0].eth1Addr, nodeOps[0]);
+        assertEq(winnersDV2[1].eth1Addr, nodeOps[6]);
+        assertEq(winnersDV2[2].eth1Addr, nodeOps[2]);
+        assertEq(winnersDV2[3].eth1Addr, nodeOps[5]);
 
         // Verify the number of node ops in the auction
         assertEq(auction.numNodeOpsInAuction(), 8);
@@ -657,17 +616,13 @@ contract AuctionTest is ByzantineDeployer {
 
         // DV2: nodeOps[0], nodeOps[6], nodeOps[2], nodeOps[1]
         vm.prank(address(strategyModuleManager));
-        auction.createDV(aliceStratMod3);
+        IStrategyModule.Node[] memory winnersDV3 = auction.getAuctionWinners();
         
-        // Verify the DV1 composition
-        address [] memory winnersDV3 = aliceStratMod3.getDVNodesAddr();
-        assertEq(winnersDV3[0], nodeOps[0]);
-        assertEq(winnersDV3[1], nodeOps[6]);
-        assertEq(winnersDV3[2], nodeOps[2]);
-        assertEq(winnersDV3[3], nodeOps[1]);
-
-        // Verify cluster manager DV1
-        assertEq(aliceStratMod3.getClusterManager(), nodeOps[1]);
+        // Verify the DV3 composition
+        assertEq(winnersDV3[0].eth1Addr, nodeOps[0]);
+        assertEq(winnersDV3[1].eth1Addr, nodeOps[6]);
+        assertEq(winnersDV3[2].eth1Addr, nodeOps[2]);
+        assertEq(winnersDV3[3].eth1Addr, nodeOps[1]);
 
         // Verify the number of node ops in the auction
         assertEq(auction.numNodeOpsInAuction(), 5);
@@ -676,25 +631,21 @@ contract AuctionTest is ByzantineDeployer {
 
         // DV2: nodeOps[1], nodeOps[3], nodeOps[7], nodeOps[9]
         vm.prank(address(strategyModuleManager));
-        auction.createDV(bobStratMod1);
+        IStrategyModule.Node[] memory winnersDV4 = auction.getAuctionWinners();
         
-        // Verify the DV1 composition
-        address [] memory winnersDV4 = bobStratMod1.getDVNodesAddr();
-        assertEq(winnersDV4[0], nodeOps[1]);
-        assertEq(winnersDV4[1], nodeOps[3]);
-        assertEq(winnersDV4[2], nodeOps[7]);
-        assertEq(winnersDV4[3], nodeOps[9]);
-
-        // Verify cluster manager DV1
-        assertEq(bobStratMod1.getClusterManager(), nodeOps[9]);
+        // Verify the DV4 composition
+        assertEq(winnersDV4[0].eth1Addr, nodeOps[1]);
+        assertEq(winnersDV4[1].eth1Addr, nodeOps[3]);
+        assertEq(winnersDV4[2].eth1Addr, nodeOps[7]);
+        assertEq(winnersDV4[3].eth1Addr, nodeOps[9]);
 
         // Verify the number of node ops in the auction
         assertEq(auction.numNodeOpsInAuction(), 3);
 
         /* ===================== NOT ENOUGH NODE OPS IN AUCTION ===================== */
         vm.prank(address(strategyModuleManager));
-        vm.expectRevert(IAuction.NotEnoughNodeOps.selector);
-        auction.createDV(bobStratMod2);
+        vm.expectRevert(bytes("Not enough node ops in auction"));
+        auction.getAuctionWinners();
 
         // Verify remaining bids of nodeOps[3]
         uint256[] memory nodeOp3Bid1 = auction.getNodeOpAuctionScoreBidPrices(nodeOps[3], nodeOpsAuctionScore[3][1]);

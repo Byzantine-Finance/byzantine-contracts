@@ -50,14 +50,11 @@ interface IAuction {
 
     /**
      * @notice Function triggered by the StrategyModuleManager every time a staker deposit 32ETH and ask for a DV.
+     * It allows the pre-creation of a new DV for the next staker.
      * It finds the `clusterSize` node operators with the highest auction scores and put them in a DV.
-     * @param _stratModNeedingDV: the strategy module asking for a DV.
      * @dev Reverts if not enough node operators are available.
      */
-    function createDV(
-        IStrategyModule _stratModNeedingDV
-    ) 
-        external;
+    function getAuctionWinners() external returns(IStrategyModule.Node[] memory);
 
     /**
      * @notice Fonction to determine the auction price for a validator according to its bids parameters
@@ -206,9 +203,6 @@ interface IAuction {
 
     /// @dev Returned when bidder didn't pay its entire bid
     error NotEnoughEtherSent();
-
-    /// @dev Returned when trying to create a DV but not enough node operators are in auction
-    error NotEnoughNodeOps();
 
     /// @dev Returned when the deposit to the Escrow contract failed
     error EscrowTransferFailed();
