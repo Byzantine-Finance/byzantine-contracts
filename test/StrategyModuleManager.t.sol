@@ -69,12 +69,7 @@ contract StrategyModuleManagerTest is ProofParsing, ByzantineDeployer {
         vm.prank(alice);
         strategyModuleManager.preCreateDVs(2);
 
-        // Byzantine pre-create the first 2 DVs before Auction countdown finished
-        vm.expectRevert(bytes("Auction hasn't started"));
-        strategyModuleManager.preCreateDVs(2);
-
-        // Byzantine pre-create the first 2 DVs after Auction countdown finished
-        vm.warp(block.timestamp + auctionCountdown);
+        // Byzantine pre-create the first 2 DVs
         strategyModuleManager.preCreateDVs(2);
 
         // Verify number of pre-created DVs
@@ -624,7 +619,6 @@ contract StrategyModuleManagerTest is ProofParsing, ByzantineDeployer {
     /* ===================== MODIFIERS ===================== */
 
     modifier preCreateClusters(uint8 _numDVsToPreCreate) {
-        vm.warp(block.timestamp + auctionCountdown);
         strategyModuleManager.preCreateDVs(_numDVsToPreCreate);
         _;
     }

@@ -6,8 +6,7 @@
     "expected_pos_daily_return_wei": 3243835616438356,
     "max_discount_rate": 2000,
     "min_Validation_duration": 90,
-    "cluster_size": 4,
-    "auction_countdown_days": 7
+    "cluster_size": 4
   },
   "bidReceiver": "0x9c475A3FB5E0ee61B049516b7e1186Cc3F1362C0",
   "eigenLayerContractAddr": {

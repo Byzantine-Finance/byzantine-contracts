@@ -403,20 +403,7 @@ contract AuctionTest is ByzantineDeployer {
         assertEq(auction.clusterSize(), 7);
     }
 
-    function test_getAuctionWinners_RevertWhen_CountdownNotFinished() external {
-        // 4 node ops bid
-        _4NodeOpsBidDiff();
-
-        // Verify the number of node ops in the auction
-        assertEq(auction.numNodeOpsInAuction(), 4);
-
-        // Revert if want to create DV before the countdown is finished
-        vm.expectRevert(bytes("Auction hasn't started"));
-        vm.prank(address(strategyModuleManager));
-        auction.getAuctionWinners();
-    }
-
-    function test_getAuctionWinners_FourDiffBids() external waitAuctionStarts {
+    function test_getAuctionWinners_FourDiffBids() external {
         // 4 node ops bid
         uint256[][] memory nodeOpsAuctionScore = _4NodeOpsBidDiff();
 
@@ -473,7 +460,7 @@ contract AuctionTest is ByzantineDeployer {
 
     }
 
-    function test_getAuctionWinners_EightSameBids() external waitAuctionStarts {
+    function test_getAuctionWinners_EightSameBids() external {
         // 4 node ops bids 2 times (all of them have the same bids)
         uint256[][] memory nodeOpsAuctionScore = _4NodeOpsBidSame();
 
@@ -531,7 +518,7 @@ contract AuctionTest is ByzantineDeployer {
 
     }
 
-    function test_getAuctionWinners_ThreeSameBids_WinnerAlreadyExists() external waitAuctionStarts {
+    function test_getAuctionWinners_ThreeSameBids_WinnerAlreadyExists() external {
         // 4 node ops bid (three bids are similar)
         uint256[][] memory nodeOpsAuctionScore = _4NodeOpsBid_ThreeSame_WinnerAlreadyExists();
 
@@ -575,7 +562,7 @@ contract AuctionTest is ByzantineDeployer {
         assertEq(auction.numNodeOpsInAuction(), 1);
     }
 
-    function test_CreateMultipleDVs() external waitAuctionStarts {
+    function test_CreateMultipleDVs() external {
         // 10 node ops bid (real life example)
         uint256[][] memory nodeOpsAuctionScore = _10NodeOpsBid();
 
@@ -794,10 +781,4 @@ contract AuctionTest is ByzantineDeployer {
         return _nodeOpsBid(nodeOpBids);
     }
 
-    /* ===================== MODIFIERS ===================== */
-
-    modifier waitAuctionStarts() {
-        vm.warp(block.timestamp + auctionCountdown);
-        _;
-    }
 }

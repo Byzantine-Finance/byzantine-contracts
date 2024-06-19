@@ -33,8 +33,6 @@ contract ByzantineDeployer is EigenLayerDeployer {
     uint16 public maxDiscountRate = 15e2; // 15%
     uint160 public minValidationDuration = 30; // 30 days
     uint8 public clusterSize = 4;
-    // Time to wait before auction begins
-    uint256 public auctionCountdown = 7 days;
 
     /* =============== TEST VARIABLES AND STRUCT =============== */
    
@@ -115,7 +113,6 @@ contract ByzantineDeployer is EigenLayerDeployer {
         );
         ByzNft byzNftImplementation = new ByzNft();
         Auction auctionImplementation = new Auction(
-            auctionCountdown,
             escrow,
             strategyModuleManager
         );

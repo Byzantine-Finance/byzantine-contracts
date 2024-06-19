@@ -82,7 +82,6 @@ contract Deploy_Holesky_From_Scratch is ExistingDeploymentParser {
         );
         byzNftImplementation = new ByzNft();
         auctionImplementation = new Auction(
-            AUCTION_COUNTDOWN,
             escrow,
             strategyModuleManager
         );

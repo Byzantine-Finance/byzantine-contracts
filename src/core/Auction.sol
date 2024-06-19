@@ -25,10 +25,9 @@ contract Auction is
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor(
-        uint256 _auctionCountdown,
         IEscrow _escrow,
         IStrategyModuleManager _strategyModuleManager
-    ) AuctionStorage(_auctionCountdown, _escrow, _strategyModuleManager) {
+    ) AuctionStorage(_escrow, _strategyModuleManager) {
         // Disable initializer in the context of the implementation contract
         _disableInitializers();
     }
@@ -49,7 +48,6 @@ contract Auction is
         maxDiscountRate = _maxDiscountRate;
         minDuration = _minDuration;
         clusterSize = _clusterSize;
-        auctionCountdownFinished = false;
     }
 
     /* ===================== EXTERNAL FUNCTIONS ===================== */
@@ -84,7 +82,6 @@ contract Auction is
         external
         onlyStategyModuleManager
         nonReentrant
-        isAuctionAuthorized
         returns(IStrategyModule.Node[] memory)
     {
         // Check if enough node ops in the auction to create a DV
@@ -619,11 +616,4 @@ contract Auction is
         _;
     }
 
-    modifier isAuctionAuthorized() {
-        if (!auctionCountdownFinished) {
-            require(block.timestamp >= deploymentTimestamp + auctionCountdown, "Auction hasn't started");
-            auctionCountdownFinished = true;
-        }
-        _;
-    }
 }

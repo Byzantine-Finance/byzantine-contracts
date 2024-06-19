@@ -28,12 +28,6 @@ interface IAuction {
     /// @notice Get the cluster size of a DV (i.e the number of nodes in a DV)
     function clusterSize() external view returns (uint8);
 
-    /// @notice Get the time to wait before the first auction can start (in seconds)
-    function auctionCountdown() external view returns (uint256);
-
-    /// @notice Getter to know if auction countdown is finished
-    function auctionCountdownFinished() external view returns (bool);
-
     /**
      * @notice Add a node operator to the the whitelist to not make him pay the bond.
      * @param _nodeOpAddr: the node operator to whitelist.

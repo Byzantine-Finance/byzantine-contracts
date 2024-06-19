@@ -48,7 +48,6 @@ contract ExistingDeploymentParser is Script, Test {
     uint16 MAX_DISCOUNT_RATE;
     uint160 MIN_VALIDATION_DURATION;
     uint8 CLUSTER_SIZE;
-    uint256 AUCTION_COUNTDOWN;
 
     /// @notice use for deploying a new set of Byzantine contracts
     function _parseInitialDeploymentParams(string memory initialDeploymentParamsPath) internal virtual {
@@ -68,7 +67,6 @@ contract ExistingDeploymentParser is Script, Test {
         MAX_DISCOUNT_RATE = uint16(stdJson.readUint(initialDeploymentData, ".auctionConfig.max_discount_rate"));
         MIN_VALIDATION_DURATION = uint160(stdJson.readUint(initialDeploymentData, ".auctionConfig.min_Validation_duration"));
         CLUSTER_SIZE = uint8(stdJson.readUint(initialDeploymentData, ".auctionConfig.cluster_size"));
-        AUCTION_COUNTDOWN = stdJson.readUint(initialDeploymentData, ".auctionConfig.auction_countdown_days") * 1 days;
 
         // read bidReceiver address
         bidReceiver = stdJson.readAddress(initialDeploymentData, ".bidReceiver");
@@ -210,7 +208,6 @@ contract ExistingDeploymentParser is Script, Test {
         emit log_named_uint("MAX_DISCOUNT_RATE", MAX_DISCOUNT_RATE);
         emit log_named_uint("MIN_VALIDATION_DURATION", MIN_VALIDATION_DURATION);
         emit log_named_uint("CLUSTER_SIZE", CLUSTER_SIZE);
-        emit log_named_uint("AUCTION_COUNTDOWN", AUCTION_COUNTDOWN);
 
         emit log_named_address("eigenPodManager contract address", address(eigenPodManager));
         emit log_named_address("delegationManager contract address", address(delegation));
