@@ -33,10 +33,10 @@ contract ByzNft is
      * @notice Gets called when a full staker creates a Strategy Module
      * @param _to The address of the staker who created the Strategy Module
      * @param _nounce to calculate the tokenId. This is to prevent minting the same tokenId twice.
-     * @return The tokenId of the newly minted NFT (calculated from the number of Strategy Modules already own by the staker and the staker's address)
+     * @return The tokenId of the newly minted NFT (calculated from the number of Strategy Modules already deployed)
      */
-    function mint(address _to, uint256 _nounce) external onlyOwner returns (uint256) {
-        uint256 tokenId = uint256(keccak256(abi.encodePacked(_to, _nounce)));
+    function mint(address _to, uint64 _nounce) external onlyOwner returns (uint256) {
+        uint256 tokenId = uint256(keccak256(abi.encode(_nounce)));
         _safeMint(_to, tokenId);
         return tokenId;
     }

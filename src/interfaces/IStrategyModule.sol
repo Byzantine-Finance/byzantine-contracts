@@ -17,17 +17,13 @@ interface IStrategyModule {
     // The number of Validation Credits (1 VC = the right to run a validator as part of a DV for a day)
     uint256 vcNumber;
     // The node reputation (TODO : Add a reputation system to the protocol)
-    uint256 reputation;
+    uint128 reputation;
     // The node's address on the execution layer
     address eth1Addr;
   }
 
   /// @notice Struct to store the details of a Distributed Validator created on Byzantine
   struct ClusterDetails {
-    // Must be calculated / verified offchain by Byzantine to ensure the integrity of the DV's deposit data 
-    bytes trustedPubKey;
-    // The node responsible to deposit the 32ETH on the Beacon Chain
-    address clusterManager;
     // The status of the Distributed Validator
     DVStatus dvStatus;
     // A record of the 4 nodes being part of the cluster
@@ -35,10 +31,10 @@ interface IStrategyModule {
   }
 
   /**
-   * @notice Used to initialize the  nftId of that StrategyModule.
+   * @notice Used to initialize the nftId of that StrategyModule and its owner.
    * @dev Called on construction by the StrategyModuleManager.
-   */
-  function initialize(uint256 _nftId) external;
+  */
+  function initialize(uint256 _nftId,address _initialOwner) external;
 
   /**
    * @notice Returns the owner of this StrategyModule
@@ -51,27 +47,20 @@ interface IStrategyModule {
   function stratModOwner() external view returns (address);
 
   /**
-   * @notice Creates an EigenPod for the strategy module.
-   * @dev Function will revert if not called by the StrategyModule owner or StrategyModuleManager.
-   * @dev Function will revert if the StrategyModule already has an EigenPod.
-   * @dev Returns EigenPod address
-   */
-  function createPod() external returns (address);
-
-  /**
-   * @notice Deposit 32ETH from the contract's balance in the beacon chain to activate a Distributed Validator.
+   * @notice Deposit 32ETH in the beacon chain to activate a Distributed Validator and start validating on the consensus layer.
+   * Also creates an EigenPod for the StrategyModule. The NFT owner can staker additional native ETH by calling again this function.
    * @param pubkey The 48 bytes public key of the beacon chain DV.
    * @param signature The DV's signature of the deposit data.
    * @param depositDataRoot The root/hash of the deposit data for the DV's deposit.
-   * @dev Function is callable only by the StrategyModule owner or the cluster manager => Byzantine is non-custodian
-   * @dev Byzantine or Strategy Module owner must first initialize the trusted pubkey of the DV.
+   * @dev Function is callable only by the StrategyModuleManager or the NFT Owner.
+   * @dev The first call to this function is done by the StrategyModuleManager and creates the StrategyModule's EigenPod.
    */
-  function beaconChainDeposit(
+  function stakeNativeETH(
     bytes calldata pubkey, 
     bytes calldata signature, 
     bytes32 depositDataRoot
   ) 
-    external; 
+    external payable; 
 
   /**
    * @notice This function verifies that the withdrawal credentials of the Distributed Validator(s) owned by
@@ -137,26 +126,16 @@ interface IStrategyModule {
   function delegateTo(address operator) external;
 
   /**
-   * @notice Edit the `clusterDetails` struct once the auction is over
-   * @param nodes An array of Node making up the DV (the first `CLUSTER_SIZE` winners of the auction)
-   * @param clusterManager The node responsible for handling the DKG and deposit the 32ETH in the Beacon Chain (more rewards to earn)
-   * @dev Callable only by the AuctionContract. Should be called once an auction is over and `CLUSTER_SIZE` validators have been selected.
-   * @dev Reverts if the `nodes` array is not of length `CLUSTER_SIZE`.
+   * @notice Set the `clusterDetails` struct of the StrategyModule.
+   * @param nodes An array of Node making up the DV
+   * @param dvStatus The status of the DV, refer to the DVStatus enum for details.
+   * @dev Callable only by the StrategyModuleManager and bound a pre-created DV to this StrategyModule.
    */
-  function updateClusterDetails(
-    Node[] calldata nodes,
-    address clusterManager
+  function setClusterDetails(
+    Node[4] calldata nodes,
+    DVStatus dvStatus
   ) 
     external;
-
-  /**
-   * @notice StrategyModuleManager or Owner fill the expected/ trusted public key for its DV (retrievable from the Obol SDK/API).
-   * @dev Protection against a trustless cluster manager trying to deposit the 32ETH in another ethereum validator (in `beaconChainDeposit`)
-   * @param trustedPubKey The public key of the DV retrieved with the Obol SDK/API from the configHash
-   * @dev Revert if the pubkey is not 48 bytes long.
-   * @dev Revert if not callable by StrategyModuleManager or StrategyModule owner.
-   */
-  function setTrustedDVPubKey(bytes calldata trustedPubKey) external;
 
   /**
    * @notice Allow the Strategy Module's owner to withdraw the smart contract's balance.
@@ -171,40 +150,25 @@ interface IStrategyModule {
   function callEigenPodManager(bytes calldata data) external payable returns (bytes memory);
 
   /**
-   * @notice Returns the DV's public key set by a trusted party
-   */
-  function getTrustedDVPubKey() external view returns (bytes memory);
-
-  /**
    * @notice Returns the status of the Distributed Validator (DV)
    */
   function getDVStatus() external view returns (DVStatus);
 
   /**
-   * @notice Returns the DV's cluster manager
+   * @notice Returns the DV nodes details of the Strategy Module
+   * It returns the eth1Addr, the number of Validation Credit and the reputation score of each nodes.
    */
-  function getClusterManager() external view returns (address);
-
-  /**
-   * @notice Returns the DV's nodes' eth1 addresses
-   */
-  function getDVNodesAddr() external view returns (address[] memory);
+  function getDVNodesDetails() external view returns (IStrategyModule.Node[4] memory);
 
 
   /// @dev Error when unauthorized call to a function callable only by the Strategy Module Owner (aka the ByzNft holder).
   error OnlyNftOwner();
 
   /// @dev Error when unauthorized call to a function callable only by the StrategyModuleOwner or the StrategyModuleManager.
-  error OnlyStrategyModuleOwnerOrManager();
-  
-  /// @dev Error when unauthorized call to a function callable only by the StrategyModuleOwner or the DV Manager.
-  error OnlyStrategyModuleOwnerOrDVManager();
+  error OnlyNftOwnerOrStrategyModuleManager();
 
   /// @dev Error when unauthorized call to a function callable only by the StrategyModuleManager.
   error OnlyStrategyModuleManager();
-
-  /// @dev Returned when unauthorized call to a function only callable by the Auction contract
-  error OnlyAuctionContract();
 
   /// @dev Returned when not privided the right number of nodes 
   error InvalidClusterSize();

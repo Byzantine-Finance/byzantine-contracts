@@ -35,8 +35,14 @@ abstract contract StrategyModuleManagerStorage is IStrategyModuleManager {
     /// @notice ByzNft tokenId to its tied StrategyModule
     mapping(uint256 => address) public nftIdToStratMod;
 
+    /// @notice Mapping to store the pre-created clusters waiting for work
+    mapping(uint64 => IStrategyModule.ClusterDetails) public pendingClusters;
+
+    /// @notice The number of pre-created clusters. Used as the mapping index.
+    uint64 public numPreCreatedClusters;
+
     /// @notice The number of StratMods that have been deployed
-    uint256 public numStratMods; // This is also the number of ByzNft minted
+    uint64 public numStratMods; // This is also the number of ByzNft minted
 
     /* ================= CONSTRUCTOR ================= */ 
 

@@ -46,6 +46,7 @@ contract StrategyModule is IStrategyModule, Initializable {
 
     /// @notice The ByzNft associated to this StrategyModule.
     /// @notice The owner of the ByzNft is the StrategyModule owner.
+    /// TODO When non-upgradeable put that variable immutable and set it in the constructor
     uint256 public stratModNftId;
 
     // Empty struct, all the fields have their default value
@@ -58,18 +59,13 @@ contract StrategyModule is IStrategyModule, Initializable {
         _;
     }
 
-    modifier onlyStratModOwnerOrManager() {
-        if (msg.sender != stratModOwner() && msg.sender != address(stratModManager)) revert OnlyStrategyModuleOwnerOrManager();
+    modifier onlyNftOwnerOrStratModManager() {
+        if (msg.sender != stratModOwner() && msg.sender != address(stratModManager)) revert OnlyNftOwnerOrStrategyModuleManager();
         _;
     }
 
-    modifier onlyStratModOwnerOrDVManager() {
-        if (msg.sender != stratModOwner() && msg.sender != clusterDetails.clusterManager) revert OnlyStrategyModuleOwnerOrDVManager();
-        _;
-    }
-
-    modifier onlyAuctionContract() {
-        if (msg.sender != address(auction)) revert OnlyAuctionContract();
+    modifier onlyStratModManager() {
+        if (msg.sender != address(stratModManager)) revert OnlyStrategyModuleManager();
         _;
     }
 
@@ -93,18 +89,22 @@ contract StrategyModule is IStrategyModule, Initializable {
     }
 
     /**
-     * @notice Used to initialize the  nftId of that StrategyModule.
+     * @notice Used to initialize the nftId of that StrategyModule and its owner.
      * @dev Called on construction by the StrategyModuleManager.
      */
-    function initialize(uint256 _nftId) external initializer {
-        stratModNftId = _nftId;
+    function initialize(uint256 _nftId, address _initialOwner) external initializer {
+        try byzNft.ownerOf(_nftId) returns (address nftOwner) {
+            require(nftOwner == _initialOwner, "Only NFT owner can initialize the StrategyModule");
+            stratModNftId = _nftId;
+        } catch Error(string memory reason) {
+            revert(string.concat("Cannot initialize StrategyModule: ", reason));
+        }
     }
 
     /* =================== FALLBACK =================== */
 
     /**
      * @notice Payable fallback function that receives ether deposited to the StrategyModule contract
-     * @dev Used by the StrategyModuleManager to send the staker's deposited ETH while waiting for the DV creation.
      * @dev Strategy Module is the address where to send the principal ethers post exit.
      */
     receive() external payable {
@@ -114,36 +114,21 @@ contract StrategyModule is IStrategyModule, Initializable {
     /* ============== EXTERNAL FUNCTIONS ============== */
 
     /**
-     * @notice Creates an EigenPod for the strategy module.
-     * @dev Function will revert if not called by the StrategyModule owner or StrategyModuleManager.
-     * @dev Function will revert if the StrategyModule already has an EigenPod.
-     * @dev Returns EigenPod address
-     */
-    function createPod() external onlyStratModOwnerOrManager returns (address) {
-        return eigenPodManager.createPod();
-    }
-
-    /**
-     * @notice Deposit 32ETH from the contract's balance in the beacon chain to activate a Distributed Validator.
+     * @notice Deposit 32ETH in the beacon chain to activate a Distributed Validator and start validating on the consensus layer.
+     * Also creates an EigenPod for the StrategyModule. The NFT owner can staker additional native ETH by calling again this function.
      * @param pubkey The 48 bytes public key of the beacon chain DV.
      * @param signature The DV's signature of the deposit data.
      * @param depositDataRoot The root/hash of the deposit data for the DV's deposit.
-     * @dev Function is callable only by the StrategyModule owner or the cluster manager => Byzantine is non-custodian
-     * @dev Byzantine or Strategy Module owner must first initialize the trusted pubkey of the DV.
+     * @dev Function is callable only by the StrategyModuleManager or the NFT Owner.
+     * @dev The first call to this function is done by the StrategyModuleManager and creates the StrategyModule's EigenPod.
      */
-    function beaconChainDeposit(
+    function stakeNativeETH(
         bytes calldata pubkey, 
         bytes calldata signature,
         bytes32 depositDataRoot
-    ) external onlyStratModOwnerOrDVManager {
-        require(clusterDetails.trustedPubKey.length > 0, "StrategyModule.beaconChainDeposit: Trusted pubkey not initialized");
-        require(_isValidPubKey(clusterDetails.trustedPubKey, pubkey), "StrategyModule.beaconChainDeposit: Invalid DV pubkey");
-        require(address(this).balance >= 32 ether, "StrategyModule.beaconChainDeposit: Insufficient Strategy Module balance to activate the Distributed Validator");
-
-        eigenPodManager.stake{value: 32 ether}(pubkey, signature, depositDataRoot);
-        
-        // Update DV Status to DEPOSITED_NOT_VERIFIED
-        clusterDetails.dvStatus = DVStatus.DEPOSITED_NOT_VERIFIED;
+    ) external payable onlyNftOwnerOrStratModManager {
+        // Create Eigen Pod (if not already has one) and stake the native ETH
+        eigenPodManager.stake{value: msg.value}(pubkey, signature, depositDataRoot);
     }
 
     /**
@@ -249,37 +234,24 @@ contract StrategyModule is IStrategyModule, Initializable {
     }
 
     /**
-     * @notice Edit the `clusterDetails` struct once the auction is over
-     * @param nodes An array of Node making up the DV (the first `CLUSTER_SIZE` winners of the auction)
-     * @param clusterManager The node responsible for handling the DKG and deposit the 32ETH in the Beacon Chain (more rewards to earn)
-     * @dev Callable only by the AuctionContract. Should be called once an auction is over and `CLUSTER_SIZE` validators have been selected.
-     * @dev Reverts if the `nodes` array is not of length `CLUSTER_SIZE`.
+     * @notice Set the `clusterDetails` struct of the StrategyModule.
+     * @param nodes An array of Node making up the DV
+     * @param dvStatus The status of the DV, refer to the DVStatus enum for details.
+     * @dev Callable only by the StrategyModuleManager and bound a pre-created DV to this StrategyModule.
      */
-    function updateClusterDetails(
-        Node[] calldata nodes,
-        address clusterManager
-    ) external onlyAuctionContract {
-        if (nodes.length != CLUSTER_SIZE) revert InvalidClusterSize();
+    function setClusterDetails(
+        Node[4] calldata nodes,
+        DVStatus dvStatus
+    ) external onlyStratModManager {
 
-        for (uint i = 0; i < CLUSTER_SIZE;) {
+        for (uint8 i = 0; i < CLUSTER_SIZE;) {
             clusterDetails.nodes[i] = nodes[i];
             unchecked {
                 ++i;
             }
         }
-        clusterDetails.clusterManager = clusterManager;
-    }
 
-    /**
-     * @notice StrategyModuleManager or Owner fill the expected/ trusted public key for its DV (retrievable from the Obol SDK/API).
-     * @dev Protection against a trustless cluster manager trying to deposit the 32ETH in another ethereum validator (in `beaconChainDeposit`)
-     * @param trustedPubKey The public key of the DV retrieved with the Obol SDK/API from the configHash
-     * @dev Revert if the pubkey is not 48 bytes long.
-     * @dev Revert if not callable by StrategyModuleManager or StrategyModule owner.
-     */
-    function setTrustedDVPubKey(bytes calldata trustedPubKey) external onlyStratModOwnerOrManager {
-        require(trustedPubKey.length == 48, "StrategyModuleManager.setDVPubKey: invalid pubkey length");
-        clusterDetails.trustedPubKey = trustedPubKey;
+        clusterDetails.dvStatus = dvStatus;
     }
 
     /**
@@ -298,13 +270,6 @@ contract StrategyModule is IStrategyModule, Initializable {
     function stratModOwner() public view returns (address) {
         return byzNft.ownerOf(stratModNftId);
     }
-
-    /**
-     * @notice Returns the DV's public key set by a trusted party
-     */
-    function getTrustedDVPubKey() public view returns (bytes memory) {
-        return clusterDetails.trustedPubKey;
-    }
     
     /**
      * @notice Returns the status of the Distributed Validator (DV)
@@ -314,24 +279,11 @@ contract StrategyModule is IStrategyModule, Initializable {
     }
 
     /**
-     * @notice Returns the DV's cluster manager
+     * @notice Returns the DV nodes details of the Strategy Module
+     * It returns the eth1Addr, the number of Validation Credit and the reputation score of each nodes.
      */
-    function getClusterManager() public view returns (address) {
-        return clusterDetails.clusterManager;
-    }
-
-    /**
-     * @notice Returns the DV's nodes' eth1 addresses
-     */
-    function getDVNodesAddr() public view returns (address[] memory) {
-        address[] memory nodesAddr = new address[](CLUSTER_SIZE);
-        for (uint i = 0; i < CLUSTER_SIZE;) {
-            nodesAddr[i] = clusterDetails.nodes[i].eth1Addr;
-            unchecked {
-                ++i;
-            }
-        }
-        return nodesAddr;
+    function getDVNodesDetails() public view returns (IStrategyModule.Node[4] memory) {
+        return clusterDetails.nodes;
     }
 
     /* ============== INTERNAL FUNCTIONS ============== */
@@ -350,22 +302,6 @@ contract StrategyModule is IStrategyModule, Initializable {
         (bool success, bytes memory retData) = address(to).call{value: value}(data);
         if (!success) revert CallFailed(data);
         return retData;
-    }
-
-    /**
-     * @notice Verify the public key provided by cluster Manager before depositing the ETH.
-     * @param trustedPubKey The public key verified by Byzantine or the Strategy Module owner.
-     * @param untrustedPubKey The public key provided by the cluster Manager when depositing the ETH.
-     * @return true if the public keys match, false otherwise.
-     */
-    function _isValidPubKey(bytes memory trustedPubKey, bytes memory untrustedPubKey) private pure returns (bool) {
-        for (uint8 i = 0; i < 48;) {
-            if (trustedPubKey[i] != untrustedPubKey[i]) return false;
-            unchecked {
-                ++i;
-            }
-        }
-        return true;
     }
 
 }

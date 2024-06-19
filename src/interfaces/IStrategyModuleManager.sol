@@ -6,20 +6,35 @@ import "../interfaces/IStrategyModule.sol";
 
 interface IStrategyModuleManager {
 
-    /**
-     * @notice Creates a StrategyModule for the sender.
-     * @dev Returns StrategyModule address 
-     */
-    function createStratMod() external returns (address);
+    /// @notice Get total number of pre-created clusters.
+    function numPreCreatedClusters() external view returns (uint64);
+
+    /// @notice Get the total number of Strategy Modules that have been deployed.
+    function numStratMods() external view returns (uint64);
 
     /**
-     * @notice A 32ETH staker create a Strategy Module and deposit in its smart contract its stake.
-     * @return The addresses of the newly created StrategyModule AND the address of its associated EigenPod (for the DV withdrawal address)
-     * @dev This action triggers an auction to select node operators to create a Distributed Validator.
-     * @dev One node operator of the DV (the DV manager) will have to deposit the 32ETH in the Beacon Chain.
+     * @notice Function to pre-create Distributed Validators. Must be called at least one time to allow stakers to enter in the protocol.
+     * @param _numDVsToPreCreate Number of Distributed Validators to pre-create.
+     * @dev This function is only callable by Byzantine Finance. Once the first DVs are pre-created, the stakers
+     * pre-create a new DV every time they create a new StrategyModule (if enough operators in Auction).
+     */
+    function preCreateDVs(uint8 _numDVsToPreCreate) external;
+
+    /**
+     * @notice A 32ETH staker create a Strategy Module, use a pre-created DV as a validator and activate it by depositing 32ETH.
+     * @param pubkey The 48 bytes public key of the beacon chain DV.
+     * @param signature The DV's signature of the deposit data.
+     * @param depositDataRoot The root/hash of the deposit data for the DV's deposit.
+     * @dev This action triggers a new auction to pre-create a new Distributed Validator for the next staker (if enough operators in Auction).
+     * @dev It also fill the ClusterDetails struct of the newly created StrategyModule.
      * @dev Function will revert if not exactly 32 ETH are sent with the transaction.
      */
-    function createStratModAndStakeNativeETH() external payable returns (address, address);
+    function createStratModAndStakeNativeETH(
+        bytes calldata pubkey,
+        bytes calldata signature,
+        bytes32 depositDataRoot
+    ) 
+        external payable;
 
     /**
      * @notice Strategy Module owner can transfer its Strategy Module to another address.
@@ -34,13 +49,22 @@ interface IStrategyModuleManager {
     function transferStratModOwnership(address stratModAddr, address newOwner) external;
 
     /**
-     * @notice Byzantine owner fill the expected/ trusted public key for a DV (retrievable from the Obol SDK/API).
-     * @dev Protection against a trustless cluster manager trying to deposit the 32ETH in another ethereum validator.
-     * @param stratModAddr The address of the Strategy Module to set the trusted DV pubkey
-     * @param pubKey The public key of the DV retrieved with the Obol SDK/API from a configHash
-     * @dev Revert if not callable by StrategyModuleManager owner.
+     * @notice Returns the address of the Eigen Pod of a specific StrategyModule.
+     * @param _nounce The index of the Strategy Module you want to know the Eigen Pod address.
+     * @dev Function essential to pre-crete DVs as their withdrawal address has to be the Eigen Pod address.
      */
-    function setTrustedDVPubKey(address stratModAddr, bytes calldata pubKey) external;
+    function preCalculatePodAddress(uint64 _nounce) external view returns (address);
+
+    
+    /// @notice Returns the number of current pending clusters waiting for a Strategy Module.
+    function getNumPendingClusters() external view returns (uint64);
+
+    /**
+     * @notice Returns the node details of a pending cluster.
+     * @param clusterIndex The index of the pending cluster you want to know the node details.
+     * @dev If the index does not exist, it returns the default value of the Node struct.
+     */
+    function getPendingClusterNodeDetails(uint64 clusterIndex) external view returns (IStrategyModule.Node[4] memory);
 
     /**
      * @notice Returns the number of StrategyModules owned by an address.
@@ -84,11 +108,11 @@ interface IStrategyModuleManager {
     function isDelegated(address staker) external view returns (bool[] memory);
 
     /**
-     * @notice Specify to which operators `staker`'s StrategyModules are delegated to.
+     * @notice Specify to which operators `staker`'s StrategyModules has delegated to.
      * @param staker The address of the StrategyModules' owner.
      * @dev Revert if the `staker` doesn't have any StrategyModule.
      */
-    function delegateTo(address staker) external view returns (address[] memory);
+    function hasDelegatedTo(address staker) external view returns (address[] memory);
 
     /**
      * @notice Returns 'true' if the `stratModAddr` has created an EigenPod, and 'false' otherwise.
