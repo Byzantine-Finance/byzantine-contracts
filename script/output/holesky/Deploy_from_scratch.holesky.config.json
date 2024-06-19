@@ -1,24 +1,24 @@
 {
   "addresses": {
-    "auction": "0x7d64D69FDA6aB71Ab71771a134a82BACAEF9796E",
-    "auctionImplementation": "0x0424C4C93f8cB3d32e7e486b873AD2EA074a9b66",
-    "byzNft": "0x087453b08B72eD622F1a8cBCFf51130999bcAcEE",
-    "byzNftImplementation": "0x9DB1e2709C185f38259A69646C7E93Cb552C900C",
-    "byzantineProxyAdmin": "0xB43EFca8a42231B24f54BFC99dF1ac1A983FE1BD",
-    "emptyContract": "0x976A8a8652d08AaC069dC7964042b5cf671E0098",
-    "escrow": "0x773c9371797Dc63b313CB187d5eDDF0422Bfaf9b",
-    "escrowImplementation": "0xfF6b7c401f4a6905d7ec6C7BAF3761aF16a3ed99",
-    "strategyModuleBeacon": "0xFef28Ca5fff9b34e2890f5cCd4f560fb18205316",
-    "strategyModuleImplementation": "0xD59bFf7007597Ed4583D914Dd8cB03bD30530D04",
-    "strategyModuleManager": "0x70f3af2d0Ce82a35A55A7C89fF4618B83c7A0169",
-    "strategyModuleManagerImplementation": "0x8732d6CD6170FC9A82D4CBDdf2C3108c0355E5f3"
+    "auction": "0x1ae6F573F0D7b4b966Ce103BC18F3A3b9E43987b",
+    "auctionImplementation": "0x8aa905d236b5c316716487C04e72Ed2683c68A45",
+    "byzNft": "0xB8492aD52067B0b0a520041c0B16A3092bee05Bc",
+    "byzNftImplementation": "0x3F26e94839Bf370062043122CCB1c95e668E69Db",
+    "byzantineProxyAdmin": "0x6aA4FfD1aecB89879b9A98f01A4d9c1531D63e1c",
+    "emptyContract": "0xb3b18C956f1D0D90a5E45D3249b9C31711aFb8a6",
+    "escrow": "0x5FE3eD446e0195E9626744D1047E31C8927535d5",
+    "escrowImplementation": "0xD0f7EC487Bf492e1a6341648F4ce597430276439",
+    "strategyModuleBeacon": "0x5504899Eb7a4A21485Fa20C48371776E9E6D4E43",
+    "strategyModuleImplementation": "0x9E3e5D91A9521b14F842A747a62Af4774C4223b9",
+    "strategyModuleManager": "0x6b70ECA73689463C863873154744169Bcc622308",
+    "strategyModuleManagerImplementation": "0x4d67959Ffbaafd79DE45fF73147147185d626bf7"
   },
   "chainInfo": {
     "chainId": 17000,
-    "deploymentBlock": 1723158
+    "deploymentBlock": 1769907
   },
   "parameters": {
     "bidReceiver": "0x9c475A3FB5E0ee61B049516b7e1186Cc3F1362C0",
-    "byzantineAdmin": "0x5c27a880ec9024F006A70B8f1fB91b82d94ef4D4"
+    "byzantineAdmin": "0x6D040d67Ab711EC159F870F5259f27bB8d62FeD7"
   }
 }

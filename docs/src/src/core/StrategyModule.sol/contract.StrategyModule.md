@@ -1,5 +1,5 @@
 # StrategyModule
-[Git Source](https://github.com/Byzantine-Finance/byzantine-contracts/blob/039f6bfc2d98b2c720b4f881f44b17511a859648/src/core/StrategyModule.sol)
+[Git Source](https://github.com/Byzantine-Finance/byzantine-contracts/blob/80b6cda4622c51c2217311610eeb15b655b99e2c/src/core/StrategyModule.sol)
 
 **Inherits:**
 [IStrategyModule](/src/interfaces/IStrategyModule.sol/interface.IStrategyModule.md), Initializable
@@ -73,6 +73,7 @@ IDelegationManager public immutable delegationManager;
 The ByzNft associated to this StrategyModule.
 
 The owner of the ByzNft is the StrategyModule owner.
+TODO When non-upgradeable put that variable immutable and set it in the constructor
 
 
 ```solidity
@@ -95,25 +96,18 @@ ClusterDetails public clusterDetails;
 modifier onlyNftOwner();
 ```
 
-### onlyStratModOwnerOrManager
+### onlyNftOwnerOrStratModManager
 
 
 ```solidity
-modifier onlyStratModOwnerOrManager();
+modifier onlyNftOwnerOrStratModManager();
 ```
 
-### onlyStratModOwnerOrDVManager
+### onlyStratModManager
 
 
 ```solidity
-modifier onlyStratModOwnerOrDVManager();
-```
-
-### onlyAuctionContract
-
-
-```solidity
-modifier onlyAuctionContract();
+modifier onlyStratModManager();
 ```
 
 ### constructor
@@ -131,20 +125,18 @@ constructor(
 
 ### initialize
 
-Used to initialize the  nftId of that StrategyModule.
+Used to initialize the nftId of that StrategyModule and its owner.
 
 *Called on construction by the StrategyModuleManager.*
 
 
 ```solidity
-function initialize(uint256 _nftId) external initializer;
+function initialize(uint256 _nftId, address _initialOwner) external initializer;
 ```
 
 ### receive
 
 Payable fallback function that receives ether deposited to the StrategyModule contract
-
-*Used by the StrategyModuleManager to send the staker's deposited ETH while waiting for the DV creation.*
 
 *Strategy Module is the address where to send the principal ethers post exit.*
 
@@ -153,36 +145,22 @@ Payable fallback function that receives ether deposited to the StrategyModule co
 receive() external payable;
 ```
 
-### createPod
+### stakeNativeETH
 
-Creates an EigenPod for the strategy module.
+Deposit 32ETH in the beacon chain to activate a Distributed Validator and start validating on the consensus layer.
+Also creates an EigenPod for the StrategyModule. The NFT owner can staker additional native ETH by calling again this function.
 
-*Function will revert if not called by the StrategyModule owner or StrategyModuleManager.*
+*Function is callable only by the StrategyModuleManager or the NFT Owner.*
 
-*Function will revert if the StrategyModule already has an EigenPod.*
-
-*Returns EigenPod address*
-
-
-```solidity
-function createPod() external onlyStratModOwnerOrManager returns (address);
-```
-
-### beaconChainDeposit
-
-Deposit 32ETH from the contract's balance in the beacon chain to activate a Distributed Validator.
-
-*Function is callable only by the StrategyModule owner or the cluster manager => Byzantine is non-custodian*
-
-*Byzantine or Strategy Module owner must first initialize the trusted pubkey of the DV.*
+*The first call to this function is done by the StrategyModuleManager and creates the StrategyModule's EigenPod.*
 
 
 ```solidity
-function beaconChainDeposit(
+function stakeNativeETH(
     bytes calldata pubkey,
     bytes calldata signature,
     bytes32 depositDataRoot
-) external onlyStratModOwnerOrDVManager;
+) external payable onlyNftOwnerOrStratModManager;
 ```
 **Parameters**
 
@@ -305,45 +283,22 @@ function delegateTo(address operator) external onlyNftOwner;
 |`operator`|`address`|The account teh STrategy Module is delegating its assets to for use in serving applications built on EigenLayer.|
 
 
-### updateClusterDetails
+### setClusterDetails
 
-Edit the `clusterDetails` struct once the auction is over
+Set the `clusterDetails` struct of the StrategyModule.
 
-*Callable only by the AuctionContract. Should be called once an auction is over and `CLUSTER_SIZE` validators have been selected.*
-
-*Reverts if the `nodes` array is not of length `CLUSTER_SIZE`.*
+*Callable only by the StrategyModuleManager and bound a pre-created DV to this StrategyModule.*
 
 
 ```solidity
-function updateClusterDetails(Node[] calldata nodes, address clusterManager) external onlyAuctionContract;
+function setClusterDetails(Node[4] calldata nodes, DVStatus dvStatus) external onlyStratModManager;
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`nodes`|`Node[]`|An array of Node making up the DV (the first `CLUSTER_SIZE` winners of the auction)|
-|`clusterManager`|`address`|The node responsible for handling the DKG and deposit the 32ETH in the Beacon Chain (more rewards to earn)|
-
-
-### setTrustedDVPubKey
-
-StrategyModuleManager or Owner fill the expected/ trusted public key for its DV (retrievable from the Obol SDK/API).
-
-*Protection against a trustless cluster manager trying to deposit the 32ETH in another ethereum validator (in `beaconChainDeposit`)*
-
-*Revert if the pubkey is not 48 bytes long.*
-
-*Revert if not callable by StrategyModuleManager or StrategyModule owner.*
-
-
-```solidity
-function setTrustedDVPubKey(bytes calldata trustedPubKey) external onlyStratModOwnerOrManager;
-```
-**Parameters**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`trustedPubKey`|`bytes`|The public key of the DV retrieved with the Obol SDK/API from the configHash|
+|`nodes`|`Node[4]`|An array of Node making up the DV|
+|`dvStatus`|`DVStatus`|The status of the DV, refer to the DVStatus enum for details.|
 
 
 ### withdrawContractBalance
@@ -366,15 +321,6 @@ Returns the address of the owner of the Strategy Module's ByzNft.
 function stratModOwner() public view returns (address);
 ```
 
-### getTrustedDVPubKey
-
-Returns the DV's public key set by a trusted party
-
-
-```solidity
-function getTrustedDVPubKey() public view returns (bytes memory);
-```
-
 ### getDVStatus
 
 Returns the status of the Distributed Validator (DV)
@@ -384,22 +330,14 @@ Returns the status of the Distributed Validator (DV)
 function getDVStatus() public view returns (DVStatus);
 ```
 
-### getClusterManager
+### getDVNodesDetails
 
-Returns the DV's cluster manager
-
-
-```solidity
-function getClusterManager() public view returns (address);
-```
-
-### getDVNodesAddr
-
-Returns the DV's nodes' eth1 addresses
+Returns the DV nodes details of the Strategy Module
+It returns the eth1Addr, the number of Validation Credit and the reputation score of each nodes.
 
 
 ```solidity
-function getDVNodesAddr() public view returns (address[] memory);
+function getDVNodesDetails() public view returns (IStrategyModule.Node[4] memory);
 ```
 
 ### _executeCall
@@ -417,27 +355,5 @@ function _executeCall(address payable to, uint256 value, bytes memory data) priv
 |`to`|`address payable`|address to execute call|
 |`value`|`uint256`|amount of ETH to send with call|
 |`data`|`bytes`|bytes array to execute|
-
-
-### _isValidPubKey
-
-Verify the public key provided by cluster Manager before depositing the ETH.
-
-
-```solidity
-function _isValidPubKey(bytes memory trustedPubKey, bytes memory untrustedPubKey) private pure returns (bool);
-```
-**Parameters**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`trustedPubKey`|`bytes`|The public key verified by Byzantine or the Strategy Module owner.|
-|`untrustedPubKey`|`bytes`|The public key provided by the cluster Manager when depositing the ETH.|
-
-**Returns**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`<none>`|`bool`|true if the public keys match, false otherwise.|
 
 

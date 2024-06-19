@@ -1,5 +1,5 @@
 # Escrow
-[Git Source](https://github.com/Byzantine-Finance/byzantine-contracts/blob/039f6bfc2d98b2c720b4f881f44b17511a859648/src/vault/Escrow.sol)
+[Git Source](https://github.com/Byzantine-Finance/byzantine-contracts/blob/80b6cda4622c51c2217311610eeb15b655b99e2c/src/vault/Escrow.sol)
 
 **Inherits:**
 [IEscrow](/src/interfaces/IEscrow.sol/interface.IEscrow.md)

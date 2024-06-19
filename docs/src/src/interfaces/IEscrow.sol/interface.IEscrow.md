@@ -1,5 +1,5 @@
 # IEscrow
-[Git Source](https://github.com/Byzantine-Finance/byzantine-contracts/blob/039f6bfc2d98b2c720b4f881f44b17511a859648/src/interfaces/IEscrow.sol)
+[Git Source](https://github.com/Byzantine-Finance/byzantine-contracts/blob/80b6cda4622c51c2217311610eeb15b655b99e2c/src/interfaces/IEscrow.sol)
 
 
 ## Functions
@@ -57,5 +57,13 @@ error OnlyAuction();
 
 ```solidity
 error InsufficientFundsInEscrow();
+```
+
+### FailedToSendEther
+Returned when failed to send Ether to the bid price receiver or to bidder
+
+
+```solidity
+error FailedToSendEther();
 ```
 

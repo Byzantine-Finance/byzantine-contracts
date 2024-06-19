@@ -14,7 +14,7 @@
     - [IStrategyModule](src/interfaces/IStrategyModule.sol/interface.IStrategyModule.md)
     - [IStrategyModuleManager](src/interfaces/IStrategyModuleManager.sol/interface.IStrategyModuleManager.md)
   - [❱ libraries](src/libraries/README.md)
-    - [BokkyPooBahsRedBlackTreeLibrary](src/libraries/BokkyPooBahsRedBlackTreeLibrary.sol/library.BokkyPooBahsRedBlackTreeLibrary.md)
+    - [HitchensOrderStatisticsTreeLib](src/libraries/HitchensOrderStatisticsTreeLib.sol/library.HitchensOrderStatisticsTreeLib.md)
   - [❱ tokens](src/tokens/README.md)
     - [ByzNft](src/tokens/ByzNft.sol/contract.ByzNft.md)
   - [❱ vault](src/vault/README.md)

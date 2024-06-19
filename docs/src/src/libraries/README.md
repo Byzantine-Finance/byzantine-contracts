@@ -1,4 +1,4 @@
 
 
 # Contents
-- [BokkyPooBahsRedBlackTreeLibrary](BokkyPooBahsRedBlackTreeLibrary.sol/library.BokkyPooBahsRedBlackTreeLibrary.md)
+- [HitchensOrderStatisticsTreeLib](HitchensOrderStatisticsTreeLib.sol/library.HitchensOrderStatisticsTreeLib.md)

@@ -1,5 +1,5 @@
 # AuctionStorage
-[Git Source](https://github.com/Byzantine-Finance/byzantine-contracts/blob/039f6bfc2d98b2c720b4f881f44b17511a859648/src/core/AuctionStorage.sol)
+[Git Source](https://github.com/Byzantine-Finance/byzantine-contracts/blob/80b6cda4622c51c2217311610eeb15b655b99e2c/src/core/AuctionStorage.sol)
 
 **Inherits:**
 [IAuction](/src/interfaces/IAuction.sol/interface.IAuction.md)
@@ -39,47 +39,56 @@ IStrategyModuleManager public immutable strategyModuleManager;
 
 
 ### _auctionTree
-Auction scores stored in a Red-Black tree (complexity O(log n))
+Auction scores stored in a Red-Black tree (complexity O(log 2n))
 
 
 ```solidity
-BokkyPooBahsRedBlackTreeLibrary.Tree internal _auctionTree;
+HitchensOrderStatisticsTreeLib.Tree internal _auctionTree;
 ```
 
 
-### _expectedDailyReturnWei
+### expectedDailyReturnWei
 Daily rewards of Ethereum Pos (in WEI)
 
 
 ```solidity
-uint256 internal _expectedDailyReturnWei;
+uint256 public expectedDailyReturnWei;
 ```
 
 
-### _minDuration
+### minDuration
 Minimum duration to be part of a DV (in days)
 
 
 ```solidity
-uint256 internal _minDuration;
+uint160 public minDuration;
 ```
 
 
-### _maxDiscountRate
-Maximum discount rate (i.e the max profit margin of node op) in percentage (from 0 to 10000 -> 100%)
+### numNodeOpsInAuction
+Number of node operators in auction and seeking for a DV
 
 
 ```solidity
-uint256 internal _maxDiscountRate;
+uint64 public numNodeOpsInAuction;
 ```
 
 
-### _clusterSize
+### maxDiscountRate
+Maximum discount rate (i.e the max profit margin of node op) in percentage
+
+
+```solidity
+uint16 public maxDiscountRate;
+```
+
+
+### clusterSize
 Number of nodes in a Distributed Validator
 
 
 ```solidity
-uint256 internal _clusterSize;
+uint8 public clusterSize;
 ```
 
 
@@ -88,16 +97,7 @@ Node operator address => node operator auction details
 
 
 ```solidity
-mapping(address => NodeOpDetails) internal _nodeOpsInfo;
-```
-
-
-### _auctionScoreToNodeOp
-Auction score => node operator address
-
-
-```solidity
-mapping(uint256 => address) internal _auctionScoreToNodeOp;
+mapping(address => AuctionDetails) internal _nodeOpsInfo;
 ```
 
 

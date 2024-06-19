@@ -1,5 +1,5 @@
 # StrategyModuleManagerStorage
-[Git Source](https://github.com/Byzantine-Finance/byzantine-contracts/blob/039f6bfc2d98b2c720b4f881f44b17511a859648/src/core/StrategyModuleManagerStorage.sol)
+[Git Source](https://github.com/Byzantine-Finance/byzantine-contracts/blob/80b6cda4622c51c2217311610eeb15b655b99e2c/src/core/StrategyModuleManagerStorage.sol)
 
 **Inherits:**
 [IStrategyModuleManager](/src/interfaces/IStrategyModuleManager.sol/interface.IStrategyModuleManager.md)
@@ -69,12 +69,30 @@ mapping(uint256 => address) public nftIdToStratMod;
 ```
 
 
+### pendingClusters
+Mapping to store the pre-created clusters waiting for work
+
+
+```solidity
+mapping(uint64 => IStrategyModule.ClusterDetails) public pendingClusters;
+```
+
+
+### numPreCreatedClusters
+The number of pre-created clusters. Used as the mapping index.
+
+
+```solidity
+uint64 public numPreCreatedClusters;
+```
+
+
 ### numStratMods
 The number of StratMods that have been deployed
 
 
 ```solidity
-uint256 public numStratMods;
+uint64 public numStratMods;
 ```
 
 

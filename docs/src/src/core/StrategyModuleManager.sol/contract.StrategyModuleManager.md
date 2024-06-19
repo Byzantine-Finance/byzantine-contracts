@@ -1,5 +1,5 @@
 # StrategyModuleManager
-[Git Source](https://github.com/Byzantine-Finance/byzantine-contracts/blob/039f6bfc2d98b2c720b4f881f44b17511a859648/src/core/StrategyModuleManager.sol)
+[Git Source](https://github.com/Byzantine-Finance/byzantine-contracts/blob/80b6cda4622c51c2217311610eeb15b655b99e2c/src/core/StrategyModuleManager.sol)
 
 **Inherits:**
 Initializable, OwnableUpgradeable, [StrategyModuleManagerStorage](/src/core/StrategyModuleManagerStorage.sol/abstract.StrategyModuleManagerStorage.md)
@@ -35,40 +35,54 @@ function initialize(address initialOwner) external initializer;
 modifier onlyStratModOwner(address owner, address stratMod);
 ```
 
-### createStratMod
+### preCreateDVs
 
-Creates a StrategyModule for the sender.
+Function to pre-create Distributed Validators. Must be called at least one time to allow stakers to enter in the protocol.
 
-*Returns StrategyModule address*
+*This function is only callable by Byzantine Finance. Once the first DVs are pre-created, the stakers
+pre-create a new DV every time they create a new StrategyModule (if enough operators in Auction).*
 
 
 ```solidity
-function createStratMod() external returns (address);
+function preCreateDVs(uint8 _numDVsToPreCreate) external onlyOwner;
 ```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_numDVsToPreCreate`|`uint8`|Number of Distributed Validators to pre-create.|
+
 
 ### createStratModAndStakeNativeETH
 
-A 32ETH staker create a Strategy Module and deposit in its smart contract its stake.
+A 32ETH staker create a Strategy Module, use a pre-created DV as a validator and activate it by depositing 32ETH.
 
-*This action triggers an auction to select node operators to create a Distributed Validator.*
+*This action triggers a new auction to pre-create a new Distributed Validator for the next staker (if enough operators in Auction).*
 
-*One node operator of the DV (the DV manager) will have to deposit the 32ETH in the Beacon Chain.*
+*It also fill the ClusterDetails struct of the newly created StrategyModule.*
 
 *Function will revert if not exactly 32 ETH are sent with the transaction.*
 
 
 ```solidity
-function createStratModAndStakeNativeETH() external payable returns (address, address);
+function createStratModAndStakeNativeETH(
+    bytes calldata pubkey,
+    bytes calldata signature,
+    bytes32 depositDataRoot
+) external payable;
 ```
-**Returns**
+**Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`<none>`|`address`|The addresses of the newly created StrategyModule AND the address of its associated EigenPod (for the DV withdrawal address)|
-|`<none>`|`address`||
+|`pubkey`|`bytes`|The 48 bytes public key of the beacon chain DV.|
+|`signature`|`bytes`|The DV's signature of the deposit data.|
+|`depositDataRoot`|`bytes32`|The root/hash of the deposit data for the DV's deposit.|
 
 
 ### transferStratModOwnership
+
+TODO Verify the pubkey in arguments to be sure it is using the right pubkey of a pre-created cluster
 
 Strategy Module owner can transfer its Strategy Module to another address.
 Under the hood, he transfers the ByzNft associated to the StrategyModule.
@@ -95,24 +109,47 @@ function transferStratModOwnership(
 |`newOwner`|`address`|The address of the new owner of the StrategyModule.|
 
 
-### setTrustedDVPubKey
+### preCalculatePodAddress
 
-Byzantine owner fill the expected/ trusted public key for a DV (retrievable from the Obol SDK/API).
+Returns the address of the Eigen Pod of a specific StrategyModule.
 
-*Protection against a trustless cluster manager trying to deposit the 32ETH in another ethereum validator.*
-
-*Revert if not callable by StrategyModuleManager owner.*
+*Function essential to pre-crete DVs as their withdrawal address has to be the Eigen Pod address.*
 
 
 ```solidity
-function setTrustedDVPubKey(address stratModAddr, bytes calldata pubKey) external onlyOwner;
+function preCalculatePodAddress(uint64 _nounce) external view returns (address);
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`stratModAddr`|`address`|The address of the Strategy Module to set the trusted DV pubkey|
-|`pubKey`|`bytes`|The public key of the DV retrieved with the Obol SDK/API from a configHash|
+|`_nounce`|`uint64`|The index of the Strategy Module you want to know the Eigen Pod address.|
+
+
+### getNumPendingClusters
+
+Returns the number of current pending clusters waiting for a Strategy Module.
+
+
+```solidity
+function getNumPendingClusters() public view returns (uint64);
+```
+
+### getPendingClusterNodeDetails
+
+Returns the node details of a pending cluster.
+
+*If the index does not exist, it returns the default value of the Node struct.*
+
+
+```solidity
+function getPendingClusterNodeDetails(uint64 clusterIndex) public view returns (IStrategyModule.Node[4] memory);
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`clusterIndex`|`uint64`|The index of the pending cluster you want to know the node details.|
 
 
 ### getStratModNumber
@@ -196,15 +233,15 @@ function isDelegated(address staker) public view returns (bool[] memory);
 |`staker`|`address`|The address of the StrategyModules' owner.|
 
 
-### delegateTo
+### hasDelegatedTo
 
-Specify to which operators `staker`'s StrategyModules are delegated to.
+Specify to which operators `staker`'s StrategyModules has delegated to.
 
 *Revert if the `staker` doesn't have any StrategyModule.*
 
 
 ```solidity
-function delegateTo(address staker) public view returns (address[] memory);
+function hasDelegatedTo(address staker) public view returns (address[] memory);
 ```
 **Parameters**
 
@@ -253,6 +290,6 @@ function hasPod(address stratModAddr) public view returns (bool);
 
 
 ```solidity
-function _deployStratMod() internal returns (address);
+function _deployStratMod() internal returns (IStrategyModule);
 ```
 
