@@ -111,35 +111,35 @@ interface IAuction {
 
     /**
      * @notice Fonction to determine the price to add in the protocol if the node operator outbids. Returns 0 if he decreases its bid.
-     * @notice The bid which will be updated will be the last bid with `_auctionScore`
+     * @notice The bid which will be updated will be the last bid with `_oldAuctionScore`
      * @param _nodeOpAddr: address of the node operator updating its bid
-     * @param _auctionScore: auction score of the bid to update
-     * @param _discountRate: discount rate (i.e the desired profit margin) in percentage (scale from 0 to 10000)
-     * @param _timeInDays: duration of being a validator, in days
-     * @dev Reverts if the node op doesn't have a bid with `_auctionScore`.
-     * @dev Revert if `_discountRate` or `_timeInDays` don't respect the values set by the byzantine.
+     * @param _oldAuctionScore: auction score of the bid to update
+     * @param _newDiscountRate: discount rate (i.e the desired profit margin) in percentage (scale from 0 to 10000)
+     * @param _newTimeInDays: duration of being a validator, in days
+     * @dev Reverts if the node op doesn't have a bid with `_oldAuctionScore`.
+     * @dev Revert if `_newDiscountRate` or `_newTimeInDays` don't respect the values set by the byzantine.
      */
     function getUpdateOneBidPrice(
         address _nodeOpAddr,
-        uint256 _auctionScore,
-        uint256 _discountRate,
-        uint256 _timeInDays
+        uint256 _oldAuctionScore,
+        uint256 _newDiscountRate,
+        uint256 _newTimeInDays
     ) 
         external view returns (uint256);
 
     /**
-     * @notice  Update a bid of a node operator associated to `_auctionScore`. The node op will have to pay more if he outbids. 
+     * @notice  Update a bid of a node operator associated to `_oldAuctionScore`. The node op will have to pay more if he outbids. 
      *          If he decreases his bid, the escrow contract will send him back the difference.
-     * @notice  The bid which will be updated will be the last bid with `_auctionScore`
-     * @param _auctionScore: auction score of the bid to update
+     * @notice  The bid which will be updated will be the last bid with `_oldAuctionScore`
+     * @param _oldAuctionScore: auction score of the bid to update
      * @param _newDiscountRate: new discount rate (i.e the desired profit margin) in percentage (scale from 0 to 10000)
      * @param _newTimeInDays: new duration of being a validator, in days
-     * @dev Reverts if the node op doesn't have a bid with `_auctionScore`.
+     * @dev Reverts if the node op doesn't have a bid with `_oldAuctionScore`.
      * @dev Reverts if the transfer of the funds to the Escrow contract failed.
-     * @dev Revert if `_discountRate` or `_timeInDays` don't respect the values set by the byzantine.
+     * @dev Revert if `_newDiscountRate` or `_newTimeInDays` don't respect the values set by the byzantine.
      */
     function updateOneBid(
-        uint256 _auctionScore,
+        uint256 _oldAuctionScore,
         uint256 _newDiscountRate,
         uint256 _newTimeInDays
     ) 
