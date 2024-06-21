@@ -78,6 +78,29 @@ contract ExistingDeploymentParser is Script, Test {
         logInitialDeploymentParams();
     }
 
+    /// @notice Fetch deployed contract addresses to upgrade a contract
+    function _parseDeployedContractAddresses(string memory contratsAddressesPath) internal virtual {
+        // READ JSON FILE DATA
+        string memory contractsAddressesData = vm.readFile(contratsAddressesPath);
+
+        // read contracts addresses
+        auction = Auction(stdJson.readAddress(contractsAddressesData, ".addresses.auction"));
+        auctionImplementation = Auction(stdJson.readAddress(contractsAddressesData, ".addresses.auctionImplementation"));
+        byzNft = ByzNft(stdJson.readAddress(contractsAddressesData, ".addresses.byzNft"));
+        byzNftImplementation = ByzNft(stdJson.readAddress(contractsAddressesData, ".addresses.byzNftImplementation"));
+        byzantineProxyAdmin = ProxyAdmin(stdJson.readAddress(contractsAddressesData, ".addresses.byzantineProxyAdmin"));
+        emptyContract = EmptyContract(stdJson.readAddress(contractsAddressesData, ".addresses.emptyContract"));
+        escrow = Escrow(payable(stdJson.readAddress(contractsAddressesData, ".addresses.escrow")));
+        escrowImplementation = Escrow(payable(stdJson.readAddress(contractsAddressesData, ".addresses.escrowImplementation")));
+        strategyModuleBeacon = UpgradeableBeacon(stdJson.readAddress(contractsAddressesData, ".addresses.strategyModuleBeacon"));
+        strategyModuleImplementation = StrategyModule(payable(stdJson.readAddress(contractsAddressesData, ".addresses.strategyModuleImplementation")));
+        strategyModuleManager = StrategyModuleManager(stdJson.readAddress(contractsAddressesData, ".addresses.strategyModuleManager"));
+        strategyModuleManagerImplementation = StrategyModuleManager(stdJson.readAddress(contractsAddressesData, ".addresses.strategyModuleManagerImplementation"));
+
+        // read byzantineAdmin address
+        byzantineAdmin = stdJson.readAddress(contractsAddressesData, ".parameters.byzantineAdmin");
+    }
+
     /// @notice Ensure contracts point at each other correctly via constructors
     function _verifyContractPointers() internal view virtual {
         // StrategyModuleManager
@@ -249,5 +272,27 @@ contract ExistingDeploymentParser is Script, Test {
         string memory finalJson = vm.serializeString(parent_object, chain_info, chain_info_output);
 
         vm.writeJson(finalJson, outputPath);
+    }
+
+    /**
+     * @notice Update contract addresses in JSON file after an upgrade
+     */
+    function logAndUpdateContractAddresses(string memory outputPath) public {
+        // WRITE JSON DATA ADDRESSES
+        string memory deployed_addresses = "addresses";
+        vm.serializeAddress(deployed_addresses, "byzantineProxyAdmin", address(byzantineProxyAdmin));
+        vm.serializeAddress(deployed_addresses, "strategyModuleManager", address(strategyModuleManager));
+        vm.serializeAddress(deployed_addresses, "strategyModuleManagerImplementation", address(strategyModuleManagerImplementation));
+        vm.serializeAddress(deployed_addresses, "strategyModuleBeacon", address(strategyModuleBeacon));
+        vm.serializeAddress(deployed_addresses, "strategyModuleImplementation", address(strategyModuleImplementation));
+        vm.serializeAddress(deployed_addresses, "byzNft", address(byzNft));
+        vm.serializeAddress(deployed_addresses, "byzNftImplementation", address(byzNftImplementation));
+        vm.serializeAddress(deployed_addresses, "auction", address(auction));
+        vm.serializeAddress(deployed_addresses, "auctionImplementation", address(auctionImplementation));
+        vm.serializeAddress(deployed_addresses, "escrow", address(escrow));
+        vm.serializeAddress(deployed_addresses, "escrowImplementation", address(escrowImplementation));
+        string memory deployed_addresses_output = vm.serializeAddress(deployed_addresses, "emptyContract", address(emptyContract));
+
+        vm.writeJson(deployed_addresses_output, outputPath, ".addresses");
     }
 }
