@@ -192,7 +192,7 @@ contract Auction is
             _nodeOpsInfo[msg.sender].auctionScoreToBidPrices[auctionScores[i]].push(bidPrice);
             _nodeOpsInfo[msg.sender].auctionScoreToVcNumbers[auctionScores[i]].push(_timesInDays[i]);
 
-            /// TODO: Emit event to associate an auction score to a bid price in the front
+            emit BidPlaced(msg.sender, reputationScore, _discountRates[i], _timesInDays[i], bidPrice, auctionScores[i]);
 
             unchecked {
                 ++i;
@@ -349,6 +349,8 @@ contract Auction is
             escrow.refund(msg.sender, ethersToSendBack);
         }
 
+        emit BidUpdated(msg.sender, reputationScore, _auctionScore, _newTimeInDays, _newDiscountRate, newBidPrice, newAuctionScore);
+
         return newAuctionScore;
 
     }
@@ -390,7 +392,8 @@ contract Auction is
         } else {
             escrow.refund(msg.sender, bidToRefund + _BOND);
         }
-        
+
+        emit BidWithdrawn(msg.sender, _auctionScore);
     }
 
     /**
@@ -592,6 +595,8 @@ contract Auction is
 
                     // Decrease the number of node ops in the auction if the winner has no more bids
                     if (_nodeOpsInfo[winnerAddr].numBids == 0) --numNodeOpsInAuction;
+                    
+                    emit WinnerJoinedDV(winnerAddr, bestAuctionScores[i]);
 
                     // End function if enough winners
                     if (count == clusterSize) return auctionWinners;
