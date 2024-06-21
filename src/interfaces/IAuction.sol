@@ -13,6 +13,29 @@ interface IAuction {
         mapping(uint256 => uint256[]) auctionScoreToVcNumbers;
     }
 
+    event BidPlaced(
+        address indexed nodeOpAddr,
+        uint256 reputationScore,
+        uint256 discountRate,
+        uint256 duration,
+        uint256 bidPrice,
+        uint256 auctionScore
+    );
+    
+    event BidUpdated(
+        address indexed nodeOpAddr,
+        uint256 reputationScore,
+        uint256 oldAuctionScore,
+        uint256 newDuration,
+        uint256 newDiscountRate,
+        uint256 newBidPrice,
+        uint256 newAuctionScore
+    );
+
+    event BidWithdrawn(address indexed nodeOpAddr, uint256 auctionScore); 
+
+    event WinnerJoinedDV(address indexed nodeOpAddr, uint256 auctionScore);
+
     /// @notice Getter of the state variable `numNodeOpsInAuction`
     function numNodeOpsInAuction() external view returns (uint64);
 
