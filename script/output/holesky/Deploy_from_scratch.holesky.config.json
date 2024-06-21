@@ -1,7 +1,7 @@
 {
   "addresses": {
     "auction": "0x1ae6F573F0D7b4b966Ce103BC18F3A3b9E43987b",
-    "auctionImplementation": "0x8aa905d236b5c316716487C04e72Ed2683c68A45",
+    "auctionImplementation": "0xedbE23174eC71604FBc4D7af6416dc8396c46572",
     "byzNft": "0xB8492aD52067B0b0a520041c0B16A3092bee05Bc",
     "byzNftImplementation": "0x3F26e94839Bf370062043122CCB1c95e668E69Db",
     "byzantineProxyAdmin": "0x6aA4FfD1aecB89879b9A98f01A4d9c1531D63e1c",
