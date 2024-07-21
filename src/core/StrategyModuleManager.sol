@@ -14,6 +14,7 @@ import "./StrategyModuleManagerStorage.sol";
 import "../interfaces/IByzNft.sol";
 import "../interfaces/IAuction.sol";
 import "../interfaces/IStrategyModule.sol";
+import "../interfaces/IStakerRewards.sol";
 
 // TODO: Emit events to notify what happened
 
@@ -30,8 +31,9 @@ contract StrategyModuleManager is
         IAuction _auction,
         IByzNft _byzNft,
         IEigenPodManager _eigenPodManager,
-        IDelegationManager _delegationManager
-    ) StrategyModuleManagerStorage(_stratModBeacon, _auction, _byzNft, _eigenPodManager, _delegationManager) {
+        IDelegationManager _delegationManager,
+        IStakerRewards _stakerRewards
+    ) StrategyModuleManagerStorage(_stratModBeacon, _auction, _byzNft, _eigenPodManager, _delegationManager, _stakerRewards) {
         // Disable initializer in the context of the implementation contract
         _disableInitializers();
     }
@@ -64,11 +66,16 @@ contract StrategyModuleManager is
     function preCreateDVs(
         uint8 _numDVsToPreCreate
     ) external onlyOwner {
+        // Add up all the VCs of the nodes in the DV
+        uint256 totalVCs;   
+
         for (uint8 i = 0; i < _numDVsToPreCreate;) {
             IStrategyModule.Node[] memory nodes = auction.getAuctionWinners();
 
             for (uint8 j = 0; j < nodes.length;) {
                 pendingClusters[numPreCreatedClusters].nodes[j] = nodes[j];
+                totalVCs += pendingClusters[numPreCreatedClusters].nodes[j].vcNumber;
+
                 unchecked {
                     ++j;
                 }
@@ -81,6 +88,9 @@ contract StrategyModuleManager is
                 ++i;
             }
         }
+
+        // Trigger the checkpoint in StakerRewards contract and update it
+        stakerRewards.updateCheckpoint(totalVCs, _numDVsToPreCreate);
     }
 
     /**
@@ -121,16 +131,35 @@ contract StrategyModuleManager is
 
         // If enough node ops in Auction, trigger a new auction for the next staker's DV
         if (auction.numNodeOpsInAuction() >= clusterSize) {
+            // Add up the VCs of all the nodes DV 
+            uint256 totalVCs;
+
             IStrategyModule.Node[] memory nodes = auction.getAuctionWinners();
             for (uint8 i = 0; i < nodes.length;) {
                 pendingClusters[numPreCreatedClusters].nodes[i] = nodes[i];
+                totalVCs += pendingClusters[numPreCreatedClusters].nodes[i].vcNumber;
+
                 unchecked {
                     ++i;
                 }
             }
             pendingClusters[numPreCreatedClusters].dvStatus = IStrategyModule.DVStatus.WAITING_ACTIVATION;
             ++numPreCreatedClusters;
+
+            // Trigger the checkpoint in StakerRewards contract and update it. 1 = 1 DV created
+            stakerRewards.updateCheckpoint(totalVCs, 1);
         }
+
+        // Update the staker details in the StakerRewards contract
+        IStrategyModule.Node[4] memory nodes = newStratMod.getDVNodesDetails();
+        // Find the smallest VC in the cluster
+        uint256 smallestVC = nodes[0].vcNumber;
+        for (uint8 i; i < clusterSize;) {
+            if (nodes[i].vcNumber < smallestVC) {
+                smallestVC = nodes[i].vcNumber;
+            }
+        }
+        stakerRewards.stakerJoined(msg.sender, smallestVC); 
     }
 
     /**
