@@ -89,8 +89,10 @@ contract StakerRewards is Initializable, OwnableUpgradeable, ReentrancyGuardUpgr
             uint256 vcToBurn = _getElapsedDays(rewardCheckpoint.startAt) * rewardCheckpoint.clusterSize * _numDVsPreCreated;
             totalVCs -= vcToBurn;
 
-            // Increase totalNotYetClaimedRewards
-            _increaseTotalNotClaimedRewards();
+            // If there are already stakers, update totalNotYetClaimedRewards by adding the rewards generated from the previous checkpoint
+            if (_hasStakers) {
+                _increaseTotalNotClaimedRewards();
+            }
         }
 
         // Update the reward checkpoint
@@ -116,18 +118,18 @@ contract StakerRewards is Initializable, OwnableUpgradeable, ReentrancyGuardUpgr
         }
 
         // Update the staker data
-        StakerData storage data = stakers[_staker];
-        data.lastUpdateTime = block.timestamp;
-        data.maxRewardDays = _maxRewardDays;
+        StakerData storage staker = stakers[_staker];
+        staker.lastUpdateTime = block.timestamp;
+        staker.maxRewardDays = _maxRewardDays;
     }
 
     /**
      * @notice Staker claims rewards and receive rewards
      * @dev The function does the following actions: 
      * 1. Calculate the rewards and send the rewards to the staker
-     * 2. Update the total VC number by burning the used VCs and update the total not yet claimed rewards
+     * 2. Update totalNotYetClaimedRewards by decreasing the claimed rewards
      * 3. Update the node operators' reward counter
-     * 4. Update the checkpoint data
+     * 4. Update the checkpoint data including updating totalVCs by burning the used VCs and upding AGAIN totalNotYetClaimedRewards by increasing by the        distributed rewards from the last checkpoint
      * 5. Update the staker data
     */ 
     function claimRewards() external {
@@ -136,8 +138,7 @@ contract StakerRewards is Initializable, OwnableUpgradeable, ReentrancyGuardUpgr
         (bool success,) = payable(msg.sender).call{value: rewards}("");
         if (!success) revert FailedToSendRewards();
 
-        // Update totalVCs and totalNotYetClaimedRewards
-        totalVCs -= elapsedDays * rewardCheckpoint.clusterSize; 
+        // Update totalNotYetClaimedRewards by subtracting the claimed rewards
         totalNotYetClaimedRewards -= rewards;
 
         // Update each node operator's reward counter
@@ -147,9 +148,9 @@ contract StakerRewards is Initializable, OwnableUpgradeable, ReentrancyGuardUpgr
         updateCheckpoint(0, rewardCheckpoint.numDVs);
 
         // Update the staker data
-        StakerData storage data = stakers[msg.sender];
-        data.lastUpdateTime = block.timestamp;
-        data.claimedRewards += rewards;
+        StakerData storage staker = stakers[msg.sender];
+        staker.lastUpdateTime = block.timestamp;
+        staker.claimedRewards += rewards;
 
         // TODO: consider the situation where one of the staker has consumed all the VCs, and where 2/4 have consumed all the VCs
     }
@@ -164,6 +165,9 @@ contract StakerRewards is Initializable, OwnableUpgradeable, ReentrancyGuardUpgr
         return address(this).balance - totalNotYetClaimedRewards;
     }
 
+
+    /* ============== INTERNAL FUNCTIONS ============== */
+
     /**
     * @notice Calculate the rewards for a staker
     * @param _staker The address of the staker
@@ -171,17 +175,20 @@ contract StakerRewards is Initializable, OwnableUpgradeable, ReentrancyGuardUpgr
     * @return The rewards for the staker and the number of days that the staker has claime rewards for
     */
     function _calculateRewards(address _staker) internal view returns(uint256, uint256) {
-        StakerData storage data = stakers[_staker];
-        uint256 elapsedDays = _getElapsedDays(data.lastUpdateTime);
-        if (elapsedDays < data.maxRewardDays) {
+        StakerData storage staker = stakers[_staker];
+        uint256 elapsedDays = _getElapsedDays(staker.lastUpdateTime);
+
+        if (elapsedDays <= staker.maxRewardDays) {
             return (rewardCheckpoint.dailyRewardsPerDV * elapsedDays, elapsedDays);
         }
-        return (rewardCheckpoint.dailyRewardsPerDV * data.maxRewardDays, data.maxRewardDays);
+        // If the staker has claimed rewards for more than maxRewardDays, return the maximum rewards
+        return (rewardCheckpoint.dailyRewardsPerDV * staker.maxRewardDays, staker.maxRewardDays);
     }
 
-
-    /* ============== INTERNAL FUNCTIONS ============== */
-
+    /**
+    * @notice Get the number of days that have elapsed between the last checkpoint and the current one
+    * @param _lastTimestamp The timestamp of the last checkpoint or the last update time of the staker
+    */
     function _getElapsedDays(uint256 _lastTimestamp) internal view returns(uint256) {
         return (block.timestamp - _lastTimestamp) / _ONE_DAY;
     }
