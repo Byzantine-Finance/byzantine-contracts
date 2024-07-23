@@ -59,6 +59,9 @@ contract Deploy_Holesky_From_Scratch is ExistingDeploymentParser {
         escrow = Escrow(
             payable(address(new TransparentUpgradeableProxy(address(emptyContract), address(byzantineProxyAdmin), "")))
         );
+        stakerRewards = StakerRewards(
+            payable(address(new TransparentUpgradeableProxy(address(emptyContract), address(byzantineProxyAdmin), "")))
+        );
 
         // StrategyModule implementation contract
         strategyModuleImplementation = new StrategyModule(
@@ -66,7 +69,8 @@ contract Deploy_Holesky_From_Scratch is ExistingDeploymentParser {
             auction,
             byzNft,
             eigenPodManager,
-            delegation
+            delegation,
+            stakerRewards
         );
         // StrategyModule beacon contract. The Beacon Proxy contract is deployed in the StrategyModuleManager
         // This contract points to the implementation contract.
@@ -78,7 +82,8 @@ contract Deploy_Holesky_From_Scratch is ExistingDeploymentParser {
             auction,
             byzNft,
             eigenPodManager,
-            delegation
+            delegation,
+            stakerRewards
         );
         byzNftImplementation = new ByzNft();
         auctionImplementation = new Auction(
@@ -86,7 +91,11 @@ contract Deploy_Holesky_From_Scratch is ExistingDeploymentParser {
             strategyModuleManager
         );
         escrowImplementation = new Escrow(
-            bidReceiver,
+            stakerRewards,
+            auction
+        );
+        stakerRewardsImplementation = new StakerRewards(
+            strategyModuleManager,
             auction
         );
 
@@ -126,6 +135,12 @@ contract Deploy_Holesky_From_Scratch is ExistingDeploymentParser {
         byzantineProxyAdmin.upgradeAndCall(
             TransparentUpgradeableProxy(payable(address(escrow))),
             address(escrowImplementation),
+            ""
+        );
+        // Upgrade StakerRewards
+        byzantineProxyAdmin.upgradeAndCall(
+            TransparentUpgradeableProxy(payable(address(stakerRewards))),
+            address(stakerRewardsImplementation),
             ""
         );
     }

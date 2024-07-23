@@ -10,6 +10,7 @@ import "../../src/core/StrategyModule.sol";
 import "../../src/tokens/ByzNft.sol";
 import "../../src/core/Auction.sol";
 import "../../src/vault/Escrow.sol";
+import "../../src/core/StakerRewards.sol";
 
 import "eigenlayer-contracts/pods/EigenPodManager.sol";
 import "eigenlayer-contracts/core/DelegationManager.sol";
@@ -32,6 +33,8 @@ contract ExistingDeploymentParser is Script, Test {
     Auction public auctionImplementation;
     Escrow public escrow;
     Escrow public escrowImplementation;
+    StakerRewards public stakerRewards;
+    StakerRewards public stakerRewardsImplementation;
 
     // EigenLayer contracts
     DelegationManager public delegation;
@@ -41,8 +44,8 @@ contract ExistingDeploymentParser is Script, Test {
 
     // Byzantine Admin
     address byzantineAdmin;
-    // Address which receives the bid of the winners (will be a smart contract in the future to distribute the rewards)
-    address bidReceiver;
+    // // Address which receives the bid of the winners (will be a smart contract in the future to distribute the rewards)
+    // address bidReceiver;
     // Initial Auction parameters
     uint256 EXPECTED_POS_DAILY_RETURN_WEI;
     uint16 MAX_DISCOUNT_RATE;
@@ -69,7 +72,7 @@ contract ExistingDeploymentParser is Script, Test {
         CLUSTER_SIZE = uint8(stdJson.readUint(initialDeploymentData, ".auctionConfig.cluster_size"));
 
         // read bidReceiver address
-        bidReceiver = stdJson.readAddress(initialDeploymentData, ".bidReceiver");
+        // bidReceiver = stdJson.readAddress(initialDeploymentData, ".bidReceiver");
 
         // read eigen layer contract addresses
         eigenPodManager = EigenPodManager(stdJson.readAddress(initialDeploymentData, ".eigenLayerContractAddr.eigenPodManager"));
@@ -96,6 +99,8 @@ contract ExistingDeploymentParser is Script, Test {
         strategyModuleImplementation = StrategyModule(payable(stdJson.readAddress(contractsAddressesData, ".addresses.strategyModuleImplementation")));
         strategyModuleManager = StrategyModuleManager(stdJson.readAddress(contractsAddressesData, ".addresses.strategyModuleManager"));
         strategyModuleManagerImplementation = StrategyModuleManager(stdJson.readAddress(contractsAddressesData, ".addresses.strategyModuleManagerImplementation"));
+        stakerRewards = StakerRewards(payable(stdJson.readAddress(contractsAddressesData, ".addresses.stakerRewards")));
+        stakerRewardsImplementation = StakerRewards(payable(stdJson.readAddress(contractsAddressesData, ".addresses.stakerRewardsImplementation")));
 
         // read byzantineAdmin address
         byzantineAdmin = stdJson.readAddress(contractsAddressesData, ".parameters.byzantineAdmin");
@@ -156,8 +161,8 @@ contract ExistingDeploymentParser is Script, Test {
         );
         // Escrow
         require(
-            escrow.bidPriceReceiver() == bidReceiver,
-            "escrow: bidPriceReceiver address not set correctly"
+            escrow.stakerRewards() == stakerRewards,
+            "escrow: stakerRewards address not set correctly"
         );
         require(
             escrow.auction() == auction,
@@ -190,6 +195,11 @@ contract ExistingDeploymentParser is Script, Test {
         require(
             byzantineProxyAdmin.getProxyImplementation(TransparentUpgradeableProxy(payable(address(escrow)))) == address(escrowImplementation),
             "escrow: implementation set incorrectly"
+        );
+        // StakerRewards
+        require(
+            byzantineProxyAdmin.getProxyImplementation(TransparentUpgradeableProxy(payable(address(stakerRewards)))) == address(stakerRewardsImplementation),
+            "stakerRewards: implementation set incorrectly"
         );
     }
 
@@ -256,11 +266,13 @@ contract ExistingDeploymentParser is Script, Test {
         vm.serializeAddress(deployed_addresses, "auctionImplementation", address(auctionImplementation));
         vm.serializeAddress(deployed_addresses, "escrow", address(escrow));
         vm.serializeAddress(deployed_addresses, "escrowImplementation", address(escrowImplementation));
+        vm.serializeAddress(deployed_addresses, "stakerRewards", address(stakerRewards));
+        vm.serializeAddress(deployed_addresses, "stakerRewardsImplementation", address(stakerRewardsImplementation));
         string memory deployed_addresses_output = vm.serializeAddress(deployed_addresses, "emptyContract", address(emptyContract));
 
         string memory parameters = "parameters";
         vm.serializeAddress(parameters, "byzantineAdmin", byzantineAdmin);
-        string memory parameters_output = vm.serializeAddress(parameters, "bidReceiver", bidReceiver);
+        // string memory parameters_output = vm.serializeAddress(parameters, "bidReceiver", bidReceiver);
 
         string memory chain_info = "chainInfo";
         vm.serializeUint(chain_info, "deploymentBlock", block.number);
@@ -268,7 +280,7 @@ contract ExistingDeploymentParser is Script, Test {
 
         // serialize all the data
         vm.serializeString(parent_object, deployed_addresses, deployed_addresses_output);
-        vm.serializeString(parent_object, parameters, parameters_output);
+        // vm.serializeString(parent_object, parameters, parameters_output);
         string memory finalJson = vm.serializeString(parent_object, chain_info, chain_info_output);
 
         vm.writeJson(finalJson, outputPath);

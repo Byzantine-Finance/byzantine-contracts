@@ -126,7 +126,7 @@ interface IStrategyModule {
   function delegateTo(address operator) external;
 
   /**
-   * @notice Set the `clusterDetails` struct of the StrategyModule.
+   * @notice Set the `clusterDetails` struct of the StrategyModule and get the smallest VC number
    * @param nodes An array of Node making up the DV
    * @param dvStatus The status of the DV, refer to the DVStatus enum for details.
    * @dev Callable only by the StrategyModuleManager and bound a pre-created DV to this StrategyModule.
@@ -135,7 +135,7 @@ interface IStrategyModule {
     Node[4] calldata nodes,
     DVStatus dvStatus
   ) 
-    external;
+    external returns (uint256);
 
   /**
    * @notice Allow the Strategy Module's owner to withdraw the smart contract's balance.

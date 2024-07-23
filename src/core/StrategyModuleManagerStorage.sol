@@ -8,6 +8,7 @@ import "../interfaces/IByzNft.sol";
 import "../interfaces/IAuction.sol";
 import "eigenlayer-contracts/interfaces/IEigenPodManager.sol";
 import "eigenlayer-contracts/interfaces/IDelegationManager.sol";
+import "../interfaces/IStakerRewards.sol";
 
 abstract contract StrategyModuleManagerStorage is IStrategyModuleManager {
     /* ============== CONSTANTS + IMMUTABLES ============== */
@@ -26,6 +27,9 @@ abstract contract StrategyModuleManagerStorage is IStrategyModuleManager {
 
     /// @notice EigenLayer's DelegationManager contract
     IDelegationManager public immutable delegationManager;
+
+    /// @notice StakerReward contract
+    IStakerRewards public immutable stakerRewards;
 
     /* ============== STATE VARIABLES ============== */
 
@@ -51,13 +55,15 @@ abstract contract StrategyModuleManagerStorage is IStrategyModuleManager {
         IAuction _auction,
         IByzNft _byzNft,
         IEigenPodManager _eigenPodManager,
-        IDelegationManager _delegationManager
+        IDelegationManager _delegationManager,
+        IStakerRewards _stakerRewards
     ) {
         stratModBeacon = _stratModBeacon;
         auction = _auction;
         byzNft = _byzNft;
         eigenPodManager = _eigenPodManager;
         delegationManager = _delegationManager;
+        stakerRewards = _stakerRewards;
     }
 
     /**

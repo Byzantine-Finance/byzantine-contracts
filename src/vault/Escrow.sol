@@ -3,25 +3,22 @@ pragma solidity ^0.8.20;
 
 import {IEscrow} from "../interfaces/IEscrow.sol";
 import {IAuction} from "../interfaces/IAuction.sol";
+import {IStakerRewards} from "../interfaces/IStakerRewards.sol";
 
 contract Escrow is IEscrow {
 
-    /**
-     * @notice Address which receives the bid of the auction winners
-     * @dev This will be updated to a smart contract vault in the future to distribute the stakers rewards
-     */
-    address public immutable bidPriceReceiver;
-
     /// @notice Auction contract
     IAuction public immutable auction;
+    /// @notice StakerRewards contract
+    IStakerRewards public immutable stakerRewards;
 
     /**
-     * @notice Constructor to set the bidPriceReceiver address and the auction contract
-     * @param _bidPriceReceiver Address which receives the bid of the winners and distribute it to the stakers
+     * @notice Constructor to set the staker reward and auction contracts
+     * @param _stakerRewards The staker reward proxy contract
      * @param _auction The auction proxy contract
      */
-    constructor(address _bidPriceReceiver, IAuction _auction) {
-        bidPriceReceiver = _bidPriceReceiver;
+    constructor(IStakerRewards _stakerRewards, IAuction _auction) {
+        stakerRewards = _stakerRewards;
         auction = _auction;
     }
 
@@ -40,7 +37,7 @@ contract Escrow is IEscrow {
      */
     function releaseFunds(uint256 _bidPrice) public onlyAuction {
         if (address(this).balance < _bidPrice) revert InsufficientFundsInEscrow();
-        (bool success, ) = payable(bidPriceReceiver).call{value: _bidPrice}("");
+        (bool success, ) = address(stakerRewards).call{value: _bidPrice}("");
         if (!success) revert FailedToSendEther();
     }
 

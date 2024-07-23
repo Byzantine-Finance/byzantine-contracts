@@ -8,18 +8,20 @@ pragma solidity ^0.8.20;
 import {IAuction} from "../src/interfaces/IAuction.sol";
 import {IEscrow} from "../src/interfaces/IEscrow.sol";
 import {Escrow} from "../src/vault/Escrow.sol";
+import {IStakerRewards} from "../src/interfaces/IStakerRewards.sol";
 
 import {Test, console} from "forge-std/Test.sol";
 
 contract EscrowTest is Test {
     IEscrow escrow;
+    IStakerRewards stakerRewards;
 
     address auctionContractAddr = 0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9;
-    address BID_PRICE_RECEIVER = 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266;
+    address stakerRewardsContractAddr = 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266; // TODO: Change from bidPriceReceiver to the contract address
     address someone = makeAddr("someone");
 
     function setUp() external {
-        escrow = new Escrow(BID_PRICE_RECEIVER, IAuction(auctionContractAddr));
+        escrow = new Escrow(IStakerRewards(stakerRewardsContractAddr), IAuction(auctionContractAddr));
 
         vm.deal(auctionContractAddr, 1000 ether);
         vm.deal(someone, 1000 ether);
@@ -48,7 +50,7 @@ contract EscrowTest is Test {
         escrow.releaseFunds(1000);
         escrow.releaseFunds(100);
         assertEq(address(escrow).balance, 400);
-        assertEq(BID_PRICE_RECEIVER.balance, 100);
+        assertEq(address(stakerRewards).balance, 100);
         vm.stopPrank();
     }
 

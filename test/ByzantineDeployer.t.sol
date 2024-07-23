@@ -13,6 +13,7 @@ import "../src/core/StrategyModule.sol";
 import "../src/tokens/ByzNft.sol";
 import "../src/core/Auction.sol";
 import "../src/vault/Escrow.sol";
+import "../src/core/StakerRewards.sol";
 
 contract ByzantineDeployer is EigenLayerDeployer {
 
@@ -23,6 +24,7 @@ contract ByzantineDeployer is EigenLayerDeployer {
     ByzNft public byzNft;
     Auction public auction;
     Escrow public escrow;
+    StakerRewards public stakerRewards;
 
     // Byzantine Admin
     address public byzantineAdmin = address(this);
@@ -54,7 +56,9 @@ contract ByzantineDeployer is EigenLayerDeployer {
         makeAddr("node_operator_6"),
         makeAddr("node_operator_7"),
         makeAddr("node_operator_8"),
-        makeAddr("node_operator_9")
+        makeAddr("node_operator_9"),
+        makeAddr("node_operator_10"),
+        makeAddr("node_operator_11")
     ];
 
     struct NodeOpBid {
@@ -90,6 +94,9 @@ contract ByzantineDeployer is EigenLayerDeployer {
         escrow = Escrow(
             payable(address(new TransparentUpgradeableProxy(address(emptyContract), address(byzantineProxyAdmin), "")))
         );
+        stakerRewards = StakerRewards(
+            payable(address(new TransparentUpgradeableProxy(address(emptyContract), address(byzantineProxyAdmin), "")))
+        );
 
         // StrategyModule implementation contract
         IStrategyModule strategyModuleImplementation = new StrategyModule(
@@ -97,7 +104,8 @@ contract ByzantineDeployer is EigenLayerDeployer {
             auction,
             byzNft,
             eigenPodManager,
-            delegation
+            delegation,
+            stakerRewards
         );
         // StrategyModule beacon contract. The Beacon Proxy contract is deployed in the StrategyModuleManager
         // This contract points to the implementation contract.
@@ -109,7 +117,8 @@ contract ByzantineDeployer is EigenLayerDeployer {
             auction,
             byzNft,
             eigenPodManager,
-            delegation
+            delegation,
+            stakerRewards
         );
         ByzNft byzNftImplementation = new ByzNft();
         Auction auctionImplementation = new Auction(
@@ -117,9 +126,14 @@ contract ByzantineDeployer is EigenLayerDeployer {
             strategyModuleManager
         );
         Escrow escrowImplementation = new Escrow(
-            bidReceiver,
+            stakerRewards,
             auction
         );
+        StakerRewards stakerRewardsImplementation = new StakerRewards(
+            strategyModuleManager,
+            auction
+        );
+
 
         // Third, upgrade the proxy contracts to use the correct implementation contracts and initialize them.
         // Upgrade StrategyModuleManager
@@ -159,6 +173,12 @@ contract ByzantineDeployer is EigenLayerDeployer {
             address(escrowImplementation),
             ""
         );
+        // Upgrade StakerRewards
+        byzantineProxyAdmin.upgradeAndCall(
+            TransparentUpgradeableProxy(payable(address(stakerRewards))),
+            address(stakerRewardsImplementation),
+            ""
+        );
     }
 
     function testByzantineContractsInitialization() public view {
@@ -173,6 +193,8 @@ contract ByzantineDeployer is EigenLayerDeployer {
         assertEq(auction.maxDiscountRate(), maxDiscountRate);
         assertEq(auction.minDuration(), minValidationDuration);
         assertEq(auction.clusterSize(), clusterSize);
+        // StakerRewards
+        assertEq(stakerRewards.totalVCs(), 0);
     }
 
 } 
