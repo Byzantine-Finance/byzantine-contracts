@@ -13,6 +13,7 @@ import "../interfaces/IByzNft.sol";
 import "../interfaces/IStrategyModuleManager.sol";
 import "../interfaces/IStrategyModule.sol";
 import "../interfaces/IAuction.sol";
+import "../interfaces/IStakerRewards.sol";
 
 // TODO: Allow Strategy Module ByzNft to be tradeable => conceive a fair exchange mechanism between the seller and the buyer
 
@@ -41,6 +42,9 @@ contract StrategyModule is IStrategyModule, Initializable {
 
     /// @notice EigenLayer's DelegationManager contract
     IDelegationManager public immutable delegationManager;
+
+    /// @notice StakerRewards contract
+    IStakerRewards public immutable stakerRewards;
 
     /* ============== STATE VARIABLES ============== */
 
@@ -77,13 +81,15 @@ contract StrategyModule is IStrategyModule, Initializable {
         IAuction _auction,
         IByzNft _byzNft,
         IEigenPodManager _eigenPodManager,
-        IDelegationManager _delegationManager
+        IDelegationManager _delegationManager,
+        IStakerRewards _stakerRewards
     ) {
         stratModManager = _stratModManager;
         auction = _auction;
         byzNft = _byzNft;
         eigenPodManager = _eigenPodManager;
         delegationManager = _delegationManager;
+        stakerRewards = _stakerRewards;
         // Disable initializer in the context of the implementation contract
         _disableInitializers();
     }
@@ -234,7 +240,7 @@ contract StrategyModule is IStrategyModule, Initializable {
     }
 
     /**
-     * @notice Set the `clusterDetails` struct of the StrategyModule.
+     * @notice Set the `clusterDetails` struct of the StrategyModule and get the smallest VC number
      * @param nodes An array of Node making up the DV
      * @param dvStatus The status of the DV, refer to the DVStatus enum for details.
      * @dev Callable only by the StrategyModuleManager and bound a pre-created DV to this StrategyModule.
@@ -242,16 +248,22 @@ contract StrategyModule is IStrategyModule, Initializable {
     function setClusterDetails(
         Node[4] calldata nodes,
         DVStatus dvStatus
-    ) external onlyStratModManager {
-
+    ) external onlyStratModManager returns(uint256) {
+        uint256 smallestVcNumber = nodes[0].vcNumber;
         for (uint8 i = 0; i < CLUSTER_SIZE;) {
             clusterDetails.nodes[i] = nodes[i];
+
+            // If the current VC number is smaller than the smallest VC number, update it
+            if (nodes[i].vcNumber < smallestVcNumber) {
+                smallestVcNumber = nodes[i].vcNumber;
+            }
             unchecked {
                 ++i;
             }
         }
 
         clusterDetails.dvStatus = dvStatus;
+        return smallestVcNumber;
     }
 
     /**

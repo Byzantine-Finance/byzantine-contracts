@@ -15,6 +15,7 @@ import "../interfaces/IByzNft.sol";
 import "../interfaces/IAuction.sol";
 import "../interfaces/IStrategyModule.sol";
 import "../interfaces/IStakerRewards.sol";
+import {console} from "forge-std/console.sol";
 
 // TODO: Emit events to notify what happened
 
@@ -119,8 +120,8 @@ contract StrategyModuleManager is
 
         uint256 clusterSize = pendingClusters[numStratMods].nodes.length;
 
-        // Set the ClusterDetails struct of the new StrategyModule
-        newStratMod.setClusterDetails(
+        // Set the ClusterDetails struct of the new StrategyModule and get the smallest VC of the DV
+        uint256 smallestVC = newStratMod.setClusterDetails(
             pendingClusters[numStratMods].nodes,
             IStrategyModule.DVStatus.DEPOSITED_NOT_VERIFIED
         );
@@ -151,14 +152,6 @@ contract StrategyModuleManager is
         }
 
         // Update the staker details in the StakerRewards contract
-        IStrategyModule.Node[4] memory nodes = newStratMod.getDVNodesDetails();
-        // Find the smallest VC in the cluster
-        uint256 smallestVC = nodes[0].vcNumber;
-        for (uint8 i; i < clusterSize;) {
-            if (nodes[i].vcNumber < smallestVC) {
-                smallestVC = nodes[i].vcNumber;
-            }
-        }
         stakerRewards.stakerJoined(msg.sender, smallestVC); 
     }
 
