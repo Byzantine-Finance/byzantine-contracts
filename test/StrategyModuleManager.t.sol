@@ -16,6 +16,8 @@ import "../src/core/Auction.sol";
 
 import "../src/interfaces/IStrategyModule.sol";
 import "../src/interfaces/IStrategyModuleManager.sol";
+import "../src/interfaces/IStakerRewards.sol";
+import {console} from "forge-std/Test.sol";
 
 contract StrategyModuleManagerTest is ProofParsing, ByzantineDeployer {
     using BeaconChainProofs for *;
@@ -43,7 +45,8 @@ contract StrategyModuleManagerTest is ProofParsing, ByzantineDeployer {
         vm.deal(alice, STARTING_BALANCE);
         vm.deal(bob, STARTING_BALANCE);
 
-        // For the context of these tests, we assume 8 node operators has pending bids
+        // For the context of these tests, we assume 12 node operators has pending bids
+        // TODO: change function name to _12NodeOpsBid()
         _8NodeOpsBid();
 
         // Get deposit data of a random validator
@@ -59,7 +62,7 @@ contract StrategyModuleManagerTest is ProofParsing, ByzantineDeployer {
         assertEq(byzNftContract.owner(), address(strategyModuleManager));
     }
 
-    function testPreCreateDVs() public {
+    function testPreCreateDVs() public startAtPresentDay {
         // Alice would like to create a StrategyModule but no pending clusters
         vm.expectRevert(bytes("StrategyModuleManager.createStratModAndStakeNativeETH: no pending DVs"));
         _createStratModAndStakeNativeETH(alice, 32 ether);
@@ -96,9 +99,21 @@ contract StrategyModuleManagerTest is ProofParsing, ByzantineDeployer {
         assertEq(nodesDV2[2].vcNumber, 400);
         assertEq(nodesDV2[3].vcNumber, 300);
 
-        // Alice creates a StrategyModule and activates the first DV
+        // Verify the RewardCheckpoint details in StakerRewards contract 
+        uint256 totalVCs = 999 + 900 + 800 + 700 + 600 + 500 + 400 + 300;
+
+        assertEq(stakerRewards.totalVCs(), totalVCs);
+        (uint256 startAt1, uint256 dailyRewardsPerDV1, ) = stakerRewards.rewardCheckpoint();
+        assertEq(startAt1, block.timestamp); 
+        assertEq(address(stakerRewards).balance, 3668072547945203058);
+        assertEq(dailyRewardsPerDV1, 2822136986301368); 
+        assertEq(clusterSize, 4);
+
+        // Alice creates a StrategyModule and activates the first DV and precreate a new DV
         _createStratModAndStakeNativeETH(alice, 32 ether);
         assertEq(alice.balance, STARTING_BALANCE - 32 ether);
+
+        uint256 timestampDvCreated = block.timestamp;
 
         // Verify the first pending DV has been deleted from the pending container
         nodesDV1 = strategyModuleManager.getPendingClusterNodeDetails(0);
@@ -112,8 +127,16 @@ contract StrategyModuleManagerTest is ProofParsing, ByzantineDeployer {
         assertEq(nodesDV1[3].vcNumber, 0);
 
         // Verify number of pending DVs
-        assertEq(strategyModuleManager.numPreCreatedClusters(), 2);
-        assertEq(strategyModuleManager.getNumPendingClusters(), 1);
+        assertEq(strategyModuleManager.numPreCreatedClusters(), 3);
+        assertEq(strategyModuleManager.getNumPendingClusters(), 2);
+
+        // Verify the updated RewardCheckpoint details in StakerRewards contract after a newly created DV
+        assertEq(stakerRewards.totalVCs(), totalVCs + 700);
+        (uint256 startAt2, uint256 dailyRewardsPerDV2, ) = stakerRewards.rewardCheckpoint();
+        assertEq(startAt2, timestampDvCreated); 
+        // assertEq(address(stakerRewards).balance, );
+        // assertEq(dailyRewardsPerDV2, ); 
+        assertEq(clusterSize, 4);
     }
 
     function testCreateStratMods() public preCreateClusters(2) {
@@ -603,8 +626,12 @@ contract StrategyModuleManagerTest is ProofParsing, ByzantineDeployer {
         (, uint256[] memory time5) = _createOneBidParamArray(13e2, 500);  // 6th
         (, uint256[] memory time6) = _createOneBidParamArray(13e2, 400);  // 7th
         (, uint256[] memory time7) = _createOneBidParamArray(13e2, 300);  // 8th
+        (, uint256[] memory time8) = _createOneBidParamArray(13e2, 250);  // 9th
+        (, uint256[] memory time9) = _createOneBidParamArray(13e2, 200);  // 10th
+        (, uint256[] memory time10) = _createOneBidParamArray(13e2, 150);  // 11th
+        (, uint256[] memory time11) = _createOneBidParamArray(13e2, 100);  // 12th
 
-        NodeOpBid[] memory nodeOpBids = new NodeOpBid[](8);
+        NodeOpBid[] memory nodeOpBids = new NodeOpBid[](12);
         nodeOpBids[0] = NodeOpBid(nodeOps[0], DR0, time0);
         nodeOpBids[1] = NodeOpBid(nodeOps[1], DR0, time1); 
         nodeOpBids[2] = NodeOpBid(nodeOps[2], DR0, time2); 
@@ -613,6 +640,10 @@ contract StrategyModuleManagerTest is ProofParsing, ByzantineDeployer {
         nodeOpBids[5] = NodeOpBid(nodeOps[5], DR0, time5);
         nodeOpBids[6] = NodeOpBid(nodeOps[6], DR0, time6);
         nodeOpBids[7] = NodeOpBid(nodeOps[7], DR0, time7);
+        nodeOpBids[8] = NodeOpBid(nodeOps[8], DR0, time8);
+        nodeOpBids[9] = NodeOpBid(nodeOps[9], DR0, time9); 
+        nodeOpBids[10] = NodeOpBid(nodeOps[10], DR0, time10); 
+        nodeOpBids[11] = NodeOpBid(nodeOps[11], DR0, time11);
         _nodeOpsBid(nodeOpBids);
     }
 
@@ -622,5 +653,9 @@ contract StrategyModuleManagerTest is ProofParsing, ByzantineDeployer {
         strategyModuleManager.preCreateDVs(_numDVsToPreCreate);
         _;
     }
-
+    
+    modifier startAtPresentDay() {
+        vm.warp(1721754401);
+        _;
+    }
 }
