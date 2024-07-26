@@ -45,8 +45,7 @@ contract StrategyModuleManagerTest is ProofParsing, ByzantineDeployer {
         vm.deal(alice, STARTING_BALANCE);
         vm.deal(bob, STARTING_BALANCE);
 
-        // For the context of these tests, we assume 12 node operators has pending bids
-        // TODO: change function name to _12NodeOpsBid()
+        // For the context of these tests, we assume 8 node operators has pending bids
         _8NodeOpsBid();
 
         // Get deposit data of a random validator
@@ -62,7 +61,7 @@ contract StrategyModuleManagerTest is ProofParsing, ByzantineDeployer {
         assertEq(byzNftContract.owner(), address(strategyModuleManager));
     }
 
-    function testPreCreateDVs() public startAtPresentDay {
+    function testPreCreateDVs() public {
         // Alice would like to create a StrategyModule but no pending clusters
         vm.expectRevert(bytes("StrategyModuleManager.createStratModAndStakeNativeETH: no pending DVs"));
         _createStratModAndStakeNativeETH(alice, 32 ether);
@@ -99,21 +98,9 @@ contract StrategyModuleManagerTest is ProofParsing, ByzantineDeployer {
         assertEq(nodesDV2[2].vcNumber, 400);
         assertEq(nodesDV2[3].vcNumber, 300);
 
-        // Verify the RewardCheckpoint details in StakerRewards contract 
-        uint256 totalVCs = 999 + 900 + 800 + 700 + 600 + 500 + 400 + 300;
-
-        assertEq(stakerRewards.totalVCs(), totalVCs);
-        (uint256 startAt1, uint256 dailyRewardsPerDV1, ) = stakerRewards.rewardCheckpoint();
-        assertEq(startAt1, block.timestamp); 
-        assertEq(address(stakerRewards).balance, 3668072547945203058);
-        assertEq(dailyRewardsPerDV1, 2822136986301368); 
-        assertEq(clusterSize, 4);
-
-        // Alice creates a StrategyModule and activates the first DV and precreate a new DV
+        // Alice creates a StrategyModule and activates the first DV and precreate a new DV at the same time
         _createStratModAndStakeNativeETH(alice, 32 ether);
         assertEq(alice.balance, STARTING_BALANCE - 32 ether);
-
-        uint256 timestampDvCreated = block.timestamp;
 
         // Verify the first pending DV has been deleted from the pending container
         nodesDV1 = strategyModuleManager.getPendingClusterNodeDetails(0);
@@ -127,16 +114,8 @@ contract StrategyModuleManagerTest is ProofParsing, ByzantineDeployer {
         assertEq(nodesDV1[3].vcNumber, 0);
 
         // Verify number of pending DVs
-        assertEq(strategyModuleManager.numPreCreatedClusters(), 3);
-        assertEq(strategyModuleManager.getNumPendingClusters(), 2);
-
-        // Verify the updated RewardCheckpoint details in StakerRewards contract after a newly created DV
-        assertEq(stakerRewards.totalVCs(), totalVCs + 700);
-        (uint256 startAt2, uint256 dailyRewardsPerDV2, ) = stakerRewards.rewardCheckpoint();
-        assertEq(startAt2, timestampDvCreated); 
-        // assertEq(address(stakerRewards).balance, );
-        // assertEq(dailyRewardsPerDV2, ); 
-        assertEq(clusterSize, 4);
+        assertEq(strategyModuleManager.numPreCreatedClusters(), 2);
+        assertEq(strategyModuleManager.getNumPendingClusters(), 1);
     }
 
     function testCreateStratMods() public preCreateClusters(2) {
@@ -485,6 +464,91 @@ contract StrategyModuleManagerTest is ProofParsing, ByzantineDeployer {
 
     }
 
+    function testStakerRewardsContract() public startAtPresentDay preCreateClusters(1) {
+        // (checkpoint 1) Byzantine pre-create the first 1 DVs 
+
+        // Verify the RewardCheckpoint related to the first DVs' details in StakerRewards contract
+        uint256 totalVCs = 999 + 900 + 800 + 700;
+        assertEq(stakerRewards.totalVCs(), totalVCs);
+        (uint256 startAt1, uint256 dailyRewardsPerDV1, ) = stakerRewards.rewardCheckpoint();
+        assertEq(startAt1, block.timestamp); 
+        assertEq(address(stakerRewards).balance, 2398110904109587458);
+        assertEq(dailyRewardsPerDV1, 2822136986301368); 
+        assertEq(clusterSize, 4);
+
+        // 10 days after
+        vm.warp(block.timestamp + 10 days);
+        uint256 checkpoint2Timestamp = block.timestamp;
+
+        // (checkpoint 2) Alice creates a StrategyModule and activates the first DV and precreate a new DV at the same time 
+        _createStratModAndStakeNativeETH(alice, 32 ether);     
+
+        // Verify the updated RewardCheckpoint details in StakerRewards contract 
+        assertEq(stakerRewards.totalVCs(), 5199);
+        (uint256 startAt2, uint256 dailyRewardsPerDV2, ) = stakerRewards.rewardCheckpoint();
+        assertEq(startAt2, checkpoint2Timestamp); 
+        assertEq(address(stakerRewards).balance, 3668072547945203058); // 2398110904109587458 + 1269961643835615600
+        assertEq(dailyRewardsPerDV2, 2822136986301368); 
+        assertEq(clusterSize, 4);
+        
+        // Verify the strategy module details in StakerRewards contract
+        address aliceStratModAddr = strategyModuleManager.getStratMods(alice)[0];
+        (uint256 lastUpdateTime1, uint256 rewardDaysCap1) = stakerRewards.stratMods(aliceStratModAddr);
+        assertEq(lastUpdateTime1, block.timestamp);
+        assertEq(rewardDaysCap1, 700); // 700 being the smallest num of the DV 1
+
+        // 25 days after
+        vm.warp(block.timestamp + 25 days);
+        uint256 timestamp = block.timestamp;
+        uint256 elapsedDays = (timestamp - checkpoint2Timestamp) / 1 days;
+        console.log("elapsedDays", elapsedDays);
+
+        // (checkpoint 3) Bob creates a StrategyModule and activates the first DV without precreating a new DV 
+        _createStratModAndStakeNativeETH(bob, 32 ether);
+
+        // Verify the updated RewardCheckpoint 
+        assertEq(elapsedDays, 25);
+        assertEq(stakerRewards.totalVCs(), 5099); 
+        (uint256 startAt3, uint256 dailyRewardsPerDV3, ) = stakerRewards.rewardCheckpoint();
+        assertEq(startAt3, timestamp); 
+        // dailyRewardsPerDV3 = (address(stakerRewards).balance - dailyRewardsPerDV2 * elapsedDays) / stakerRewards.totalVCs() * 4;
+        assertEq(dailyRewardsPerDV3, 2822136986301368); 
+        assertEq(address(stakerRewards).balance, 3668072547945203058); // unchanged as Alice didn't create a new DV
+
+        // Verify the strategy module details in StakerRewards contract
+        address bobStratModAddr = strategyModuleManager.getStratMods(bob)[0];
+        (uint256 lastUpdateTime2, uint256 rewardDaysCap2) = stakerRewards.stratMods(bobStratModAddr);
+        assertEq(lastUpdateTime2, timestamp);
+        assertEq(rewardDaysCap2, 300); 
+
+        // Verify other variables
+        uint256 distributedRewards = dailyRewardsPerDV2 * elapsedDays;
+        assertEq(stakerRewards.totalNotYetClaimedRewards(), distributedRewards);
+        assertEq(stakerRewards.totalActiveDVs(), 2);
+
+        // 300 days after
+        vm.warp(block.timestamp + 300 days);
+
+        // (checkpoint 4) Alice claims her rewards
+        address aliceStratModAddress = strategyModuleManager.getStratMods(alice)[0];
+        console.log(aliceStratModAddress);
+        (uint256 claimedRewards, uint256 rewardDaysCap) = stakerRewards.calculateRewards(aliceStratModAddress);
+        assertEq(claimedRewards, 917194520547944600);
+        uint256 aliceBalanceBeforeClaim = address(alice).balance;
+        vm.prank(alice);
+        stakerRewards.claimRewards(aliceStratModAddress);
+        assertEq(address(alice).balance, aliceBalanceBeforeClaim + 917194520547944600);
+
+        // Verify the updated VC numbers of node operators 
+        // TODO: continue test, pb of access control of setClusterDetails function 
+        IStrategyModule.Node[4] memory nodes = IStrategyModule(aliceStratModAddress).getDVNodesDetails();
+        // assertEq(nodes[0].vcNumber, 674);
+
+        // Verify updated reward checkpoint details
+        (, uint256 dailyRewardsPerDV4, ) = stakerRewards.rewardCheckpoint();
+
+    }
+
     // TODO: Verify the operator shares increase correctly when staker has verified correctly its withdrawal credentials
     // TODO: Delegate to differents operators by creating new strategy modules -> necessary to not put the 32ETH in the same DV
 
@@ -626,12 +690,8 @@ contract StrategyModuleManagerTest is ProofParsing, ByzantineDeployer {
         (, uint256[] memory time5) = _createOneBidParamArray(13e2, 500);  // 6th
         (, uint256[] memory time6) = _createOneBidParamArray(13e2, 400);  // 7th
         (, uint256[] memory time7) = _createOneBidParamArray(13e2, 300);  // 8th
-        (, uint256[] memory time8) = _createOneBidParamArray(13e2, 250);  // 9th
-        (, uint256[] memory time9) = _createOneBidParamArray(13e2, 200);  // 10th
-        (, uint256[] memory time10) = _createOneBidParamArray(13e2, 150);  // 11th
-        (, uint256[] memory time11) = _createOneBidParamArray(13e2, 100);  // 12th
 
-        NodeOpBid[] memory nodeOpBids = new NodeOpBid[](12);
+        NodeOpBid[] memory nodeOpBids = new NodeOpBid[](8);
         nodeOpBids[0] = NodeOpBid(nodeOps[0], DR0, time0);
         nodeOpBids[1] = NodeOpBid(nodeOps[1], DR0, time1); 
         nodeOpBids[2] = NodeOpBid(nodeOps[2], DR0, time2); 
@@ -640,10 +700,6 @@ contract StrategyModuleManagerTest is ProofParsing, ByzantineDeployer {
         nodeOpBids[5] = NodeOpBid(nodeOps[5], DR0, time5);
         nodeOpBids[6] = NodeOpBid(nodeOps[6], DR0, time6);
         nodeOpBids[7] = NodeOpBid(nodeOps[7], DR0, time7);
-        nodeOpBids[8] = NodeOpBid(nodeOps[8], DR0, time8);
-        nodeOpBids[9] = NodeOpBid(nodeOps[9], DR0, time9); 
-        nodeOpBids[10] = NodeOpBid(nodeOps[10], DR0, time10); 
-        nodeOpBids[11] = NodeOpBid(nodeOps[11], DR0, time11);
         _nodeOpsBid(nodeOpBids);
     }
 
@@ -653,7 +709,7 @@ contract StrategyModuleManagerTest is ProofParsing, ByzantineDeployer {
         strategyModuleManager.preCreateDVs(_numDVsToPreCreate);
         _;
     }
-    
+
     modifier startAtPresentDay() {
         vm.warp(1721754401);
         _;
