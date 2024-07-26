@@ -130,10 +130,10 @@ contract StrategyModuleManager is
         delete pendingClusters[numStratMods];
         ++numStratMods;
 
+        // Add up the VCs of all the nodes DV 
+        uint256 totalVCs;
         // If enough node ops in Auction, trigger a new auction for the next staker's DV
         if (auction.numNodeOpsInAuction() >= clusterSize) {
-            // Add up the VCs of all the nodes DV 
-            uint256 totalVCs;
 
             IStrategyModule.Node[] memory nodes = auction.getAuctionWinners();
             for (uint8 i = 0; i < nodes.length;) {
@@ -146,13 +146,10 @@ contract StrategyModuleManager is
             }
             pendingClusters[numPreCreatedClusters].dvStatus = IStrategyModule.DVStatus.WAITING_ACTIVATION;
             ++numPreCreatedClusters;
-
-            // Trigger the checkpoint in StakerRewards contract and update it. 1 = 1 DV created
-            stakerRewards.updateCheckpoint(totalVCs, 1);
         }
 
         // Update the staker details in the StakerRewards contract
-        stakerRewards.stakerJoined(msg.sender, smallestVC); 
+        stakerRewards.stakerJoined(address(newStratMod), smallestVC, totalVCs); 
     }
 
     /**

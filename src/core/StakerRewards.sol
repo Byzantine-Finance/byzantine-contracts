@@ -2,14 +2,14 @@
 pragma solidity ^0.8.20;
 
 import "@openzeppelin-upgrades/contracts/proxy/utils/Initializable.sol";
-import "@openzeppelin-upgrades/contracts/access/OwnableUpgradeable.sol";
 import "@openzeppelin-upgrades/contracts/security/ReentrancyGuardUpgradeable.sol";
 import {IStakerRewards} from "../interfaces/IStakerRewards.sol";
-// import "../interfaces/IStrategyModule.sol";
 import "../interfaces/IStrategyModuleManager.sol";
+import "../interfaces/IStrategyModule.sol";
 import "../interfaces/IAuction.sol";
+import {console} from "forge-std/console.sol";
 
-contract StakerRewards is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable, IStakerRewards {
+contract StakerRewards is Initializable, ReentrancyGuardUpgradeable, IStakerRewards {
 
     /* ============== CONSTANTS + IMMUTABLES ============== */
 
@@ -22,30 +22,28 @@ contract StakerRewards is Initializable, OwnableUpgradeable, ReentrancyGuardUpgr
     /// @notice Auction contract
     IAuction public immutable auction;
 
+    /// @notice Time in seconds for a day
     uint256 internal constant _ONE_DAY = 1 days; 
 
     /* ============== STATE VARIABLES ============== */
 
     /// @notice Check if there is at least one staker
     bool _hasStakers;
-    /// @notice Total of non consumed VCs in circulation: 1 VC consumed per day per NO 
+    /// @notice Total of non consumed VCs in circulation: 1 VC consumed per day per nodeOp 
     uint256 public totalVCs; 
     /// @notice Sum of all the strategy module rewards distributed at current timestamp but not yet claimed by the stakers
-    uint256 public totalNotYetClaimedRewards; 
-    /// @notice Locked amount related to the unused DVs
-    uint256 public lockedAmount;
-    /// @notice Number of stakers
+    uint256 public totalNotYetClaimedRewards;
+    /// @notice Number of active DVs that are generating rewards
     /// TODO: decreasing by 1 if the staker unstake or one of the nodeOp of the DV has consumed all the VCs
-    uint256 public totalStakers;
+    uint256 public totalActiveDVs;  
 
-    /// @notice Data related to each staker
-    struct StakerData {
+    /// @notice Data related to each strategy module 
+    struct StratModData {
         uint256 lastUpdateTime; // staking time or last claim time
-        uint256 maxRewardDays; 
-        uint256 claimedRewards;
+        uint256 rewardDaysCap; // Maximum number of days the owner of the stratMod can claim rewards 
     }
-    /// @notice Staker address to its data
-    mapping(address => StakerData) public stakers;
+    /// @notice Strategy module address => StratModData
+    mapping(address => StratModData) public stratMods;
 
     /// @notice Global struct recording the last checkpoint details
     /// @dev Formula: dailyRewardsPerDV = allocableRewardsInContract / total_number_of_VCs_in_circulation
@@ -77,7 +75,6 @@ contract StakerRewards is Initializable, OwnableUpgradeable, ReentrancyGuardUpgr
     function initialize(
         address _initialOwner
     ) external initializer {
-        _transferOwnership(_initialOwner);
         __ReentrancyGuard_init();
     }
 
@@ -93,7 +90,7 @@ contract StakerRewards is Initializable, OwnableUpgradeable, ReentrancyGuardUpgr
      * @notice Update the global reward checkpoint details when new DVs are pre-created or when a staker staked 32ETH
      * @param _newVCs Total VCs brought by the new DV
      * @param _numDVsPreCreated Number of DVs pre-created: can be 0 if no DV is pre-created
-     * @dev Function triggered in 3 scenarios: precreation of DVs, creation of new DV by a staker, arrival of a new staker.
+     * @dev Function triggered in 2 scenarios: precreation of DVs and arrival of a new staker.
      * If the checkpoint is updated due to the preCreateDVs function, the precreated DVs are batched and are considered as one checkpoint.
      * The function does the following actions:
      * 1. Increase totalVCs by the number of VCs brought by the new DV
@@ -108,7 +105,7 @@ contract StakerRewards is Initializable, OwnableUpgradeable, ReentrancyGuardUpgr
         // If there is at least one staker has staked 32ETH 
         if (_hasStakers) {
             // Decreasing totalVCs by the number of VCs consumed by all the stakers from the previous checkpoint
-            uint256 consumedVCs = _getElapsedDays(rewardCheckpoint.startAt) * rewardCheckpoint.clusterSize * _numDVsPreCreated * totalStakers;
+            uint256 consumedVCs = _getElapsedDays(rewardCheckpoint.startAt) * rewardCheckpoint.clusterSize * _numDVsPreCreated * totalActiveDVs;
             totalVCs -= consumedVCs;
 
             // Update totalNotYetClaimedRewards by adding the rewards generated from the previous checkpoint
@@ -122,54 +119,64 @@ contract StakerRewards is Initializable, OwnableUpgradeable, ReentrancyGuardUpgr
     }
 
     /**
-     * @notice Update the staker's data when a staker has staked 32 ETH
-     * @param _staker Address of the staker
-     * @param _maxRewardDays Maximum number of days the staker can claim rewards, which is also the smallest number of VC in the strategy module
+     * @notice Function triggered when a staker has staked 32ETH, a strategy module is created
+     * @param _stratModAddr Address of the strategy module
+     * @param _rewardDaysCap Maximum number of days the staker can claim rewards, which is also the smallest number of VC in the strategy module
+     * @param _newVCs Number of VCs brought by the new DV if there was one created by the new staker, otherwise 0
     */ 
-    /// TODO solve the problem where the staker has more than one strategy module
-    function stakerJoined(address _staker, uint256 _maxRewardDays) public {
-        // If this is the first staker in the contract, only update the timestamp of the checkpoint
-        if (!_hasStakers) {
-            rewardCheckpoint.startAt = block.timestamp;
-        } else {
-            // If this is not the first staker in the contract, update the checkpoint. 1 = 1 DV
-            updateCheckpoint(0, 1);
-        }
+    function stakerJoined(address _stratModAddr, uint256 _rewardDaysCap, uint256 _newVCs) public {
+        // Update the reward checkpoint
+        updateCheckpoint(_newVCs, 1);
 
-        // Update the staker data
-        StakerData storage staker = stakers[_staker];
-        staker.lastUpdateTime = block.timestamp;
-        staker.maxRewardDays = _maxRewardDays;
+        // Update the stretegy module data
+        StratModData storage stratMod = stratMods[_stratModAddr];
+        stratMod.lastUpdateTime = block.timestamp;
+        stratMod.rewardDaysCap = _rewardDaysCap;
         _hasStakers = true;
-        totalStakers++;
+        totalActiveDVs++;
     }
 
     /**
      * @notice Staker claims rewards and receive rewards
+     * @param _stratModAddr Address of the strategy module
      * @dev The function does the following actions: 
      * 1. Calculate the rewards and send the rewards to the staker
      * 2. Update the node operators' reward counter
      * 3. Update the checkpoint data 
-     * 4. Update the staker data
+     * 4. Update the stretegy module data
     */ 
-    function claimRewards() public {
+    function claimRewards(address _stratModAddr) public {
         // Calculate the rewards and send them to the staker
-        (uint256 rewards, uint256 elapsedDays) = _calculateRewards(msg.sender);
+        (uint256 rewards, uint256 elapsedDays) = calculateRewards(_stratModAddr);
         (bool success,) = payable(msg.sender).call{value: rewards}("");
         if (!success) revert FailedToSendRewards();
 
         // Update each node operator's reward counter
-        _updateStratModVcCounter(msg.sender, elapsedDays);
+        _updateStratModVcCounter(_stratModAddr, elapsedDays);
 
         // Update the checkpoint data
         _updateCheckpointWhenClaim(rewards);
 
-        // Update the staker data
-        StakerData storage staker = stakers[msg.sender];
-        staker.lastUpdateTime = block.timestamp;
-        staker.claimedRewards += rewards;
+        // Update the stretegy module data
+        StratModData storage stratMod = stratMods[_stratModAddr];
+        stratMod.lastUpdateTime = block.timestamp;
+    }
+    
+    /**
+    * @notice Calculate the rewards for a staker
+    * @param _stratModAddr Address of the strategy module
+    * @dev Staker cannot claim rewards for more than rewardDaysCap
+    * @return The rewards for the staker and the number of days that the staker has claime rewards for
+    */
+    function calculateRewards(address _stratModAddr) public view returns(uint256, uint256) {
+        StratModData storage stratMod = stratMods[_stratModAddr];
+        uint256 elapsedDays = _getElapsedDays(stratMod.lastUpdateTime);
 
-        // TODO: consider the situation where one of the staker has consumed all the VCs, and where 2/4 have consumed all the VCs
+        if (elapsedDays <= stratMod.rewardDaysCap) {
+            return (rewardCheckpoint.dailyRewardsPerDV * elapsedDays, elapsedDays);
+        }
+        // If the staker has claimed rewards for more than rewardDaysCap, return the maximum rewards
+        return (rewardCheckpoint.dailyRewardsPerDV * stratMod.rewardDaysCap, stratMod.rewardDaysCap);
     }
 
     /**
@@ -196,7 +203,7 @@ contract StakerRewards is Initializable, OwnableUpgradeable, ReentrancyGuardUpgr
     */
     function _updateCheckpointWhenClaim(uint256 _rewardsClaimed) internal {
         // Decreasing totalVCs by the number of VCs consumed by all the stakers from the previous checkpoint
-        uint256 consumedVCs = _getElapsedDays(rewardCheckpoint.startAt) * rewardCheckpoint.clusterSize * totalStakers;
+        uint256 consumedVCs = _getElapsedDays(rewardCheckpoint.startAt) * rewardCheckpoint.clusterSize * totalActiveDVs;
         totalVCs -= consumedVCs;
 
         // Update totalNotYetClaimedRewards by adding the rewards generated from the previous checkpoint
@@ -208,23 +215,6 @@ contract StakerRewards is Initializable, OwnableUpgradeable, ReentrancyGuardUpgr
         // Update the reward checkpoint
         rewardCheckpoint.dailyRewardsPerDV = getAllocatableRewards() / totalVCs * rewardCheckpoint.clusterSize; // rewards per validator (4 nodeOp, 4 VCs burnt/day)
         rewardCheckpoint.startAt = block.timestamp;
-    }
-
-    /**
-    * @notice Calculate the rewards for a staker
-    * @param _staker The address of the staker
-    * @dev Staker cannot claim rewards for more than maxRewardDays
-    * @return The rewards for the staker and the number of days that the staker has claime rewards for
-    */
-    function _calculateRewards(address _staker) internal view returns(uint256, uint256) {
-        StakerData storage staker = stakers[_staker];
-        uint256 elapsedDays = _getElapsedDays(staker.lastUpdateTime);
-
-        if (elapsedDays <= staker.maxRewardDays) {
-            return (rewardCheckpoint.dailyRewardsPerDV * elapsedDays, elapsedDays);
-        }
-        // If the staker has claimed rewards for more than maxRewardDays, return the maximum rewards
-        return (rewardCheckpoint.dailyRewardsPerDV * staker.maxRewardDays, staker.maxRewardDays);
     }
 
     /**
@@ -241,40 +231,40 @@ contract StakerRewards is Initializable, OwnableUpgradeable, ReentrancyGuardUpgr
     */
     function _increaseTotalNotClaimedRewards() internal {
         uint256 elapsedDays = _getElapsedDays(rewardCheckpoint.startAt);
-        uint256 rewardsDistributed = rewardCheckpoint.dailyRewardsPerDV * elapsedDays * totalStakers;
+        uint256 rewardsDistributed = rewardCheckpoint.dailyRewardsPerDV * elapsedDays * totalActiveDVs;
         // Update the total distributed but not yet claimed rewards
         totalNotYetClaimedRewards += rewardsDistributed;
     }
 
     /**
     * @notice Update the VC counter of each node operator of all the strategy modules owned by a staker
-    * @param _staker The address of the staker
+    * @param _stratModAddr Address of the strategy module
+    * @param _consumedVCs The number of VCs consumed by a DV during a period of time
     * @dev The function iterates through all the strategy modules owned by the staker and update the VC counter of each node operator
     */
-    function _updateStratModVcCounter(address _staker, uint256 _consumedVCs) internal view {
-        address[] memory stratMods = stratModManager.getStratMods(_staker);
+    function _updateStratModVcCounter(address _stratModAddr, uint256 _consumedVCs) internal {
+        IStrategyModule.Node[4] memory nodes = IStrategyModule(_stratModAddr).getDVNodesDetails();
 
-        for (uint8 i; i < stratMods.length;) {
-            IStrategyModule.Node[4] memory nodes = IStrategyModule(stratMods[i]).getDVNodesDetails();
-
-            for (uint8 j; j < nodes.length;) {
-                if (_consumedVCs > nodes[j].vcNumber) {
-                    nodes[j].vcNumber = 0;
-                    // TODO: kick the node operator out of the DV
-                }
-                nodes[j].vcNumber -= _consumedVCs; 
-
-                unchecked {
-                    ++j;
-                }
+        bool zeroVCs;
+        for (uint8 i; i < nodes.length;) {
+            if (_consumedVCs >= nodes[i].vcNumber) {
+                nodes[i].vcNumber = 0;
+                zeroVCs = true;
+                // TODO: kick the node operator out of the DV
             }
+            nodes[i].vcNumber -= _consumedVCs; 
 
             unchecked {
                 ++i;
             }
         }
-    }
 
-    function _calculateLockDvAmount() internal view returns(uint256) {
+        // If one of the node operators has zero VCs, the DV is exited
+        // TODO: solve problem of access control of setClusterDetails function
+        if (zeroVCs) {
+            IStrategyModule(_stratModAddr).setClusterDetails(nodes, IStrategyModule.DVStatus.EXITED);
+        } else {
+            IStrategyModule(_stratModAddr).setClusterDetails(nodes, IStrategyModule.DVStatus.ACTIVE_AND_VERIFIED);
+        }
     }
 }
