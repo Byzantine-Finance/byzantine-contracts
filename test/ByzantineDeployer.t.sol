@@ -56,9 +56,7 @@ contract ByzantineDeployer is EigenLayerDeployer {
         makeAddr("node_operator_6"),
         makeAddr("node_operator_7"),
         makeAddr("node_operator_8"),
-        makeAddr("node_operator_9"),
-        makeAddr("node_operator_10"),
-        makeAddr("node_operator_11")
+        makeAddr("node_operator_9")
     ];
 
     struct NodeOpBid {
