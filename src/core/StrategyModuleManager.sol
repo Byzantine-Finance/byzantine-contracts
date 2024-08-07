@@ -91,7 +91,7 @@ contract StrategyModuleManager is
         }
 
         // Trigger the checkpoint in StakerRewards contract and update it
-        stakerRewards.updateCheckpoint(totalVCs, _numDVsToPreCreate);
+        stakerRewards.updateCheckpoint(totalVCs, auction.clusterSize());
     }
 
     /**
@@ -149,7 +149,7 @@ contract StrategyModuleManager is
         }
 
         // Update the staker details in the StakerRewards contract
-        stakerRewards.stakerJoined(address(newStratMod), smallestVC, totalVCs); 
+        stakerRewards.stakerJoined(address(newStratMod), smallestVC, totalVCs, clusterSize);
     }
 
     /**

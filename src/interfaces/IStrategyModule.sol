@@ -143,6 +143,13 @@ interface IStrategyModule {
    */
   function withdrawContractBalance() external;
 
+    /**
+     * @notice Subtracts the consumed VC number from the VC number of each node in the DV and updates the DV status if VC number is 0.
+     * @param consumedVCs The number of VC numbers to subtract from the VC number of each node in the DV
+     * @dev Callable by the StakerRewards contract to update the VC number after offchain computation 
+     */
+    function updateNodeVcNumber(uint256 consumedVCs) external;
+
   /**
    * @notice Call the EigenPodManager contract
    * @param data to call contract 

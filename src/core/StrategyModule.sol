@@ -274,6 +274,25 @@ contract StrategyModule is IStrategyModule, Initializable {
         payable(msg.sender).transfer(address(this).balance);
     }
 
+    /**
+     * @notice Subtracts the consumed VC number from the VC number of each node in the DV and updates the DV status if VC number is 0.
+     * @param consumedVCs The number of VC numbers to subtract from the VC number of each node in the DV
+     * @dev Callable by the StakerRewards contract to update the VC number after offchain computation 
+     */
+    function updateNodeVcNumber(uint256 consumedVCs) external {
+        for (uint8 i = 0; i < CLUSTER_SIZE;) {
+            clusterDetails.nodes[i].vcNumber -= consumedVCs;
+            // If the VC number is 0, set the DV status to EXITED
+            if (clusterDetails.nodes[i].vcNumber == 0) {
+                clusterDetails.dvStatus = DVStatus.EXITED;
+            }
+
+            unchecked {
+                ++i;
+            }
+        }
+    }
+
     /* ================ VIEW FUNCTIONS ================ */
 
     /**
