@@ -51,6 +51,8 @@ contract ExistingDeploymentParser is Script, Test {
     uint16 MAX_DISCOUNT_RATE;
     uint160 MIN_VALIDATION_DURATION;
     uint8 CLUSTER_SIZE;
+    // Initial StakerRewards parameters
+    uint256 UPKEEP_INTERVAL;
 
     /// @notice use for deploying a new set of Byzantine contracts
     function _parseInitialDeploymentParams(string memory initialDeploymentParamsPath) internal virtual {
@@ -73,6 +75,9 @@ contract ExistingDeploymentParser is Script, Test {
 
         // read bidReceiver address
         // bidReceiver = stdJson.readAddress(initialDeploymentData, ".bidReceiver");
+
+        // read stakerRewards config
+        UPKEEP_INTERVAL = stdJson.readUint(initialDeploymentData, ".upkeepInterval");
 
         // read eigen layer contract addresses
         eigenPodManager = EigenPodManager(stdJson.readAddress(initialDeploymentData, ".eigenLayerContractAddr.eigenPodManager"));
@@ -217,6 +222,9 @@ contract ExistingDeploymentParser is Script, Test {
         // Auction
         vm.expectRevert(bytes("Initializable: contract is already initialized"));
         auction.initialize(byzantineAdmin, EXPECTED_POS_DAILY_RETURN_WEI, MAX_DISCOUNT_RATE, MIN_VALIDATION_DURATION, CLUSTER_SIZE);
+        // StakerRewards
+        vm.expectRevert(bytes("Initializable: contract is already initialized"));
+        stakerRewards.initialize(UPKEEP_INTERVAL);
     }
 
     /// @notice Verify params based on config constants that are updated from calling `_parseInitialDeploymentParams`
@@ -241,6 +249,8 @@ contract ExistingDeploymentParser is Script, Test {
         emit log_named_uint("MAX_DISCOUNT_RATE", MAX_DISCOUNT_RATE);
         emit log_named_uint("MIN_VALIDATION_DURATION", MIN_VALIDATION_DURATION);
         emit log_named_uint("CLUSTER_SIZE", CLUSTER_SIZE);
+
+        emit log_named_uint("UPKEEP_INTERVAL", UPKEEP_INTERVAL);
 
         emit log_named_address("eigenPodManager contract address", address(eigenPodManager));
         emit log_named_address("delegationManager contract address", address(delegation));

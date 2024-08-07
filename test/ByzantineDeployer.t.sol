@@ -35,6 +35,8 @@ contract ByzantineDeployer is EigenLayerDeployer {
     uint16 public maxDiscountRate = 15e2; // 15%
     uint160 public minValidationDuration = 30; // 30 days
     uint8 public clusterSize = 4;
+    // Initial StakerRewards parameters
+    uint256 public upkeepInterval = 60;
 
     /* =============== TEST VARIABLES AND STRUCT =============== */
    
@@ -129,7 +131,8 @@ contract ByzantineDeployer is EigenLayerDeployer {
         );
         StakerRewards stakerRewardsImplementation = new StakerRewards(
             strategyModuleManager,
-            auction
+            escrow,
+            byzNft
         );
 
 
@@ -175,7 +178,10 @@ contract ByzantineDeployer is EigenLayerDeployer {
         byzantineProxyAdmin.upgradeAndCall(
             TransparentUpgradeableProxy(payable(address(stakerRewards))),
             address(stakerRewardsImplementation),
-            ""
+            abi.encodeWithSelector(
+                StakerRewards.initialize.selector,
+                upkeepInterval
+            )
         );
     }
 
@@ -193,6 +199,7 @@ contract ByzantineDeployer is EigenLayerDeployer {
         assertEq(auction.clusterSize(), clusterSize);
         // StakerRewards
         assertEq(stakerRewards.totalVCs(), 0);
+        assertEq(stakerRewards.upkeepInterval(), upkeepInterval);
     }
 
 } 
