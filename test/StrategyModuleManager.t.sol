@@ -392,7 +392,7 @@ contract StrategyModuleManagerTest is ProofParsing, ByzantineDeployer {
 
         // Create the operator details for the operator to delegate to
         IDelegationManager.OperatorDetails memory operatorDetails = IDelegationManager.OperatorDetails({
-            earningsReceiver: ELOperator1,
+            __deprecated_earningsReceiver: ELOperator1,
             delegationApprover: address(0),
             stakerOptOutWindowBlocks: 0
         });
