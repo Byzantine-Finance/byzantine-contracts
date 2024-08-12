@@ -90,31 +90,6 @@ interface IStrategyModule {
     external;
 
   /**
-   * @notice This function records an update (either increase or decrease) in a validator's balance which is active,
-   * (which has already called `verifyWithdrawalCredentials`).
-   * @param proofTimestamp is the exact timestamp where the proof was generated
-   * @param stateRootProof proves a `beaconStateRoot` against a block root fetched from the oracle
-   * @param validatorIndices is the list of indices of the validators being proven, refer to consensus specs 
-   * @param validatorFieldsProofs proofs against the `beaconStateRoot` for each validator in `validatorFields`
-   * @param validatorFields are the fields of the "Validator Container", refer to consensus specs:
-   * https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/beacon-chain.md#validator
-   * @dev That function must be called for a validator which is "ACTIVE".
-   * @dev The timestamp used to generate the Beacon Block Root is `block.timestamp - FINALITY_TIME` to be sure
-   * that the Beacon Block is finalized.
-   * @dev The arguments can be generated with the Byzantine API.
-   * @dev /!\ The Withdrawal credential proof must be recent enough to be valid (no older than VERIFY_BALANCE_UPDATE_WINDOW_SECONDS).
-   * It entails to re-generate a proof every 4.5 hours.
-   */
-  function verifyBalanceUpdates(
-    uint64 proofTimestamp,
-    BeaconChainProofs.StateRootProof calldata stateRootProof,
-    uint40[] calldata validatorIndices,
-    bytes[] calldata validatorFieldsProofs,
-    bytes32[][] calldata validatorFields
-  )
-    external;
-
-  /**
    * @notice The caller delegate its Strategy Module's stake to an Eigen Layer operator.
    * @notice /!\ Delegation is all-or-nothing: when a Staker delegates to an Operator, they delegate ALL their stake.
    * @param operator The account teh STrategy Module is delegating its assets to for use in serving applications built on EigenLayer.

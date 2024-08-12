@@ -9,6 +9,7 @@ import "../interfaces/IAuction.sol";
 import "eigenlayer-contracts/interfaces/IEigenPodManager.sol";
 import "eigenlayer-contracts/interfaces/IDelegationManager.sol";
 import "../interfaces/IStakerRewards.sol";
+import "splits-v2/splitters/push/PushSplitFactory.sol";
 
 abstract contract StrategyModuleManagerStorage is IStrategyModuleManager {
     /* ============== CONSTANTS + IMMUTABLES ============== */
@@ -31,6 +32,9 @@ abstract contract StrategyModuleManagerStorage is IStrategyModuleManager {
     /// @notice StakerReward contract
     IStakerRewards public immutable stakerRewards;
 
+    /// @notice 0xSplits' PushSplitFactory contract
+    PushSplitFactory public immutable pushSplitFactory;
+
     /* ============== STATE VARIABLES ============== */
 
     /// @notice Staker to its owned StrategyModules
@@ -48,7 +52,7 @@ abstract contract StrategyModuleManagerStorage is IStrategyModuleManager {
     /// @notice The number of StratMods that have been deployed
     uint64 public numStratMods; // This is also the number of ByzNft minted
 
-    /* ================= CONSTRUCTOR ================= */ 
+    /* ================= CONSTRUCTOR ================= */
 
     constructor(
         IBeacon _stratModBeacon,
@@ -56,7 +60,8 @@ abstract contract StrategyModuleManagerStorage is IStrategyModuleManager {
         IByzNft _byzNft,
         IEigenPodManager _eigenPodManager,
         IDelegationManager _delegationManager,
-        IStakerRewards _stakerRewards
+        IStakerRewards _stakerRewards,
+        PushSplitFactory _pushSplitFactory
     ) {
         stratModBeacon = _stratModBeacon;
         auction = _auction;
@@ -64,6 +69,7 @@ abstract contract StrategyModuleManagerStorage is IStrategyModuleManager {
         eigenPodManager = _eigenPodManager;
         delegationManager = _delegationManager;
         stakerRewards = _stakerRewards;
+        pushSplitFactory = _pushSplitFactory;
     }
 
     /**
@@ -72,5 +78,4 @@ abstract contract StrategyModuleManagerStorage is IStrategyModuleManager {
      * See https://docs.openzeppelin.com/upgrades-plugins/1.x/writing-upgradeable#modifying-your-contracts
      */
     uint256[44] private __gap;
-
 }

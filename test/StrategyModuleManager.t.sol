@@ -388,48 +388,13 @@ contract StrategyModuleManagerTest is ProofParsing, ByzantineDeployer {
 
     // TODO: Test the `VerifyWithdrawalCredential` function when the proof is correct
 
-    // This test revert because we are trying to update the balance of a Pod whose validator
-    // hasn't been activated by calling `verifyWithdrawalCredentials`
-    function test_RevertWhen_UpdatePodBalanceForInactiveValidator() public preCreateClusters(2) {
-        // Get the validator fields proof
-        (
-            BeaconChainProofs.StateRootProof memory stateRootProofStruct,
-            uint40[] memory validatorIndices,
-            bytes[] memory proofsArray,
-            bytes32[][] memory validatorFieldsArray
-        ) = 
-            _getValidatorFieldsProof(abi.encodePacked("./test/test-data/withdrawal_credential_proof_1634654.json"));
-
-        // Start the test
-
-        // Alice creates a Strategy Module and stake ETH
-        address stratModAddr = _createStratModAndStakeNativeETH(alice, 32 ether);
-
-        // Deposit received on the Beacon Chain
-        uint64 timestamp = uint64(block.timestamp + 16 hours);
-        cheats.warp(timestamp);
-
-        //set the oracle block root
-        _setOracleBlockRoot(abi.encodePacked("./test/test-data/withdrawal_credential_proof_1634654.json"));
-
-        // Verify the proof
-        vm.prank(alice);
-        cheats.expectRevert(
-            bytes("EigenPod.verifyBalanceUpdate: Validator not active")
-        );
-        IStrategyModule(stratModAddr).verifyBalanceUpdates(timestamp, stateRootProofStruct, validatorIndices, proofsArray, validatorFieldsArray);
-    }
-
-    // TODO: Test the `verifyBalanceUpdates` function when the proof is correct 
-    //       and the validator is ACTIVE (has called `verifyWithdrawalCredentials` function)
-
     // The operator shares for the beacon chain strategy hasn't been updated because alice didn't verify the withdrawal credentials
     // of its validator (DV)
     function testDelegateTo() public preCreateClusters(2) {
 
         // Create the operator details for the operator to delegate to
         IDelegationManager.OperatorDetails memory operatorDetails = IDelegationManager.OperatorDetails({
-            earningsReceiver: ELOperator1,
+            __deprecated_earningsReceiver: ELOperator1,
             delegationApprover: address(0),
             stakerOptOutWindowBlocks: 0
         });

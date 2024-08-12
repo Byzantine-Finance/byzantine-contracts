@@ -3,58 +3,15 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin-upgrades/contracts/proxy/utils/Initializable.sol";
 
-import "eigenlayer-contracts/interfaces/IEigenPodManager.sol";
-import "eigenlayer-contracts/interfaces/IEigenPod.sol";
-import "eigenlayer-contracts/interfaces/IDelegationManager.sol";
 import "eigenlayer-contracts/interfaces/ISignatureUtils.sol";
 import "eigenlayer-contracts/libraries/BeaconChainProofs.sol";
 
-import "../interfaces/IByzNft.sol";
-import "../interfaces/IStrategyModuleManager.sol";
-import "../interfaces/IStrategyModule.sol";
-import "../interfaces/IAuction.sol";
-import "../interfaces/IStakerRewards.sol";
+import "./StrategyModuleStorage.sol";
 
 // TODO: Allow Strategy Module ByzNft to be tradeable => conceive a fair exchange mechanism between the seller and the buyer
 
-contract StrategyModule is IStrategyModule, Initializable {
+contract StrategyModule is Initializable, StrategyModuleStorage {
     using BeaconChainProofs for *;
-
-    /* ============== CONSTANTS + IMMUTABLES ============== */
-
-    /// @notice Average time for block finality in the Beacon Chain
-    uint16 internal constant FINALITY_TIME = 16 minutes;
-
-    uint8 internal constant CLUSTER_SIZE = 4;
-
-    /// @notice The single StrategyModuleManager for Byzantine
-    IStrategyModuleManager public immutable stratModManager;
-
-    /// @notice ByzNft contract
-    IByzNft public immutable byzNft;
-
-    /// @notice Address of the Auction contract
-    IAuction public immutable auction;
-
-    /// @notice EigenLayer's EigenPodManager contract
-    /// @dev this is the pod manager transparent proxy
-    IEigenPodManager public immutable eigenPodManager;
-
-    /// @notice EigenLayer's DelegationManager contract
-    IDelegationManager public immutable delegationManager;
-
-    /// @notice StakerRewards contract
-    IStakerRewards public immutable stakerRewards;
-
-    /* ============== STATE VARIABLES ============== */
-
-    /// @notice The ByzNft associated to this StrategyModule.
-    /// @notice The owner of the ByzNft is the StrategyModule owner.
-    /// TODO When non-upgradeable put that variable immutable and set it in the constructor
-    uint256 public stratModNftId;
-
-    // Empty struct, all the fields have their default value
-    ClusterDetails public clusterDetails;
 
     /* ============== MODIFIERS ============== */
 
@@ -183,42 +140,6 @@ contract StrategyModule is IStrategyModule, Initializable {
 
         // Update DV Status to ACTIVE_AND_VERIFIED
         clusterDetails.dvStatus = DVStatus.ACTIVE_AND_VERIFIED;
-
-    }
-
-    /**
-     * @notice This function records an update (either increase or decrease) in a validator's balance which is active,
-     * (which has already called `verifyWithdrawalCredentials`).
-     * @param proofTimestamp is the exact timestamp where the proof was generated
-     * @param stateRootProof proves a `beaconStateRoot` against a block root fetched from the oracle
-     * @param validatorIndices is the list of indices of the validators being proven, refer to consensus specs 
-     * @param validatorFieldsProofs proofs against the `beaconStateRoot` for each validator in `validatorFields`
-     * @param validatorFields are the fields of the "Validator Container", refer to consensus specs:
-     * https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/beacon-chain.md#validator
-     * @dev That function must be called for a validator which is "ACTIVE".
-     * @dev The timestamp used to generate the Beacon Block Root is `block.timestamp - FINALITY_TIME` to be sure
-     * that the Beacon Block is finalized.
-     * @dev The arguments can be generated with the Byzantine API.
-     * @dev /!\ The Withdrawal credential proof must be recent enough to be valid (no older than VERIFY_BALANCE_UPDATE_WINDOW_SECONDS).
-     * It entails to re-generate a proof every 4.5 hours.
-     */
-    function verifyBalanceUpdates(
-        uint64 proofTimestamp,
-        BeaconChainProofs.StateRootProof calldata stateRootProof,
-        uint40[] calldata validatorIndices,
-        bytes[] calldata validatorFieldsProofs,
-        bytes32[][] calldata validatorFields
-    ) external {
-
-        IEigenPod myPod = eigenPodManager.ownerToPod(address(this));
-
-        myPod.verifyBalanceUpdates(
-            proofTimestamp,
-            validatorIndices,
-            stateRootProof,
-            validatorFieldsProofs,
-            validatorFields
-        );
 
     }
 

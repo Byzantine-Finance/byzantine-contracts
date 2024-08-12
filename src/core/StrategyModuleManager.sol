@@ -33,8 +33,9 @@ contract StrategyModuleManager is
         IByzNft _byzNft,
         IEigenPodManager _eigenPodManager,
         IDelegationManager _delegationManager,
-        IStakerRewards _stakerRewards
-    ) StrategyModuleManagerStorage(_stratModBeacon, _auction, _byzNft, _eigenPodManager, _delegationManager, _stakerRewards) {
+        IStakerRewards _stakerRewards,
+        PushSplitFactory _pushSplitFactory
+    ) StrategyModuleManagerStorage(_stratModBeacon, _auction, _byzNft, _eigenPodManager, _delegationManager, _stakerRewards, _pushSplitFactory) {
         // Disable initializer in the context of the implementation contract
         _disableInitializers();
     }
