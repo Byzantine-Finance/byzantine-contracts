@@ -28,6 +28,9 @@ abstract contract StrategyModuleManagerStorage is IStrategyModuleManager {
     /// @notice EigenLayer's DelegationManager contract
     IDelegationManager public immutable delegationManager;
 
+    /// @notice 0xSplits' PushSplitFactory contract
+    PushSplitFactory public immutable pushSplitFactory;
+
     /* ============== STATE VARIABLES ============== */
 
     /// @notice Staker to its owned StrategyModules
@@ -52,13 +55,15 @@ abstract contract StrategyModuleManagerStorage is IStrategyModuleManager {
         IAuction _auction,
         IByzNft _byzNft,
         IEigenPodManager _eigenPodManager,
-        IDelegationManager _delegationManager
+        IDelegationManager _delegationManager,
+        PushSplitFactory _pushSplitFactory
     ) {
         stratModBeacon = _stratModBeacon;
         auction = _auction;
         byzNft = _byzNft;
         eigenPodManager = _eigenPodManager;
         delegationManager = _delegationManager;
+        pushSplitFactory = _pushSplitFactory;
     }
 
     /**

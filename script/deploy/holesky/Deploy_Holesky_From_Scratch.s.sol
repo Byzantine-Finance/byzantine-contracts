@@ -78,7 +78,8 @@ contract Deploy_Holesky_From_Scratch is ExistingDeploymentParser {
             auction,
             byzNft,
             eigenPodManager,
-            delegation
+            delegation,
+            pushSplitFactory
         );
         byzNftImplementation = new ByzNft();
         auctionImplementation = new Auction(
