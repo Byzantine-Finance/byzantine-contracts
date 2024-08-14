@@ -5,6 +5,7 @@ import "@openzeppelin-upgrades/contracts/proxy/utils/Initializable.sol";
 
 import "eigenlayer-contracts/interfaces/ISignatureUtils.sol";
 import "eigenlayer-contracts/libraries/BeaconChainProofs.sol";
+import { PushSplit } from "splits-v2/splitters/push/PushSplit.sol";
 
 import "./StrategyModuleStorage.sol";
 
@@ -184,6 +185,21 @@ contract StrategyModule is Initializable, StrategyModuleStorage {
         }
         clusterDetails.splitAddr = splitAddr;
         clusterDetails.dvStatus = dvStatus;
+    }
+
+    /**
+     * @notice Distributes the tokens issued from the PoS rewards evenly between the node operators.
+     * @param _split The current split struct of the StrategyModule. Can be reconstructed offchain since the only variable is the `recipients` field.
+     * @param _token The address of the token to distribute. NATIVE_TOKEN_ADDR = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE
+     * @dev The distributor is the msg.sender. He will earn the distribution fees.
+     * @dev If the push failed, the tokens will be sent to the SplitWarehouse. NodeOp will have to call the withdraw function.
+     */
+    function distributeSplitBalance(
+        SplitV2Lib.Split calldata _split,
+        address _token
+    ) external onlyIfNativeRestaking {
+        address splitAddr = clusterDetails.splitAddr;
+        PushSplit(splitAddr).distribute(_split, _token, msg.sender);
     }
 
     /**

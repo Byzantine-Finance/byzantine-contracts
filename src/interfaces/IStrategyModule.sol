@@ -119,6 +119,19 @@ interface IStrategyModule {
     external;
 
   /**
+   * @notice Distributes the tokens issued from the PoS rewards evenly between the node operators.
+   * @param _split The current split struct of the StrategyModule. Can be reconstructed offchain since the only variable is the `recipients` field.
+   * @param _token The address of the token to distribute. NATIVE_TOKEN_ADDR = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE
+   * @dev The distributor is the msg.sender. He will earn the distribution fees.
+   * @dev If the push failed, the tokens will be sent to the SplitWarehouse. NodeOp will have to call the withdraw function.
+   */
+  function distributeSplitBalance(
+      SplitV2Lib.Split calldata _split,
+      address _token
+  )
+    external;
+
+  /**
    * @notice Allow the Strategy Module's owner to withdraw the smart contract's balance.
    * @dev Revert if the caller is not the owner of the Strategy Module's ByzNft.
    */

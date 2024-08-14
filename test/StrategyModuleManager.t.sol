@@ -29,6 +29,9 @@ contract StrategyModuleManagerTest is ProofParsing, ByzantineDeployer {
     bytes signature;
     bytes32 depositDataRoot;
 
+    /// @notice address of the native token in the Split contract
+    address public constant SPLIT_NATIVE_TOKEN_ADDR = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
+
     /// @notice Initial balance of all the node operators
     uint256 constant STARTING_BALANCE = 100 ether;
 
@@ -260,6 +263,47 @@ contract StrategyModuleManagerTest is ProofParsing, ByzantineDeployer {
         vm.expectRevert(bytes("Cannot initialize StrategyModule: ERC721: invalid token ID"));
         IStrategyModule(stratModAddr).initialize(firstNftId, bob);
         vm.stopPrank();
+    }
+
+    function testSplitDistribution() public preCreateClusters(2) {
+        // Alice creates a StrategyModule
+        IStrategyModule stratModAlice = IStrategyModule(_createStratModAndStakeNativeETH(alice, 32 ether));
+        address stratModAliceSplit = stratModAlice.getSplitAddress();
+
+        // Create the recipients array
+        IStrategyModule.Node[4] memory nodesDVAlice = stratModAlice.getDVNodesDetails();
+        address[] memory recipients = new address[](nodesDVAlice.length);
+        for (uint i = 0; i < nodesDVAlice.length; i++) {
+            recipients[i] = nodesDVAlice[i].eth1Addr;
+        }
+
+        // Get DV's node ops' balances
+        uint256[] memory nodeOpsInitialBalances = new uint256[](nodesDVAlice.length);
+        for (uint i = 0; i < nodesDVAlice.length; i++) {
+            nodeOpsInitialBalances[i] = recipients[i].balance;
+        }
+        // Get distributor's balance
+        uint256 distributorBalance = bob.balance;
+
+        // Fake the PoS rewards and add 100ETH in stratModAliceSplit contract
+        vm.deal(stratModAliceSplit, 100 ether);
+        assertEq(stratModAliceSplit.balance, 100 ether);
+
+        SplitV2Lib.Split memory split = _createSplit(recipients);
+        // Bob distributes the Split balance to DV's node ops
+        vm.prank(bob);
+        stratModAlice.distributeSplitBalance(split, SPLIT_NATIVE_TOKEN_ADDR);
+
+        // Verify the Split contract balance has been drained
+        assertEq(stratModAliceSplit.balance, 1); // 0xSplits decided to left 1 wei to save gas. Only impact the distributor rewards
+
+        // Verify the new balances of the DV's node ops
+        for (uint i = 0; i < nodesDVAlice.length; i++) {
+            assertEq(recipients[i].balance, nodeOpsInitialBalances[i] + 24.5 ether);
+        }
+
+        // Verify the distributor balance
+        assertEq(bob.balance, distributorBalance + 2 ether - 1);
     }
 
     function testStratModTransfer() public preCreateClusters(2) {
@@ -541,6 +585,23 @@ contract StrategyModuleManagerTest is ProofParsing, ByzantineDeployer {
             "_registerAsELOperator: operatorDetails not set appropriately"
         );
         assertTrue(delegation.isDelegated(operator), "_registerAsELOperator: operator doesn't delegate itself");
+    }
+
+    function _createSplit(
+        address[] memory recipients
+    ) internal view returns (SplitV2Lib.Split memory split) {
+
+        uint256[] memory allocations = new uint256[](recipients.length);
+        for (uint256 i = 0; i < recipients.length; i++) {
+            allocations[i] = strategyModuleManager.NODE_OP_SPLIT_ALLOCATION();
+        }
+
+        split = SplitV2Lib.Split({
+            recipients: recipients,
+            allocations: allocations,
+            totalAllocation: strategyModuleManager.SPLIT_TOTAL_ALLOCATION(),
+            distributionIncentive: strategyModuleManager.SPLIT_DISTRIBUTION_INCENTIVE()
+        });
     }
 
     function _createOneBidParamArray(
