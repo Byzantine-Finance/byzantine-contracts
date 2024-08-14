@@ -41,11 +41,6 @@ abstract contract StrategyModuleStorage is IStrategyModule {
     /// TODO When non-upgradeable put that variable immutable and set it in the constructor
     uint256 public stratModNftId;
 
-    /// @notice The smart contract where the PoS rewards are sent to for the DV's operators
-    /// @dev Byzantine is the owner of that contract and can update the split if the DV changes
-    /// TODO When non-upgradeable put that variable immutable and set it in the constructor
-    address public splitAddr;
-
     // Empty struct, all the fields have their default value
     ClusterDetails public clusterDetails;
 

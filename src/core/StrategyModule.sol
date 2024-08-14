@@ -30,6 +30,11 @@ contract StrategyModule is Initializable, StrategyModuleStorage {
         _;
     }
 
+    modifier onlyIfNativeRestaking() {
+        if (clusterDetails.dvStatus == DVStatus.NATIVE_RESTAKING_NOT_ACTIVATED) revert NativeRestakingNotActivated();
+        _;
+    }
+
     /* ============== CONSTRUCTOR & INITIALIZER ============== */
 
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -124,7 +129,7 @@ contract StrategyModule is Initializable, StrategyModuleStorage {
         uint40[] calldata validatorIndices,
         bytes[] calldata validatorFieldsProofs,
         bytes32[][] calldata validatorFields
-    ) external onlyNftOwner {
+    ) external onlyNftOwner onlyIfNativeRestaking {
 
         IEigenPod myPod = eigenPodManager.ownerToPod(address(this));
 
@@ -161,11 +166,13 @@ contract StrategyModule is Initializable, StrategyModuleStorage {
     /**
      * @notice Set the `clusterDetails` struct of the StrategyModule.
      * @param nodes An array of Node making up the DV
+     * @param splitAddr The address of the Split contract.
      * @param dvStatus The status of the DV, refer to the DVStatus enum for details.
      * @dev Callable only by the StrategyModuleManager and bound a pre-created DV to this StrategyModule.
      */
     function setClusterDetails(
         Node[4] calldata nodes,
+        address splitAddr,
         DVStatus dvStatus
     ) external onlyStratModManager {
 
@@ -175,7 +182,7 @@ contract StrategyModule is Initializable, StrategyModuleStorage {
                 ++i;
             }
         }
-
+        clusterDetails.splitAddr = splitAddr;
         clusterDetails.dvStatus = dvStatus;
     }
 
@@ -207,8 +214,16 @@ contract StrategyModule is Initializable, StrategyModuleStorage {
      * @notice Returns the DV nodes details of the Strategy Module
      * It returns the eth1Addr, the number of Validation Credit and the reputation score of each nodes.
      */
-    function getDVNodesDetails() public view returns (IStrategyModule.Node[4] memory) {
+    function getDVNodesDetails() public view onlyIfNativeRestaking returns (IStrategyModule.Node[4] memory) {
         return clusterDetails.nodes;
+    }
+
+    /**
+     * @notice Returns the address of the Split contract.
+     * @dev Contract where the PoS rewards will be sent (both execution and consensus rewards).
+     */
+    function getSplitAddress() public view onlyIfNativeRestaking returns (address) {
+        return clusterDetails.splitAddr;
     }
 
     /* ============== INTERNAL FUNCTIONS ============== */

@@ -2,11 +2,12 @@
 pragma solidity ^0.8.20;
 
 import "eigenlayer-contracts/libraries/BeaconChainProofs.sol";
+import { SplitV2Lib } from "splits-v2/libraries/SplitV2.sol";
 
 interface IStrategyModule {
 
   enum DVStatus {
-    WAITING_ACTIVATION, // Waiting for the cluster manager to deposit the 32ETH on the Beacon Chain
+    NATIVE_RESTAKING_NOT_ACTIVATED, // Native restaking is not activated and 0 ETH has been deposited
     DEPOSITED_NOT_VERIFIED, // Deposited on ethpos but withdrawal credentials has not been verified
     ACTIVE_AND_VERIFIED, // Staked on ethpos and withdrawal credentials has been verified
     EXITED // Withdraw the principal and exit the DV
@@ -23,7 +24,10 @@ interface IStrategyModule {
   }
 
   /// @notice Struct to store the details of a Distributed Validator created on Byzantine
+  /// @dev Byzantine is the owner of the Split contract and can thus update it if the DV changes
   struct ClusterDetails {
+    // The Split contract address
+    address splitAddr;
     // The status of the Distributed Validator
     DVStatus dvStatus;
     // A record of the 4 nodes being part of the cluster
@@ -103,11 +107,13 @@ interface IStrategyModule {
   /**
    * @notice Set the `clusterDetails` struct of the StrategyModule.
    * @param nodes An array of Node making up the DV
+   * @param splitAddr The address of the Split contract.
    * @param dvStatus The status of the DV, refer to the DVStatus enum for details.
    * @dev Callable only by the StrategyModuleManager and bound a pre-created DV to this StrategyModule.
    */
   function setClusterDetails(
     Node[4] calldata nodes,
+    address splitAddr,
     DVStatus dvStatus
   ) 
     external;
@@ -135,6 +141,11 @@ interface IStrategyModule {
    */
   function getDVNodesDetails() external view returns (IStrategyModule.Node[4] memory);
 
+  /**
+   * @notice Returns the address of the Split contract.
+   * @dev Contract where the PoS rewards will be sent (both execution and consensus rewards).
+   */
+  function getSplitAddress() external view returns (address);
 
   /// @dev Error when unauthorized call to a function callable only by the Strategy Module Owner (aka the ByzNft holder).
   error OnlyNftOwner();
@@ -150,5 +161,8 @@ interface IStrategyModule {
 
   /// @dev Returned on failed Eigen Layer contracts call
   error CallFailed(bytes data);
+
+  /// @dev Returned when trying to access DV data but no ETH has been deposited
+  error NativeRestakingNotActivated();
 
 }
