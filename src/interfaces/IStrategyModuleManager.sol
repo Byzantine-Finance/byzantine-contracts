@@ -2,9 +2,18 @@
 pragma solidity ^0.8.20;
 
 import "eigenlayer-contracts/interfaces/IEigenPod.sol";
+import { SplitV2Lib } from "splits-v2/libraries/SplitV2.sol";
 import "../interfaces/IStrategyModule.sol";
 
 interface IStrategyModuleManager {
+
+    /// @notice Struct to hold the details of a pending cluster
+    struct PendingClusterDetails {
+        // The parameters of the Split contract
+        SplitV2Lib.Split splitParams;
+        // A record of the 4 nodes being part of the cluster
+        IStrategyModule.Node[4] nodes;
+    }
 
     /// @notice Get total number of pre-created clusters.
     function numPreCreatedClusters() external view returns (uint64);
@@ -17,6 +26,8 @@ interface IStrategyModuleManager {
      * @param _numDVsToPreCreate Number of Distributed Validators to pre-create.
      * @dev This function is only callable by Byzantine Finance. Once the first DVs are pre-created, the stakers
      * pre-create a new DV every time they create a new StrategyModule (if enough operators in Auction).
+     * @dev Make sure there are enough bids and node operators before calling this function.
+     * @dev Pre-create clusters of size 4.
      */
     function preCreateDVs(uint8 _numDVsToPreCreate) external;
 
@@ -49,12 +60,12 @@ interface IStrategyModuleManager {
     function transferStratModOwnership(address stratModAddr, address newOwner) external;
 
     /**
-     * @notice Returns the address of the Eigen Pod of a specific StrategyModule.
-     * @param _nounce The index of the Strategy Module you want to know the Eigen Pod address.
-     * @dev Function essential to pre-crete DVs as their withdrawal address has to be the Eigen Pod address.
+     * @notice Returns the address of the EigenPod and the Split contract of the next StrategyModule to be created.
+     * @param _nounce The index of the StrategyModule you want to know the EigenPod and Split contract address.
+     * @dev Ownership of the Split contract belongs to ByzantineAdmin to be able to update it.
+     * @dev Function essential to pre-create DVs as their withdrawal address has to be the EigenPod and fee recipient address the Split.
      */
-    function preCalculatePodAddress(uint64 _nounce) external view returns (address);
-
+    function preCalculatePodAndSplitAddr(uint64 _nounce) external view returns (address, address);
     
     /// @notice Returns the number of current pending clusters waiting for a Strategy Module.
     function getNumPendingClusters() external view returns (uint64);

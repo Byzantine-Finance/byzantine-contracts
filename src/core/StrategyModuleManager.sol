@@ -61,23 +61,19 @@ contract StrategyModuleManager is
      * @param _numDVsToPreCreate Number of Distributed Validators to pre-create.
      * @dev This function is only callable by Byzantine Finance. Once the first DVs are pre-created, the stakers
      * pre-create a new DV every time they create a new StrategyModule (if enough operators in Auction).
+     * @dev Make sure there are enough bids and node operators before calling this function.
+     * @dev Pre-create clusters of size 4.
      */
     function preCreateDVs(
         uint8 _numDVsToPreCreate
     ) external onlyOwner {
+
+        // Create the Split parameters
+        (address[] memory recipients, uint256[] memory allocations) = _createSplitParams();
+
         for (uint8 i = 0; i < _numDVsToPreCreate;) {
-            IStrategyModule.Node[] memory nodes = auction.getAuctionWinners();
-
-            for (uint8 j = 0; j < nodes.length;) {
-                pendingClusters[numPreCreatedClusters].nodes[j] = nodes[j];
-                unchecked {
-                    ++j;
-                }
-            }
-            pendingClusters[numPreCreatedClusters].dvStatus = IStrategyModule.DVStatus.WAITING_ACTIVATION;
-
+            _getNewPendingCluster(recipients, allocations);
             ++numPreCreatedClusters;
-
             unchecked {
                 ++i;
             }
@@ -100,7 +96,7 @@ contract StrategyModuleManager is
     ) external payable {
         require (getNumPendingClusters() > 0, "StrategyModuleManager.createStratModAndStakeNativeETH: no pending DVs");
         require(msg.value == 32 ether, "StrategyModuleManager.createStratModAndStakeNativeETH: must initially stake for any validator with 32 ether");
-        /// TODO Verify the pubkey in arguments to be sure it is using the right pubkey of a pre-created cluster
+        /// TODO Verify the pubkey in arguments to be sure it is using the right pubkey of a pre-created cluster. Use a monolithic blockchain
 
         // Create a StrategyModule
         IStrategyModule newStratMod = _deployStratMod();
@@ -110,9 +106,13 @@ contract StrategyModuleManager is
 
         uint256 clusterSize = pendingClusters[numStratMods].nodes.length;
 
+        // deploy the Split contract
+        address splitAddr = pushSplitFactory.createSplitDeterministic(pendingClusters[numStratMods].splitParams, owner(), owner(), bytes32(uint256(keccak256(abi.encode(numStratMods)))));
+
         // Set the ClusterDetails struct of the new StrategyModule
         newStratMod.setClusterDetails(
             pendingClusters[numStratMods].nodes,
+            splitAddr,
             IStrategyModule.DVStatus.DEPOSITED_NOT_VERIFIED
         );
 
@@ -122,14 +122,9 @@ contract StrategyModuleManager is
 
         // If enough node ops in Auction, trigger a new auction for the next staker's DV
         if (auction.numNodeOpsInAuction() >= clusterSize) {
-            IStrategyModule.Node[] memory nodes = auction.getAuctionWinners();
-            for (uint8 i = 0; i < nodes.length;) {
-                pendingClusters[numPreCreatedClusters].nodes[i] = nodes[i];
-                unchecked {
-                    ++i;
-                }
-            }
-            pendingClusters[numPreCreatedClusters].dvStatus = IStrategyModule.DVStatus.WAITING_ACTIVATION;
+            // Create the Split parameters
+            (address[] memory recipients, uint256[] memory allocations) = _createSplitParams();
+            _getNewPendingCluster(recipients, allocations);
             ++numPreCreatedClusters;
         }
     }
@@ -171,12 +166,15 @@ contract StrategyModuleManager is
     /* ============== VIEW FUNCTIONS ============== */
 
     /**
-     * @notice Returns the address of the Eigen Pod of a specific StrategyModule.
-     * @param _nounce The index of the Strategy Module you want to know the Eigen Pod address.
-     * @dev Function essential to pre-crete DVs as their withdrawal address has to be the Eigen Pod address.
+     * @notice Returns the address of the EigenPod and the Split contract of the next StrategyModule to be created.
+     * @param _nounce The index of the StrategyModule you want to know the EigenPod and Split contract address.
+     * @dev Ownership of the Split contract belongs to ByzantineAdmin to be able to update it.
+     * @dev Function essential to pre-create DVs as their withdrawal address has to be the EigenPod and fee recipient address the Split.
      */
-    function preCalculatePodAddress(uint64 _nounce) external view returns (address) {
-        // Pre-calcualte next nft id
+    function preCalculatePodAndSplitAddr(uint64 _nounce) external view returns (address podAddr, address splitAddr) {
+        require(_nounce < numPreCreatedClusters && _nounce >= numStratMods, "StrategyModuleManager.preCalculatePodAndSplitAddr: invalid nounce. Should be in the precreated clusters range");
+
+        // Pre-calculate next nft id
         uint256 preNftId = uint256(keccak256(abi.encode(_nounce)));
 
         // Pre-calculate the address of the next Strategy Module
@@ -188,7 +186,14 @@ contract StrategyModuleManager is
         );
 
         // Returns the next StrategyModule's EigenPod address
-        return getPodByStratModAddr(stratModAddr);
+        podAddr = getPodByStratModAddr(stratModAddr);
+
+        // Returns the next StrategyModule's Split address
+        splitAddr = pushSplitFactory.predictDeterministicAddress(
+            pendingClusters[_nounce].splitParams,
+            owner(),
+            bytes32(preNftId)
+        );
     }
 
     /// @notice Returns the number of current pending clusters waiting for a Strategy Module.
@@ -326,6 +331,37 @@ contract StrategyModuleManager is
         stakerToStratMods[msg.sender].push(stratMod);
 
         return IStrategyModule(stratMod);
+    }
+
+    function _createSplitParams() internal pure returns (
+        address[] memory recipients,
+        uint256[] memory allocations
+    ) {
+        // Split operators allocation
+        allocations = new uint256[](4);
+        for (uint8 i = 0; i < 4;) {
+            allocations[i] = NODE_OP_SPLIT_ALLOCATION;
+            unchecked {
+                ++i;
+            }
+        }
+        // Split recipient addresses
+        recipients = new address[](4); 
+    }
+
+    function _getNewPendingCluster(address[] memory recipients, uint256[] memory allocations) internal {
+        IStrategyModule.Node[] memory nodes = auction.getAuctionWinners();
+        require(nodes.length == 4, "Incompatible cluster size");
+
+        for (uint8 j = 0; j < nodes.length;) {
+            pendingClusters[numPreCreatedClusters].nodes[j] = nodes[j];
+            recipients[j] = nodes[j].eth1Addr;
+            unchecked {
+                ++j;
+            }
+        }
+        // Create the Split structure
+        pendingClusters[numPreCreatedClusters].splitParams = SplitV2Lib.Split(recipients, allocations, SPLIT_TOTAL_ALLOCATION, SPLIT_DISTRIBUTION_INCENTIVE);
     }
 
 }

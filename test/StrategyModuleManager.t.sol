@@ -7,6 +7,7 @@ import "eigenlayer-contracts/interfaces/IEigenPod.sol";
 import "eigenlayer-contracts/interfaces/IDelegationManager.sol";
 import "eigenlayer-contracts/interfaces/IStrategy.sol";
 import "eigenlayer-contracts/libraries/BeaconChainProofs.sol";
+import { SplitV2Lib } from "splits-v2/libraries/SplitV2.sol";
 import "./utils/ProofParsing.sol";
 
 import "./ByzantineDeployer.t.sol";
@@ -207,11 +208,15 @@ contract StrategyModuleManagerTest is ProofParsing, ByzantineDeployer {
 
     }
 
-    function testpreCalculatePodAddress() public preCreateClusters(2) {
-        // Pre-calculate pod address of DV1, DV2 and DV3
-        address podAddressDV1 = strategyModuleManager.preCalculatePodAddress(0);
-        address podAddressDV2 = strategyModuleManager.preCalculatePodAddress(1);
-        address podAddressDV3 = strategyModuleManager.preCalculatePodAddress(2);
+    function testpreCalculatePodAndSplitAddress() public preCreateClusters(2) {
+
+        // Pre-calculate pod and split address of DV1 and DV2
+        (address podAddressDV1, address splitAddressDV1) = strategyModuleManager.preCalculatePodAndSplitAddr(0);
+        (address podAddressDV2, address splitAddressDV2) = strategyModuleManager.preCalculatePodAndSplitAddr(1);
+
+        // Sould revert because DV3 is not in the precreated clusters range
+        vm.expectRevert(bytes("StrategyModuleManager.preCalculatePodAndSplitAddr: invalid nounce. Should be in the precreated clusters range"));
+        (address podAddressDV3, address splitAddressDV3) = strategyModuleManager.preCalculatePodAndSplitAddr(2);
 
         // Node ops bids again
         _8NodeOpsBid();
@@ -220,6 +225,12 @@ contract StrategyModuleManagerTest is ProofParsing, ByzantineDeployer {
         address aliceStratModAddr1 = _createStratModAndStakeNativeETH(alice, 32 ether);
         address aliceStratModAddr2 = _createStratModAndStakeNativeETH(alice, 32 ether);
 
+        // Should revert because DV1 is already created
+        vm.expectRevert(bytes("StrategyModuleManager.preCalculatePodAndSplitAddr: invalid nounce. Should be in the precreated clusters range"));
+        strategyModuleManager.preCalculatePodAndSplitAddr(0);
+
+        (podAddressDV3, splitAddressDV3) = strategyModuleManager.preCalculatePodAndSplitAddr(2);
+
         // Bob creates a StrategyModule
         address bobStratModAddr1 = _createStratModAndStakeNativeETH(bob, 32 ether);
 
@@ -227,6 +238,11 @@ contract StrategyModuleManagerTest is ProofParsing, ByzantineDeployer {
         assertEq(strategyModuleManager.getPodByStratModAddr(aliceStratModAddr1), podAddressDV1);
         assertEq(strategyModuleManager.getPodByStratModAddr(aliceStratModAddr2), podAddressDV2);
         assertEq(strategyModuleManager.getPodByStratModAddr(bobStratModAddr1), podAddressDV3);
+
+        // Verify split addresses of DV1, DV2 and DV3
+        assertEq(IStrategyModule(aliceStratModAddr1).getSplitAddress(), splitAddressDV1);
+        assertEq(IStrategyModule(aliceStratModAddr2).getSplitAddress(), splitAddressDV2);
+        assertEq(IStrategyModule(bobStratModAddr1).getSplitAddress(), splitAddressDV3);
     }
 
     // Within foundry, resulting address of a contract deployed with CREATE2 differs according to the msg.sender.
