@@ -60,8 +60,8 @@ contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
 
     struct NodeOpBid {
         address nodeOp;
-        uint256[] discountRates;
-        uint256[] timesInDays;
+        uint16[] discountRates;
+        uint32[] timesInDays;
     }
 
     function setUp() public virtual override(EigenLayerDeployer, SplitsV2Deployer) {

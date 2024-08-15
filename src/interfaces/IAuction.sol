@@ -7,27 +7,27 @@ interface IAuction {
 
     /// @notice Stores auction details of node operators
     struct AuctionDetails {
-        uint128 numBids;
-        uint128 reputationScore;
+        uint16 numBids;
+        uint32 reputationScore;
         mapping(uint256 => uint256[]) auctionScoreToBidPrices;
-        mapping(uint256 => uint256[]) auctionScoreToVcNumbers;
+        mapping(uint256 => uint32[]) auctionScoreToVcNumbers;
     }
 
     event BidPlaced(
         address indexed nodeOpAddr,
-        uint256 reputationScore,
-        uint256 discountRate,
-        uint256 duration,
+        uint32 reputationScore,
+        uint16 discountRate,
+        uint32 duration,
         uint256 bidPrice,
         uint256 auctionScore
     );
     
     event BidUpdated(
         address indexed nodeOpAddr,
-        uint256 reputationScore,
+        uint32 reputationScore,
         uint256 oldAuctionScore,
-        uint256 newDuration,
-        uint256 newDiscountRate,
+        uint32 newDuration,
+        uint16 newDiscountRate,
         uint256 newBidPrice,
         uint256 newAuctionScore
     );
@@ -46,7 +46,7 @@ interface IAuction {
     function maxDiscountRate() external view returns (uint16);
 
     /// @notice Get the minimum duration to be part of a DV (in days)
-    function minDuration() external view returns (uint160);
+    function minDuration() external view returns (uint32);
 
     /// @notice Get the cluster size of a DV (i.e the number of nodes in a DV)
     function clusterSize() external view returns (uint8);
@@ -83,8 +83,8 @@ interface IAuction {
      */
     function getPriceToPay(
         address _nodeOpAddr,
-        uint256[] calldata _discountRates,
-        uint256[] calldata _timesInDays
+        uint16[] calldata _discountRates,
+        uint32[] calldata _timesInDays
     ) 
         external view returns (uint256);
 
@@ -104,8 +104,8 @@ interface IAuction {
      * @return The array of each bid auction score.
      */
     function bid(
-        uint256[] calldata _discountRates,
-        uint256[] calldata _timesInDays
+        uint16[] calldata _discountRates,
+        uint32[] calldata _timesInDays
     ) 
         external payable returns (uint256[] memory);
 
@@ -122,8 +122,8 @@ interface IAuction {
     function getUpdateOneBidPrice(
         address _nodeOpAddr,
         uint256 _oldAuctionScore,
-        uint256 _newDiscountRate,
-        uint256 _newTimeInDays
+        uint16 _newDiscountRate,
+        uint32 _newTimeInDays
     ) 
         external view returns (uint256);
 
@@ -140,8 +140,8 @@ interface IAuction {
      */
     function updateOneBid(
         uint256 _oldAuctionScore,
-        uint256 _newDiscountRate,
-        uint256 _newTimeInDays
+        uint16 _newDiscountRate,
+        uint32 _newTimeInDays
     ) 
         external payable returns (uint256);
 
@@ -161,7 +161,7 @@ interface IAuction {
     function updateAuctionConfig(
         uint256 _expectedDailyReturnWei,
         uint16 _maxDiscountRate,
-        uint160 _minDuration
+        uint32 _minDuration
     )
         external;
 
@@ -201,7 +201,7 @@ interface IAuction {
         address _nodeOpAddr,
         uint256 _auctionScore
     )
-        external view returns (uint256[] memory);
+        external view returns (uint32[] memory);
 
     /// @dev Error when unauthorized call to a function callable only by the StrategyModuleManager.
     error OnlyStrategyModuleManager();

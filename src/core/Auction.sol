@@ -39,7 +39,7 @@ contract Auction is
         address _initialOwner,
         uint256 _expectedDailyReturnWei,
         uint16 _maxDiscountRate,
-        uint160 _minDuration,
+        uint32 _minDuration,
         uint8 _clusterSize
     ) external initializer {
         _transferOwnership(_initialOwner);
@@ -101,8 +101,8 @@ contract Auction is
      */
     function getPriceToPay(
         address _nodeOpAddr,
-        uint256[] calldata _discountRates,
-        uint256[] calldata _timesInDays
+        uint16[] calldata _discountRates,
+        uint32[] calldata _timesInDays
     ) public view returns (uint256) {
         // Verify the two entry arrays have the same length
         require(_discountRates.length == _timesInDays.length, "_discountRates and _timesInDays must have the same length");
@@ -147,8 +147,8 @@ contract Auction is
      * @return The array of each bid auction score.
      */
     function bid(
-        uint256[] calldata _discountRates,
-        uint256[] calldata _timesInDays
+        uint16[] calldata _discountRates,
+        uint32[] calldata _timesInDays
     ) external payable nonReentrant returns (uint256[] memory) {
 
         // Verify the two entry arrays have the same length
@@ -163,7 +163,7 @@ contract Auction is
         bytes32 bidder = bytes32(uint256(uint160(msg.sender)));
 
         /// TODO: Get the reputation score of msg.sender
-        uint128 reputationScore = 1;
+        uint32 reputationScore = 1;
         _nodeOpsInfo[msg.sender].reputationScore = reputationScore;
 
         uint256 dailyVcPrice;
@@ -236,8 +236,8 @@ contract Auction is
     function getUpdateOneBidPrice(
         address _nodeOpAddr,
         uint256 _oldAuctionScore,
-        uint256 _newDiscountRate,
-        uint256 _newTimeInDays
+        uint16 _newDiscountRate,
+        uint32 _newTimeInDays
     ) public view returns (uint256) {
         // Verify if `_nodeOpAddr` has at least a bid with `_oldAuctionScore`
         require (getNodeOpAuctionScoreBidPrices(_nodeOpAddr, _oldAuctionScore).length > 0, "Wrong node op auctionScore");
@@ -277,8 +277,8 @@ contract Auction is
      */
     function updateOneBid(
         uint256 _oldAuctionScore,
-        uint256 _newDiscountRate,
-        uint256 _newTimeInDays
+        uint16 _newDiscountRate,
+        uint32 _newTimeInDays
     ) external payable nonReentrant returns (uint256){
         // Verify if the sender has at least a bid with `_oldAuctionScore`
         require (getNodeOpAuctionScoreBidPrices(msg.sender, _oldAuctionScore).length > 0, "Wrong node op auctionScore");
@@ -307,7 +307,7 @@ contract Auction is
         }
 
         /// TODO: Get the reputation score of msg.sender
-        uint128 reputationScore = 1;
+        uint32 reputationScore = 1;
 
         /// @notice Calculate operator's new bid price and new auction score
         uint256 newDailyVcPrice = _calculateDailyVcPrice(_newDiscountRate);
@@ -405,7 +405,7 @@ contract Auction is
     function updateAuctionConfig(
         uint256 _expectedDailyReturnWei,
         uint16 _maxDiscountRate,
-        uint160 _minDuration
+        uint32 _minDuration
     ) external onlyOwner {
         expectedDailyReturnWei = _expectedDailyReturnWei;
         maxDiscountRate = _maxDiscountRate;
@@ -459,7 +459,7 @@ contract Auction is
     function getNodeOpAuctionScoreVcs(
         address _nodeOpAddr,
         uint256 _auctionScore
-    ) public view returns (uint256[] memory) {
+    ) public view returns (uint32[] memory) {
         return _nodeOpsInfo[_nodeOpAddr].auctionScoreToVcNumbers[_auctionScore];
     }
 
@@ -471,7 +471,7 @@ contract Auction is
      * @dev vc_price = Re*(1 - D)/cluster_size
      * @dev The `expectedDailyReturnWei` is set by Byzantine and corresponds to the Ethereum daily staking return.
      */
-    function _calculateDailyVcPrice(uint256 _discountRate) internal view returns (uint256) {
+    function _calculateDailyVcPrice(uint16 _discountRate) internal view returns (uint256) {
         return (expectedDailyReturnWei * (10000 - _discountRate)) / (clusterSize * 10000);
     }
 
@@ -482,7 +482,7 @@ contract Auction is
      * @dev bid_price = time_in_days * vc_price
      */
     function _calculateBidPrice(
-        uint256 _timeInDays,
+        uint32 _timeInDays,
         uint256 _dailyVcPrice
     ) internal pure returns (uint256) {
         return _timeInDays * _dailyVcPrice;
@@ -498,8 +498,8 @@ contract Auction is
      */
     function _calculateAuctionScore(
         uint256 _dailyVcPrice,
-        uint256 _timeInDays,
-        uint256 _reputation
+        uint32 _timeInDays,
+        uint32 _reputation
     ) internal pure returns (uint256) {
         uint256 powerValue = _pow(_timeInDays);
         return (_dailyVcPrice * powerValue * _reputation) / _WAD;
@@ -509,9 +509,9 @@ contract Auction is
      * @notice Calculate the power value of 1.001**_timeInDays
      * @dev The result is divided by 1e9 to downscaled to 1e18 as the return value of `rpow` is upscaled to 1e27
      */
-    function _pow(uint256 _timeIndays) internal pure returns (uint256) {
+    function _pow(uint32 _timeIndays) internal pure returns (uint256) {
         uint256 fixedPoint = 1001 * 1e24;
-        return DSMath.rpow(fixedPoint, _timeIndays) / 1e9;
+        return DSMath.rpow(fixedPoint, uint256(_timeIndays)) / 1e9;
     }
 
     /**

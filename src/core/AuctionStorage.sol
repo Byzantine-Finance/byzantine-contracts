@@ -26,10 +26,10 @@ abstract contract AuctionStorage is IAuction {
 
     /// @notice Daily rewards of Ethereum Pos (in WEI)
     uint256 public expectedDailyReturnWei;
-    /// @notice Minimum duration to be part of a DV (in days)
-    uint160 public minDuration;
     /// @notice Number of node operators in auction and seeking for a DV
     uint64 public numNodeOpsInAuction;    
+    /// @notice Minimum duration to be part of a DV (in days)
+    uint32 public minDuration;
     /// @notice Maximum discount rate (i.e the max profit margin of node op) in percentage
     uint16 public maxDiscountRate;
     /// @notice Number of nodes in a Distributed Validator

@@ -14,17 +14,17 @@ contract AuctionTest is ByzantineDeployer {
     uint256 constant STARTING_BALANCE = 100 ether;
     uint256 constant BOND = 1 ether;
 
-    uint256[] one_DiscountRates = new uint256[](1);
-    uint256[] one_TimesInDays = new uint256[](1);
+    uint16[] one_DiscountRates = new uint16[](1);
+    uint32[] one_TimesInDays = new uint32[](1);
     uint256[1] bidPrice_one_Bid;
 
-    uint256[] three_DiffDiscountRates = new uint256[](3);
-    uint256[] three_DiffTimesInDays = new uint256[](3);
+    uint16[] three_DiffDiscountRates = new uint16[](3);
+    uint32[] three_DiffTimesInDays = new uint32[](3);
     uint256[3] auctionScores_three_DiffBids;
     uint256[3] bidPrices_three_DiffBids;
 
-    uint256[] five_SameDiffDiscountRates = new uint256[](5);
-    uint256[] five_SameDiffTimesInDays = new uint256[](5);
+    uint16[] five_SameDiffDiscountRates = new uint16[](5);
+    uint32[] five_SameDiffTimesInDays = new uint32[](5);
     uint256[5] bidPrices_five_SameDiffBids;
 
     function setUp() public override {
@@ -115,9 +115,9 @@ contract AuctionTest is ByzantineDeployer {
     }
 
     function testBid_RevertWhen_WrongBidParameters() external {
-        uint256[] memory one_WrongDiscountRates = new uint256[](1);
+        uint16[] memory one_WrongDiscountRates = new uint16[](1);
         one_WrongDiscountRates[0] = 16e2;
-        uint256[] memory one_WrongTimesInDays = new uint256[](1);
+        uint32[] memory one_WrongTimesInDays = new uint32[](1);
         one_WrongTimesInDays[0] = 10;
 
         // nodeOps[0] bids with invalid duration
@@ -176,7 +176,7 @@ contract AuctionTest is ByzantineDeployer {
         uint256[] memory auctionScoreNodeOp5 = _nodeOpBid(NodeOpBid(nodeOps[5], one_DiscountRates, one_TimesInDays));
         assertEq(auction.getNodeOpBidNumber(nodeOps[5]), 1);
         uint256[] memory nodeOp5Bid = auction.getNodeOpAuctionScoreBidPrices(nodeOps[5], auctionScoreNodeOp5[0]);
-        uint256[] memory nodeOp5Vc = auction.getNodeOpAuctionScoreVcs(nodeOps[5], auctionScoreNodeOp5[0]);
+        uint32[] memory nodeOp5Vc = auction.getNodeOpAuctionScoreVcs(nodeOps[5], auctionScoreNodeOp5[0]);
         assertEq(nodeOp5Bid.length, 1);
         assertEq(nodeOp5Vc.length, 1);
         assertEq(nodeOp5Bid[0], bidPrice_one_Bid[0]);
@@ -188,7 +188,7 @@ contract AuctionTest is ByzantineDeployer {
         assertEq(auction.getNodeOpBidNumber(nodeOps[0]), 3);
         for (uint256 i = 0; i < auctionScoreNodeOp0.length; i++) {
             uint256[] memory nodeOp0Bid = auction.getNodeOpAuctionScoreBidPrices(nodeOps[0], auctionScoreNodeOp0[i]);
-            uint256[] memory nodeOp0Vc = auction.getNodeOpAuctionScoreVcs(nodeOps[0], auctionScoreNodeOp0[i]);
+            uint32[] memory nodeOp0Vc = auction.getNodeOpAuctionScoreVcs(nodeOps[0], auctionScoreNodeOp0[i]);
             assertEq(nodeOp0Bid.length, 1);
             assertEq(nodeOp0Vc.length, 1);
             assertEq(nodeOp0Bid[0], bidPrices_three_DiffBids[i]);
@@ -201,7 +201,7 @@ contract AuctionTest is ByzantineDeployer {
         assertEq(auction.getNodeOpBidNumber(nodeOps[9]), 5);
         for (uint256 i = 0; i < auctionScoreNodeOp9.length; i++) {
             uint256[] memory nodeOp0Bid = auction.getNodeOpAuctionScoreBidPrices(nodeOps[9], auctionScoreNodeOp9[i]);
-            uint256[] memory nodeOp0Vc = auction.getNodeOpAuctionScoreVcs(nodeOps[9], auctionScoreNodeOp9[i]);
+            uint32[] memory nodeOp0Vc = auction.getNodeOpAuctionScoreVcs(nodeOps[9], auctionScoreNodeOp9[i]);
             if (i == 0 || i == 1 || i == 2) {
                 assertEq(nodeOp0Bid.length, 3);
                 assertEq(nodeOp0Vc.length, 3);
@@ -220,7 +220,7 @@ contract AuctionTest is ByzantineDeployer {
 
     function testUpdateBid_RevertWhen_WrongAuctionScore_And_WrongBidParameters() external {
         // nodeOps[0] bids
-        (uint256[] memory discountRate, uint256[] memory time) = _createOneBidParamArray(11e2, 200);
+        (uint16[] memory discountRate, uint32[] memory time) = _createOneBidParamArray(11e2, 200);
         uint256[] memory auctionScore = _nodeOpBid(NodeOpBid(nodeOps[0], discountRate, time));
 
         vm.startPrank(nodeOps[0]);
@@ -241,7 +241,7 @@ contract AuctionTest is ByzantineDeployer {
 
     function testUpdateBid_Outbid_RevertWhen_NotEnoughEthSent() external {
         // nodeOps[9] bids
-        (uint256[] memory discountRate, uint256[] memory time) = _createOneBidParamArray(11e2, 200);
+        (uint16[] memory discountRate, uint32[] memory time) = _createOneBidParamArray(11e2, 200);
         uint256[] memory auctionScore = _nodeOpBid(NodeOpBid(nodeOps[9], discountRate, time));
 
         // nodeOps[9] updates its bid
@@ -278,7 +278,7 @@ contract AuctionTest is ByzantineDeployer {
         vm.prank(nodeOps[9]);
         auction.updateOneBid{value: amountToAdd2 + 0.001 ether}(auctionScore[0], 10e2, 35);
         // Verify if nodeOps[9] has been refunded
-        (uint256[] memory discountRate, uint256[] memory time) = _createOneBidParamArray(10e2, 35);
+        (uint16[] memory discountRate, uint32[] memory time) = _createOneBidParamArray(10e2, 35);
         uint256 refundAmount = (bidPrice_one_Bid[0] + amountToAdd) - auction.getPriceToPay(nodeOps[9], discountRate, time); // nodeOps[9] is whitelisted
         assertEq(nodeOps[9].balance, STARTING_BALANCE - (bidPrice_one_Bid[0] + amountToAdd + amountToAdd2) + refundAmount);
         // Verify the balance of escrow contract after nodeOps[9] updates its bid
@@ -304,7 +304,7 @@ contract AuctionTest is ByzantineDeployer {
         uint256[] memory newBidPrice = auction.getNodeOpAuctionScoreBidPrices(nodeOps[9], newAuctionScoreNodeOp9);
         assertEq(newBidPrice.length, 1);
         assertEq(newBidPrice[0], 43791780821917800);
-        uint256[] memory newVc = auction.getNodeOpAuctionScoreVcs(nodeOps[9], newAuctionScoreNodeOp9);
+        uint32[] memory newVc = auction.getNodeOpAuctionScoreVcs(nodeOps[9], newAuctionScoreNodeOp9);
         assertEq(newVc.length, 1);
         assertEq(newVc[0], 60);
 
@@ -326,7 +326,7 @@ contract AuctionTest is ByzantineDeployer {
         uint256[] memory newBidPriceNodeOp5 = auction.getNodeOpAuctionScoreBidPrices(nodeOps[5], newAuctionScoreNodeOp5);
         assertEq(newBidPriceNodeOp5.length, 1);
         assertEq(newBidPriceNodeOp5[0], 43791780821917800);
-        uint256[] memory newVcNodeOp5 = auction.getNodeOpAuctionScoreVcs(nodeOps[5], newAuctionScoreNodeOp5);
+        uint32[] memory newVcNodeOp5 = auction.getNodeOpAuctionScoreVcs(nodeOps[5], newAuctionScoreNodeOp5);
         assertEq(newVcNodeOp5.length, 1);
         assertEq(newVcNodeOp5[0], 60);
 
@@ -387,7 +387,7 @@ contract AuctionTest is ByzantineDeployer {
         // Update auction configuration
         uint256 newExpectedDailyReturnWei = 0.0003 ether;
         uint16 newMaxDiscountRate = 10e2;
-        uint160 newMinDuration = 60;
+        uint32 newMinDuration = 60;
         auction.updateAuctionConfig(newExpectedDailyReturnWei, newMaxDiscountRate, newMinDuration);
 
         // Check if the auction configuration is updated correctly
@@ -442,13 +442,13 @@ contract AuctionTest is ByzantineDeployer {
         for (uint256 i = 0; i < winnersDV.length - 1; i++) {
             assertEq(auction.getNodeOpBidNumber(nodeOps[i]), 0);
             uint256[] memory nodeOpBid = auction.getNodeOpAuctionScoreBidPrices(nodeOps[i], nodeOpsAuctionScore[i][0]);
-            uint256[] memory nodeOpVc = auction.getNodeOpAuctionScoreVcs(nodeOps[i], nodeOpsAuctionScore[i][0]);
+            uint32[] memory nodeOpVc = auction.getNodeOpAuctionScoreVcs(nodeOps[i], nodeOpsAuctionScore[i][0]);
             assertEq(nodeOpBid.length, 0);
             assertEq(nodeOpVc.length, 0);
         }
         assertEq(auction.getNodeOpBidNumber(nodeOps[9]), 0);
         uint256[] memory nodeOp9Bid = auction.getNodeOpAuctionScoreBidPrices(nodeOps[9], nodeOpsAuctionScore[3][0]);
-        uint256[] memory nodeOp9Vc = auction.getNodeOpAuctionScoreVcs(nodeOps[9], nodeOpsAuctionScore[3][0]);
+        uint32[] memory nodeOp9Vc = auction.getNodeOpAuctionScoreVcs(nodeOps[9], nodeOpsAuctionScore[3][0]);
         assertEq(nodeOp9Bid.length, 0);
         assertEq(nodeOp9Vc.length, 0);
 
@@ -540,17 +540,17 @@ contract AuctionTest is ByzantineDeployer {
             if (i != 2) {
                 assertEq(auction.getNodeOpBidNumber(nodeOps[i]), 0);
                 uint256[] memory nodeOpBid = auction.getNodeOpAuctionScoreBidPrices(nodeOps[i], nodeOpsAuctionScore[i][0]);
-                uint256[] memory nodeOpVc = auction.getNodeOpAuctionScoreVcs(nodeOps[i], nodeOpsAuctionScore[i][0]);
+                uint32[] memory nodeOpVc = auction.getNodeOpAuctionScoreVcs(nodeOps[i], nodeOpsAuctionScore[i][0]);
                 assertEq(nodeOpBid.length, 0);
                 assertEq(nodeOpVc.length, 0);
             } else {
                 assertEq(auction.getNodeOpBidNumber(nodeOps[i]), 1);
                 uint256[] memory nodeOp2Bid1 = auction.getNodeOpAuctionScoreBidPrices(nodeOps[i], nodeOpsAuctionScore[i][0]);
-                uint256[] memory nodeOp2Vc1 = auction.getNodeOpAuctionScoreVcs(nodeOps[i], nodeOpsAuctionScore[i][0]);
+                uint32[] memory nodeOp2Vc1 = auction.getNodeOpAuctionScoreVcs(nodeOps[i], nodeOpsAuctionScore[i][0]);
                 assertEq(nodeOp2Bid1.length, 0);
                 assertEq(nodeOp2Vc1.length, 0);
                 uint256[] memory nodeOp2Bid2 = auction.getNodeOpAuctionScoreBidPrices(nodeOps[i], nodeOpsAuctionScore[i][1]);
-                uint256[] memory nodeOp2Vc2 = auction.getNodeOpAuctionScoreVcs(nodeOps[i], nodeOpsAuctionScore[i][1]);
+                uint32[] memory nodeOp2Vc2 = auction.getNodeOpAuctionScoreVcs(nodeOps[i], nodeOpsAuctionScore[i][1]);
                 assertEq(nodeOp2Bid2.length, 1);
                 assertEq(nodeOp2Vc2.length, 1);
                 assertEq(nodeOp2Bid2[0], bidPrice_one_Bid[0]);
@@ -636,7 +636,7 @@ contract AuctionTest is ByzantineDeployer {
 
         // Verify remaining bids of nodeOps[3]
         uint256[] memory nodeOp3Bid1 = auction.getNodeOpAuctionScoreBidPrices(nodeOps[3], nodeOpsAuctionScore[3][1]);
-        uint256[] memory nodeOp3Vc1 = auction.getNodeOpAuctionScoreVcs(nodeOps[3], nodeOpsAuctionScore[3][1]);
+        uint32[] memory nodeOp3Vc1 = auction.getNodeOpAuctionScoreVcs(nodeOps[3], nodeOpsAuctionScore[3][1]);
         assertEq(nodeOp3Bid1.length, 2);
         assertEq(nodeOp3Vc1.length, 2);
         assertEq(nodeOp3Bid1[0], bidPrices_five_SameDiffBids[0]);
@@ -644,7 +644,7 @@ contract AuctionTest is ByzantineDeployer {
         assertEq(nodeOp3Vc1[0], 30);
         assertEq(nodeOp3Vc1[1], 30);
         uint256[] memory nodeOp3Bid2 = auction.getNodeOpAuctionScoreBidPrices(nodeOps[3], nodeOpsAuctionScore[3][4]);
-        uint256[] memory nodeOp3Vc2 = auction.getNodeOpAuctionScoreVcs(nodeOps[3], nodeOpsAuctionScore[3][4]);
+        uint32[] memory nodeOp3Vc2 = auction.getNodeOpAuctionScoreVcs(nodeOps[3], nodeOpsAuctionScore[3][4]);
         assertEq(nodeOp3Bid2.length, 2);
         assertEq(nodeOp3Vc2.length, 2);
         assertEq(nodeOp3Bid2[0], bidPrices_five_SameDiffBids[4]);
@@ -657,29 +657,29 @@ contract AuctionTest is ByzantineDeployer {
     /* ===================== HELPER FUNCTIONS ===================== */
 
     function _createOneBidParamArray(
-        uint256 _discountRate,
-        uint256 _timeInDays
-    ) internal pure returns (uint256[] memory, uint256[] memory) {
-        uint256[] memory discountRateArray = new uint256[](1);
+        uint16 _discountRate,
+        uint32 _timeInDays
+    ) internal pure returns (uint16[] memory, uint32[] memory) {
+        uint16[] memory discountRateArray = new uint16[](1);
         discountRateArray[0] = _discountRate;
 
-        uint256[] memory timeInDaysArray = new uint256[](1);
+        uint32[] memory timeInDaysArray = new uint32[](1);
         timeInDaysArray[0] = _timeInDays;
         
         return (discountRateArray, timeInDaysArray);
     }
 
     function _createTwoBidsParamArray(
-        uint256 _discountRate1,
-        uint256 _timeInDays1,
-        uint256 _discountRate2,
-        uint256 _timeInDays2
-    ) internal pure returns (uint256[] memory, uint256[] memory) {
-        uint256[] memory discountRatesArray = new uint256[](2);
+        uint16 _discountRate1,
+        uint32 _timeInDays1,
+        uint16 _discountRate2,
+        uint32 _timeInDays2
+    ) internal pure returns (uint16[] memory, uint32[] memory) {
+        uint16[] memory discountRatesArray = new uint16[](2);
         discountRatesArray[0] = _discountRate1;
         discountRatesArray[1] = _discountRate2;
 
-        uint256[] memory timesInDaysArray = new uint256[](2);
+        uint32[] memory timesInDaysArray = new uint32[](2);
         timesInDaysArray[0] = _timeInDays1;
         timesInDaysArray[1] = _timeInDays2;
         
@@ -698,8 +698,8 @@ contract AuctionTest is ByzantineDeployer {
     function _nodeOpUpdateBid(
         address _nodeOp,
         uint256 _auctionScore,
-        uint256 _newDiscountRate,
-        uint256 _newTimeInDays
+        uint16 _newDiscountRate,
+        uint32 _newTimeInDays
     ) internal returns (uint256) {
         // Get price to pay
         uint256 priceToPay = auction.getUpdateOneBidPrice(_nodeOp, _auctionScore, _newDiscountRate, _newTimeInDays);
@@ -723,10 +723,10 @@ contract AuctionTest is ByzantineDeployer {
     }
 
     function _4NodeOpsBidDiff() internal returns (uint256[][] memory) {
-        (uint256[] memory first_DR, uint256[] memory first_time) = _createOneBidParamArray(11e2, 400);
-        (uint256[] memory second_DR, uint256[] memory second_time) = _createOneBidParamArray(11e2, 300);
-        (uint256[] memory third_DR, uint256[] memory third_time) = _createOneBidParamArray(11e2, 200);
-        (uint256[] memory fourth_DR, uint256[] memory fourth_time) = _createOneBidParamArray(11e2, 100);
+        (uint16[] memory first_DR, uint32[] memory first_time) = _createOneBidParamArray(11e2, 400);
+        (uint16[] memory second_DR, uint32[] memory second_time) = _createOneBidParamArray(11e2, 300);
+        (uint16[] memory third_DR, uint32[] memory third_time) = _createOneBidParamArray(11e2, 200);
+        (uint16[] memory fourth_DR, uint32[] memory fourth_time) = _createOneBidParamArray(11e2, 100);
 
         NodeOpBid[] memory nodeOpsBid = new NodeOpBid[](4);
         nodeOpsBid[0] = NodeOpBid(nodeOps[0], first_DR, first_time); // 1st
@@ -738,7 +738,7 @@ contract AuctionTest is ByzantineDeployer {
     }
 
     function _4NodeOpsBidSame() internal returns (uint256[][] memory) {
-        (uint256[] memory discounts, uint256[] memory times) = _createTwoBidsParamArray(11e2, 100, 11e2, 100);
+        (uint16[] memory discounts, uint32[] memory times) = _createTwoBidsParamArray(11e2, 100, 11e2, 100);
 
         NodeOpBid[] memory nodeOpsBid = new NodeOpBid[](4);
         nodeOpsBid[0] = NodeOpBid(nodeOps[0], discounts, times); // 1st // 2nd
@@ -750,9 +750,9 @@ contract AuctionTest is ByzantineDeployer {
     }
 
     function _4NodeOpsBid_ThreeSame_WinnerAlreadyExists() internal returns (uint256[][] memory) {
-        (uint256[] memory first_DR, uint256[] memory first_time) = _createOneBidParamArray(11e2, 400);
-        (uint256[] memory second_DR, uint256[] memory second_time) = _createTwoBidsParamArray(11e2, 400, 10e2, 100);
-        (uint256[] memory third_DR, uint256[] memory third_time) = _createOneBidParamArray(11e2, 100);
+        (uint16[] memory first_DR, uint32[] memory first_time) = _createOneBidParamArray(11e2, 400);
+        (uint16[] memory second_DR, uint32[] memory second_time) = _createTwoBidsParamArray(11e2, 400, 10e2, 100);
+        (uint16[] memory third_DR, uint32[] memory third_time) = _createOneBidParamArray(11e2, 100);
 
         NodeOpBid[] memory nodeOpsBid = new NodeOpBid[](4);
         nodeOpsBid[0] = NodeOpBid(nodeOps[0], first_DR, first_time); // 1st
@@ -764,7 +764,7 @@ contract AuctionTest is ByzantineDeployer {
     }
 
     function _10NodeOpsBid() internal returns (uint256[][] memory) {
-        (uint256[] memory small_DR, uint256[] memory small_time) = _createOneBidParamArray(15e2, 30);
+        (uint16[] memory small_DR, uint32[] memory small_time) = _createOneBidParamArray(15e2, 30);
 
         NodeOpBid[] memory nodeOpBids = new NodeOpBid[](10);
         nodeOpBids[0] = NodeOpBid(nodeOps[0], three_DiffDiscountRates, three_DiffTimesInDays); // 1st // 5th // 9th --

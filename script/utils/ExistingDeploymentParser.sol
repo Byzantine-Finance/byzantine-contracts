@@ -51,7 +51,7 @@ contract ExistingDeploymentParser is Script, Test {
     // Initial Auction parameters
     uint256 EXPECTED_POS_DAILY_RETURN_WEI;
     uint16 MAX_DISCOUNT_RATE;
-    uint160 MIN_VALIDATION_DURATION;
+    uint32 MIN_VALIDATION_DURATION;
     uint8 CLUSTER_SIZE;
 
     /// @notice use for deploying a new set of Byzantine contracts
@@ -70,7 +70,7 @@ contract ExistingDeploymentParser is Script, Test {
         // read auction config
         EXPECTED_POS_DAILY_RETURN_WEI = stdJson.readUint(initialDeploymentData, ".auctionConfig.expected_pos_daily_return_wei");
         MAX_DISCOUNT_RATE = uint16(stdJson.readUint(initialDeploymentData, ".auctionConfig.max_discount_rate"));
-        MIN_VALIDATION_DURATION = uint160(stdJson.readUint(initialDeploymentData, ".auctionConfig.min_Validation_duration"));
+        MIN_VALIDATION_DURATION = uint32(stdJson.readUint(initialDeploymentData, ".auctionConfig.min_Validation_duration"));
         CLUSTER_SIZE = uint8(stdJson.readUint(initialDeploymentData, ".auctionConfig.cluster_size"));
 
         // read bidReceiver address

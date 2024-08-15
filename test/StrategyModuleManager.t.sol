@@ -605,13 +605,13 @@ contract StrategyModuleManagerTest is ProofParsing, ByzantineDeployer {
     }
 
     function _createOneBidParamArray(
-        uint256 _discountRate,
-        uint256 _timeInDays
-    ) internal pure returns (uint256[] memory, uint256[] memory) {
-        uint256[] memory discountRateArray = new uint256[](1);
+        uint16 _discountRate,
+        uint32 _timeInDays
+    ) internal pure returns (uint16[] memory, uint32[] memory) {
+        uint16[] memory discountRateArray = new uint16[](1);
         discountRateArray[0] = _discountRate;
 
-        uint256[] memory timeInDaysArray = new uint256[](1);
+        uint32[] memory timeInDaysArray = new uint32[](1);
         timeInDaysArray[0] = _timeInDays;
         
         return (discountRateArray, timeInDaysArray);
@@ -637,14 +637,14 @@ contract StrategyModuleManagerTest is ProofParsing, ByzantineDeployer {
     }
 
     function _8NodeOpsBid() internal {
-        (uint256[] memory DR0, uint256[] memory time0) = _createOneBidParamArray(13e2, 999);  // 1st
-        (, uint256[] memory time1) = _createOneBidParamArray(13e2, 900);  // 2nd
-        (, uint256[] memory time2) = _createOneBidParamArray(13e2, 800);  // 3rd
-        (, uint256[] memory time3) = _createOneBidParamArray(13e2, 700);  // 4th
-        (, uint256[] memory time4) = _createOneBidParamArray(13e2, 600);  // 5th
-        (, uint256[] memory time5) = _createOneBidParamArray(13e2, 500);  // 6th
-        (, uint256[] memory time6) = _createOneBidParamArray(13e2, 400);  // 7th
-        (, uint256[] memory time7) = _createOneBidParamArray(13e2, 300);  // 8th
+        (uint16[] memory DR0, uint32[] memory time0) = _createOneBidParamArray(13e2, 999);  // 1st
+        (, uint32[] memory time1) = _createOneBidParamArray(13e2, 900);  // 2nd
+        (, uint32[] memory time2) = _createOneBidParamArray(13e2, 800);  // 3rd
+        (, uint32[] memory time3) = _createOneBidParamArray(13e2, 700);  // 4th
+        (, uint32[] memory time4) = _createOneBidParamArray(13e2, 600);  // 5th
+        (, uint32[] memory time5) = _createOneBidParamArray(13e2, 500);  // 6th
+        (, uint32[] memory time6) = _createOneBidParamArray(13e2, 400);  // 7th
+        (, uint32[] memory time7) = _createOneBidParamArray(13e2, 300);  // 8th
 
         NodeOpBid[] memory nodeOpBids = new NodeOpBid[](8);
         nodeOpBids[0] = NodeOpBid(nodeOps[0], DR0, time0);
