@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/proxy/beacon/IBeacon.sol";
 import "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 
 import "./eigenlayer-helper/EigenLayerDeployer.t.sol";
+import "./splits-helper/SplitsV2Deployer.t.sol";
 
 import "../src/core/StrategyModuleManager.sol";
 import "../src/core/StrategyModule.sol";
@@ -14,7 +15,7 @@ import "../src/tokens/ByzNft.sol";
 import "../src/core/Auction.sol";
 import "../src/vault/Escrow.sol";
 
-contract ByzantineDeployer is EigenLayerDeployer {
+contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
 
     // Byzantine contracts
     ProxyAdmin public byzantineProxyAdmin;
@@ -63,9 +64,11 @@ contract ByzantineDeployer is EigenLayerDeployer {
         uint256[] timesInDays;
     }
 
-    function setUp() public virtual override {
+    function setUp() public virtual override(EigenLayerDeployer, SplitsV2Deployer) {
         // deploy locally EigenLayer contracts
         EigenLayerDeployer.setUp();
+        // deploy locally SplitsV2 contracts
+        SplitsV2Deployer.setUp();
         // deploy locally Byzantine contracts
         _deployByzantineContractsLocal();
     }
@@ -109,7 +112,8 @@ contract ByzantineDeployer is EigenLayerDeployer {
             auction,
             byzNft,
             eigenPodManager,
-            delegation
+            delegation,
+            pushSplitFactory
         );
         ByzNft byzNftImplementation = new ByzNft();
         Auction auctionImplementation = new Auction(

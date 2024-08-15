@@ -8,9 +8,19 @@ import "../interfaces/IByzNft.sol";
 import "../interfaces/IAuction.sol";
 import "eigenlayer-contracts/interfaces/IEigenPodManager.sol";
 import "eigenlayer-contracts/interfaces/IDelegationManager.sol";
+import "splits-v2/splitters/push/PushSplitFactory.sol";
 
 abstract contract StrategyModuleManagerStorage is IStrategyModuleManager {
     /* ============== CONSTANTS + IMMUTABLES ============== */
+
+    /// @notice The split operators allocation
+    uint256 public constant NODE_OP_SPLIT_ALLOCATION = 250_000; // 25%
+
+    /// @notice The split distribution incentive
+    uint16 public constant SPLIT_DISTRIBUTION_INCENTIVE = 20_000; // 2% for the distributor
+
+    /// @notice The split total allocation
+    uint256 public constant SPLIT_TOTAL_ALLOCATION = 1_000_000; // 100% is 1_000_000
 
     /// @notice Beacon proxy to which the StrategyModules point
     IBeacon public immutable stratModBeacon;
@@ -27,6 +37,9 @@ abstract contract StrategyModuleManagerStorage is IStrategyModuleManager {
     /// @notice EigenLayer's DelegationManager contract
     IDelegationManager public immutable delegationManager;
 
+    /// @notice 0xSplits' PushSplitFactory contract
+    PushSplitFactory public immutable pushSplitFactory;
+
     /* ============== STATE VARIABLES ============== */
 
     /// @notice Staker to its owned StrategyModules
@@ -36,7 +49,7 @@ abstract contract StrategyModuleManagerStorage is IStrategyModuleManager {
     mapping(uint256 => address) public nftIdToStratMod;
 
     /// @notice Mapping to store the pre-created clusters waiting for work
-    mapping(uint64 => IStrategyModule.ClusterDetails) public pendingClusters;
+    mapping(uint64 => PendingClusterDetails) public pendingClusters;
 
     /// @notice The number of pre-created clusters. Used as the mapping index.
     uint64 public numPreCreatedClusters;
@@ -51,13 +64,15 @@ abstract contract StrategyModuleManagerStorage is IStrategyModuleManager {
         IAuction _auction,
         IByzNft _byzNft,
         IEigenPodManager _eigenPodManager,
-        IDelegationManager _delegationManager
+        IDelegationManager _delegationManager,
+        PushSplitFactory _pushSplitFactory
     ) {
         stratModBeacon = _stratModBeacon;
         auction = _auction;
         byzNft = _byzNft;
         eigenPodManager = _eigenPodManager;
         delegationManager = _delegationManager;
+        pushSplitFactory = _pushSplitFactory;
     }
 
     /**

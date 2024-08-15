@@ -3,54 +3,16 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin-upgrades/contracts/proxy/utils/Initializable.sol";
 
-import "eigenlayer-contracts/interfaces/IEigenPodManager.sol";
-import "eigenlayer-contracts/interfaces/IEigenPod.sol";
-import "eigenlayer-contracts/interfaces/IDelegationManager.sol";
 import "eigenlayer-contracts/interfaces/ISignatureUtils.sol";
 import "eigenlayer-contracts/libraries/BeaconChainProofs.sol";
+import { PushSplit } from "splits-v2/splitters/push/PushSplit.sol";
 
-import "../interfaces/IByzNft.sol";
-import "../interfaces/IStrategyModuleManager.sol";
-import "../interfaces/IStrategyModule.sol";
-import "../interfaces/IAuction.sol";
+import "./StrategyModuleStorage.sol";
 
 // TODO: Allow Strategy Module ByzNft to be tradeable => conceive a fair exchange mechanism between the seller and the buyer
 
-contract StrategyModule is IStrategyModule, Initializable {
+contract StrategyModule is Initializable, StrategyModuleStorage {
     using BeaconChainProofs for *;
-
-    /* ============== CONSTANTS + IMMUTABLES ============== */
-
-    /// @notice Average time for block finality in the Beacon Chain
-    uint16 internal constant FINALITY_TIME = 16 minutes;
-
-    uint8 internal constant CLUSTER_SIZE = 4;
-
-    /// @notice The single StrategyModuleManager for Byzantine
-    IStrategyModuleManager public immutable stratModManager;
-
-    /// @notice ByzNft contract
-    IByzNft public immutable byzNft;
-
-    /// @notice Address of the Auction contract
-    IAuction public immutable auction;
-
-    /// @notice EigenLayer's EigenPodManager contract
-    /// @dev this is the pod manager transparent proxy
-    IEigenPodManager public immutable eigenPodManager;
-
-    /// @notice EigenLayer's DelegationManager contract
-    IDelegationManager public immutable delegationManager;
-
-    /* ============== STATE VARIABLES ============== */
-
-    /// @notice The ByzNft associated to this StrategyModule.
-    /// @notice The owner of the ByzNft is the StrategyModule owner.
-    /// TODO When non-upgradeable put that variable immutable and set it in the constructor
-    uint256 public stratModNftId;
-
-    // Empty struct, all the fields have their default value
-    ClusterDetails public clusterDetails;
 
     /* ============== MODIFIERS ============== */
 
@@ -66,6 +28,11 @@ contract StrategyModule is IStrategyModule, Initializable {
 
     modifier onlyStratModManager() {
         if (msg.sender != address(stratModManager)) revert OnlyStrategyModuleManager();
+        _;
+    }
+
+    modifier onlyIfNativeRestaking() {
+        if (clusterDetails.dvStatus == DVStatus.NATIVE_RESTAKING_NOT_ACTIVATED) revert NativeRestakingNotActivated();
         _;
     }
 
@@ -163,7 +130,7 @@ contract StrategyModule is IStrategyModule, Initializable {
         uint40[] calldata validatorIndices,
         bytes[] calldata validatorFieldsProofs,
         bytes32[][] calldata validatorFields
-    ) external onlyNftOwner {
+    ) external onlyNftOwner onlyIfNativeRestaking {
 
         IEigenPod myPod = eigenPodManager.ownerToPod(address(this));
 
@@ -200,11 +167,13 @@ contract StrategyModule is IStrategyModule, Initializable {
     /**
      * @notice Set the `clusterDetails` struct of the StrategyModule.
      * @param nodes An array of Node making up the DV
+     * @param splitAddr The address of the Split contract.
      * @param dvStatus The status of the DV, refer to the DVStatus enum for details.
      * @dev Callable only by the StrategyModuleManager and bound a pre-created DV to this StrategyModule.
      */
     function setClusterDetails(
         Node[4] calldata nodes,
+        address splitAddr,
         DVStatus dvStatus
     ) external onlyStratModManager {
 
@@ -214,8 +183,23 @@ contract StrategyModule is IStrategyModule, Initializable {
                 ++i;
             }
         }
-
+        clusterDetails.splitAddr = splitAddr;
         clusterDetails.dvStatus = dvStatus;
+    }
+
+    /**
+     * @notice Distributes the tokens issued from the PoS rewards evenly between the node operators.
+     * @param _split The current split struct of the StrategyModule. Can be reconstructed offchain since the only variable is the `recipients` field.
+     * @param _token The address of the token to distribute. NATIVE_TOKEN_ADDR = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE
+     * @dev The distributor is the msg.sender. He will earn the distribution fees.
+     * @dev If the push failed, the tokens will be sent to the SplitWarehouse. NodeOp will have to call the withdraw function.
+     */
+    function distributeSplitBalance(
+        SplitV2Lib.Split calldata _split,
+        address _token
+    ) external onlyIfNativeRestaking {
+        address splitAddr = clusterDetails.splitAddr;
+        PushSplit(splitAddr).distribute(_split, _token, msg.sender);
     }
 
     /**
@@ -246,8 +230,16 @@ contract StrategyModule is IStrategyModule, Initializable {
      * @notice Returns the DV nodes details of the Strategy Module
      * It returns the eth1Addr, the number of Validation Credit and the reputation score of each nodes.
      */
-    function getDVNodesDetails() public view returns (IStrategyModule.Node[4] memory) {
+    function getDVNodesDetails() public view onlyIfNativeRestaking returns (IStrategyModule.Node[4] memory) {
         return clusterDetails.nodes;
+    }
+
+    /**
+     * @notice Returns the address of the Split contract.
+     * @dev Contract where the PoS rewards will be sent (both execution and consensus rewards).
+     */
+    function getSplitAddress() public view onlyIfNativeRestaking returns (address) {
+        return clusterDetails.splitAddr;
     }
 
     /* ============== INTERNAL FUNCTIONS ============== */

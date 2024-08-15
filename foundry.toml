@@ -6,7 +6,7 @@ fs_permissions = [{ access = "read-write", path = "./"}]
 gas_reports = ["*"]
 
 # Override the Solidity version (this overrides `auto_detect_solc`)
-solc_version = '0.8.20'
+solc_version = '0.8.23'
 
 [fmt]
 bracket_spacing = false

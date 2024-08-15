@@ -14,6 +14,8 @@ import "../../src/vault/Escrow.sol";
 import "eigenlayer-contracts/pods/EigenPodManager.sol";
 import "eigenlayer-contracts/core/DelegationManager.sol";
 
+import "splits-v2/splitters/push/PushSplitFactory.sol";
+
 import "../../test/mocks/EmptyContract.sol";
 
 import "forge-std/Script.sol";
@@ -36,6 +38,9 @@ contract ExistingDeploymentParser is Script, Test {
     // EigenLayer contracts
     DelegationManager public delegation;
     EigenPodManager public eigenPodManager;
+
+    // Splits contracts
+    PushSplitFactory public pushSplitFactory;
 
     EmptyContract public emptyContract;
 
@@ -74,6 +79,9 @@ contract ExistingDeploymentParser is Script, Test {
         // read eigen layer contract addresses
         eigenPodManager = EigenPodManager(stdJson.readAddress(initialDeploymentData, ".eigenLayerContractAddr.eigenPodManager"));
         delegation = DelegationManager(stdJson.readAddress(initialDeploymentData, ".eigenLayerContractAddr.delegation"));
+
+        // read Splits contract addresses
+        pushSplitFactory = PushSplitFactory(stdJson.readAddress(initialDeploymentData, ".splitsContracts.pushSplitFactory"));
 
         logInitialDeploymentParams();
     }
@@ -123,6 +131,10 @@ contract ExistingDeploymentParser is Script, Test {
         require(
             strategyModuleManager.delegationManager() == delegation,
             "strategyModuleManager: delegationManager address not set correctly"
+        );
+        require(
+            strategyModuleManager.pushSplitFactory() == pushSplitFactory,
+            "strategyModuleManager: pushSplitFactory address not set correctly"
         );
         // StrategyModuleImplementation
         require(
@@ -234,6 +246,8 @@ contract ExistingDeploymentParser is Script, Test {
 
         emit log_named_address("eigenPodManager contract address", address(eigenPodManager));
         emit log_named_address("delegationManager contract address", address(delegation));
+
+        emit log_named_address("pushSplitFactory contract address", address(pushSplitFactory));
 
     }
 

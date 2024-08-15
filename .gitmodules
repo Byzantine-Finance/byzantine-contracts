@@ -16,3 +16,9 @@
 [submodule "lib/ds-math"]
 	path = lib/ds-math
 	url = https://github.com/dapphub/ds-math
+[submodule "lib/splits-contracts-v2"]
+	path = lib/splits-contracts-v2
+	url = https://github.com/asanson1404/splits-contracts-monorepo
+[submodule "lib/openzeppelin-contracts-v4.9.3"]
+	path = lib/openzeppelin-contracts-v4.9.3
+	url = https://github.com/OpenZeppelin/openzeppelin-contracts

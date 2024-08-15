@@ -7,6 +7,7 @@ import "eigenlayer-contracts/interfaces/IEigenPod.sol";
 import "eigenlayer-contracts/interfaces/IDelegationManager.sol";
 import "eigenlayer-contracts/interfaces/IStrategy.sol";
 import "eigenlayer-contracts/libraries/BeaconChainProofs.sol";
+import { SplitV2Lib } from "splits-v2/libraries/SplitV2.sol";
 import "./utils/ProofParsing.sol";
 
 import "./ByzantineDeployer.t.sol";
@@ -27,6 +28,9 @@ contract StrategyModuleManagerTest is ProofParsing, ByzantineDeployer {
     bytes pubkey;
     bytes signature;
     bytes32 depositDataRoot;
+
+    /// @notice address of the native token in the Split contract
+    address public constant SPLIT_NATIVE_TOKEN_ADDR = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
 
     /// @notice Initial balance of all the node operators
     uint256 constant STARTING_BALANCE = 100 ether;
@@ -207,11 +211,15 @@ contract StrategyModuleManagerTest is ProofParsing, ByzantineDeployer {
 
     }
 
-    function testpreCalculatePodAddress() public preCreateClusters(2) {
-        // Pre-calculate pod address of DV1, DV2 and DV3
-        address podAddressDV1 = strategyModuleManager.preCalculatePodAddress(0);
-        address podAddressDV2 = strategyModuleManager.preCalculatePodAddress(1);
-        address podAddressDV3 = strategyModuleManager.preCalculatePodAddress(2);
+    function testpreCalculatePodAndSplitAddress() public preCreateClusters(2) {
+
+        // Pre-calculate pod and split address of DV1 and DV2
+        (address podAddressDV1, address splitAddressDV1) = strategyModuleManager.preCalculatePodAndSplitAddr(0);
+        (address podAddressDV2, address splitAddressDV2) = strategyModuleManager.preCalculatePodAndSplitAddr(1);
+
+        // Sould revert because DV3 is not in the precreated clusters range
+        vm.expectRevert(bytes("StrategyModuleManager.preCalculatePodAndSplitAddr: invalid nounce. Should be in the precreated clusters range"));
+        (address podAddressDV3, address splitAddressDV3) = strategyModuleManager.preCalculatePodAndSplitAddr(2);
 
         // Node ops bids again
         _8NodeOpsBid();
@@ -220,6 +228,12 @@ contract StrategyModuleManagerTest is ProofParsing, ByzantineDeployer {
         address aliceStratModAddr1 = _createStratModAndStakeNativeETH(alice, 32 ether);
         address aliceStratModAddr2 = _createStratModAndStakeNativeETH(alice, 32 ether);
 
+        // Should revert because DV1 is already created
+        vm.expectRevert(bytes("StrategyModuleManager.preCalculatePodAndSplitAddr: invalid nounce. Should be in the precreated clusters range"));
+        strategyModuleManager.preCalculatePodAndSplitAddr(0);
+
+        (podAddressDV3, splitAddressDV3) = strategyModuleManager.preCalculatePodAndSplitAddr(2);
+
         // Bob creates a StrategyModule
         address bobStratModAddr1 = _createStratModAndStakeNativeETH(bob, 32 ether);
 
@@ -227,6 +241,11 @@ contract StrategyModuleManagerTest is ProofParsing, ByzantineDeployer {
         assertEq(strategyModuleManager.getPodByStratModAddr(aliceStratModAddr1), podAddressDV1);
         assertEq(strategyModuleManager.getPodByStratModAddr(aliceStratModAddr2), podAddressDV2);
         assertEq(strategyModuleManager.getPodByStratModAddr(bobStratModAddr1), podAddressDV3);
+
+        // Verify split addresses of DV1, DV2 and DV3
+        assertEq(IStrategyModule(aliceStratModAddr1).getSplitAddress(), splitAddressDV1);
+        assertEq(IStrategyModule(aliceStratModAddr2).getSplitAddress(), splitAddressDV2);
+        assertEq(IStrategyModule(bobStratModAddr1).getSplitAddress(), splitAddressDV3);
     }
 
     // Within foundry, resulting address of a contract deployed with CREATE2 differs according to the msg.sender.
@@ -244,6 +263,47 @@ contract StrategyModuleManagerTest is ProofParsing, ByzantineDeployer {
         vm.expectRevert(bytes("Cannot initialize StrategyModule: ERC721: invalid token ID"));
         IStrategyModule(stratModAddr).initialize(firstNftId, bob);
         vm.stopPrank();
+    }
+
+    function testSplitDistribution() public preCreateClusters(2) {
+        // Alice creates a StrategyModule
+        IStrategyModule stratModAlice = IStrategyModule(_createStratModAndStakeNativeETH(alice, 32 ether));
+        address stratModAliceSplit = stratModAlice.getSplitAddress();
+
+        // Create the recipients array
+        IStrategyModule.Node[4] memory nodesDVAlice = stratModAlice.getDVNodesDetails();
+        address[] memory recipients = new address[](nodesDVAlice.length);
+        for (uint i = 0; i < nodesDVAlice.length; i++) {
+            recipients[i] = nodesDVAlice[i].eth1Addr;
+        }
+
+        // Get DV's node ops' balances
+        uint256[] memory nodeOpsInitialBalances = new uint256[](nodesDVAlice.length);
+        for (uint i = 0; i < nodesDVAlice.length; i++) {
+            nodeOpsInitialBalances[i] = recipients[i].balance;
+        }
+        // Get distributor's balance
+        uint256 distributorBalance = bob.balance;
+
+        // Fake the PoS rewards and add 100ETH in stratModAliceSplit contract
+        vm.deal(stratModAliceSplit, 100 ether);
+        assertEq(stratModAliceSplit.balance, 100 ether);
+
+        SplitV2Lib.Split memory split = _createSplit(recipients);
+        // Bob distributes the Split balance to DV's node ops
+        vm.prank(bob);
+        stratModAlice.distributeSplitBalance(split, SPLIT_NATIVE_TOKEN_ADDR);
+
+        // Verify the Split contract balance has been drained
+        assertEq(stratModAliceSplit.balance, 1); // 0xSplits decided to left 1 wei to save gas. Only impact the distributor rewards
+
+        // Verify the new balances of the DV's node ops
+        for (uint i = 0; i < nodesDVAlice.length; i++) {
+            assertEq(recipients[i].balance, nodeOpsInitialBalances[i] + 24.5 ether);
+        }
+
+        // Verify the distributor balance
+        assertEq(bob.balance, distributorBalance + 2 ether - 1);
     }
 
     function testStratModTransfer() public preCreateClusters(2) {
@@ -525,6 +585,23 @@ contract StrategyModuleManagerTest is ProofParsing, ByzantineDeployer {
             "_registerAsELOperator: operatorDetails not set appropriately"
         );
         assertTrue(delegation.isDelegated(operator), "_registerAsELOperator: operator doesn't delegate itself");
+    }
+
+    function _createSplit(
+        address[] memory recipients
+    ) internal view returns (SplitV2Lib.Split memory split) {
+
+        uint256[] memory allocations = new uint256[](recipients.length);
+        for (uint256 i = 0; i < recipients.length; i++) {
+            allocations[i] = strategyModuleManager.NODE_OP_SPLIT_ALLOCATION();
+        }
+
+        split = SplitV2Lib.Split({
+            recipients: recipients,
+            allocations: allocations,
+            totalAllocation: strategyModuleManager.SPLIT_TOTAL_ALLOCATION(),
+            distributionIncentive: strategyModuleManager.SPLIT_DISTRIBUTION_INCENTIVE()
+        });
     }
 
     function _createOneBidParamArray(
