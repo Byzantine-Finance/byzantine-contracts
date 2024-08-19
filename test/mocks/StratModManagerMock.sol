@@ -41,12 +41,17 @@ contract StratModManagerMock  {
     function createStrategyModules(uint256 _vc1, uint256 _vc2, uint256 _vc3, uint256 _vc4, uint256 _bidPrices) external {
         // Create a new StrategyModule and store it in the mapping
         StrategyModuleMock stratMod = new StrategyModuleMock(this, stakerRewardsMock);
-        nftIdToStratMod[numStratMods] = address(stratMod);
-        stakerToStratMods[msg.sender].push(address(stratMod));
 
         // Store nodes in the clusterDetails struct
         StrategyModuleMock.Node[4] memory nodes = _createDV(_vc1, _vc2, _vc3, _vc4);
         stratMod.setClusterDetails(nodes, StrategyModuleMock.DVStatus.ACTIVE_AND_VERIFIED);
+
+        // Set the mappings
+        uint256 tokenId = uint256(keccak256(abi.encode(numStratMods)));
+        nftIdToStratMod[tokenId] = address(stratMod);
+        stakerToStratMods[msg.sender].push(address(stratMod));
+
+        ++numStratMods;
 
         // Send bid prices to StakerRewards contract
         (bool success,) = address(stakerRewardsMock).call{value: _bidPrices}("");
@@ -54,9 +59,7 @@ contract StratModManagerMock  {
 
         // Update StakerRewards checkpoint 
         uint256 totalNewVCs = _vc1 + _vc2 + _vc3 + _vc4;
-        stakerRewardsMock.stakerJoined(address(stratMod), _vc1, totalNewVCs, 4);
-        
-        ++numStratMods;
+        stakerRewardsMock.strategyModuleDeployed(address(stratMod), _vc1, totalNewVCs, 4);
     }
 
     function setStakerRewardsMock(StakerRewardsMock _stakerRewardsMock) external {
