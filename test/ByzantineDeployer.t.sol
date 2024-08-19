@@ -38,6 +38,7 @@ contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
     uint8 public clusterSize = 4;
     // Initial StakerRewards parameters
     uint256 public upkeepInterval = 60;
+    uint256 public claimInterval = 4;
 
     /* =============== TEST VARIABLES AND STRUCT =============== */
    
@@ -184,7 +185,8 @@ contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
             address(stakerRewardsImplementation),
             abi.encodeWithSelector(
                 StakerRewards.initialize.selector,
-                upkeepInterval
+                upkeepInterval,
+                claimInterval
             )
         );
     }
@@ -204,6 +206,7 @@ contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
         // StakerRewards
         assertEq(stakerRewards.totalVCs(), 0);
         assertEq(stakerRewards.upkeepInterval(), upkeepInterval);
+        assertEq(stakerRewards.claimInterval(), claimInterval);
     }
 
 } 

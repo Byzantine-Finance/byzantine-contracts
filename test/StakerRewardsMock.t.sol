@@ -31,7 +31,7 @@ contract StakerRewardsMockTest is Test {
         vm.deal(address(stratModManagerMock), SEND_VALUE);
     }
 
-    function testPrecreateDVAndCreateStrategyModulesWorkCorrectly() public {
+    function testPrecreateDVAndCreateStrategyModules_WorkCorrectly() public {
         // Starting timestamp is 1
 
         // Checkpoint 1: Precreate a DV
@@ -51,7 +51,8 @@ contract StakerRewardsMockTest is Test {
         stratModManagerMock.createStrategyModules(100, 200, 300, 400, 3 ether);
         assertEq(stratModManagerMock.numStratMods(), 1);
         address stratModAddr = stratModManagerMock.getStratMods(alice)[0];
-        assertEq(stratModManagerMock.getStratModByNftId(0), stratModAddr);
+        uint256 tokenId = uint256(keccak256(abi.encode(0)));
+        assertEq(stratModManagerMock.getStratModByNftId(tokenId), stratModAddr);
 
         StrategyModuleMock.Node[4] memory nodes = StrategyModuleMock(stratModAddr).getDVNodesDetails();
         assertEq(nodes[0].vcNumber, 100);
@@ -62,7 +63,7 @@ contract StakerRewardsMockTest is Test {
         // no VCs have been consumed yet
         assertEq(address(stakerRewardsMock).balance, 4250000000000000000);
         assertEq(stakerRewardsMock.totalVCs(), 1700);
-        (uint256 lastUpdateTime, uint256 smallestVCNumber, uint256 exitTimestamp, ) = stakerRewardsMock.getStratModData(stratModAddr);
+        (uint256 lastUpdateTime, uint256 smallestVCNumber, uint256 exitTimestamp, , ) = stakerRewardsMock.getStratModData(stratModAddr);
         assertEq(lastUpdateTime, 11);
         assertEq(smallestVCNumber, 100);
         assertEq(exitTimestamp, plus10Days + 100);
@@ -90,7 +91,7 @@ contract StakerRewardsMockTest is Test {
         console.log("timestamp: %s", block.timestamp); // 61
     }
 
-    function testCheckUpkeepReturnsFalseIfNoStratModsHasConsumedAllVCs() public setupForTestingChainlink {
+    function testCheckUpkeep_ReturnsFalseIfNoStratModsHasConsumedAllVCs() public setupForTestingChainlink {
         // starting time +61 days
         // The smallest VC number is 100
         assertEq(block.timestamp, 61); 
@@ -111,7 +112,7 @@ contract StakerRewardsMockTest is Test {
         stakerRewardsMock.performUpkeep("");
     }
 
-    function testCheckUpkeepReturnsTrueWhenParametersGood() public setupForTestingChainlink {
+    function testCheckUpkeep_ReturnsTrueWhenParametersGood() public setupForTestingChainlink {
         // starting time +61 days
         // 50 days after Alice has deployed her strategy module
         assertEq(block.timestamp, 61); 
@@ -122,7 +123,7 @@ contract StakerRewardsMockTest is Test {
         vm.warp(block.timestamp + automationUpdateInterval);
 
         address stratModAddr = stratModManagerMock.getStratMods(alice)[0];
-        (, , uint256 exitTimestamp, ) = stakerRewardsMock.getStratModData(stratModAddr);
+        (, , uint256 exitTimestamp, , ) = stakerRewardsMock.getStratModData(stratModAddr);
         assertEq(exitTimestamp, 111);
 
         // Act
@@ -132,7 +133,7 @@ contract StakerRewardsMockTest is Test {
         assert(upkeepNeeded);
     }
 
-    function testPerformUpkeepUpdatesVCsAndCheckpoint() public setupForTestingChainlink {
+    function testPerformUpkeep_UpdatesVCsAndCheckpoint() public setupForTestingChainlink {
         // starting time +61 days
         // if timestamp = 111, Alice's strategy module has consumed all VCs
         uint256 automationUpdateInterval = 51;
@@ -147,8 +148,8 @@ contract StakerRewardsMockTest is Test {
 
         // Decode the performData to get the strategy module addresses
         address stratModAddr = stratModManagerMock.getStratMods(alice)[0];
-        (address[] memory statModAddresses, uint256[] memory stratModTotalVCs) = abi.decode(performData, (address[], uint256[]));
-        assertEq(statModAddresses[0], stratModAddr);
+        (address[] memory stratModAddresses, uint256[] memory stratModTotalVCs) = abi.decode(performData, (address[], uint256[]));
+        assertEq(stratModAddresses[0], stratModAddr);
         assertEq(stratModTotalVCs[0], 1000);
         assertEq(stakerRewardsMock.totalActiveDVs(), 2);
 
@@ -180,13 +181,43 @@ contract StakerRewardsMockTest is Test {
         assertEq(dailyRewardsPerDV, 13239273289524544);
     }
 
-    modifier startAtPresentDay() {
-        vm.warp(1722928880);
-        _;
+    function testPerformUpkeep_TwoUpkeepPerformedSubsequently() public setupForTestingChainlink {
+        // if timestamp = 111, Alice's strategy module has consumed all VCs
+        vm.warp(block.timestamp + 51);
+        // Manually call checkUpkeep to set upkeepNeeded to true 
+        (bool upkeepNeededAlice, bytes memory performDataAlice) = stakerRewardsMock.checkUpkeep("");
+        // UpkeepNeeded should be true
+        assert(upkeepNeededAlice);
+        stakerRewardsMock.performUpkeep(performDataAlice);
+
+        // if timestamp = 170, Bob's strategy module has consumed all VCs
+        vm.warp(block.timestamp + 60);
+        // Manually call checkUpkeep to set upkeepNeeded to true 
+        (bool upkeepNeededBob, bytes memory performDataBob) = stakerRewardsMock.checkUpkeep("");
+        // UpkeepNeeded should be true
+        assert(upkeepNeededBob);
+        stakerRewardsMock.performUpkeep(performDataBob);
+
+        // ASSERT
+        address stratModAddrBob = stratModManagerMock.getStratMods(bob)[0];
+        StrategyModuleMock.Node[4] memory nodes = StrategyModuleMock(stratModAddrBob).getDVNodesDetails();
+        assertEq(nodes[0].vcNumber, 0);
+        assertEq(nodes[1].vcNumber, 110);
+        assertEq(nodes[2].vcNumber, 220);
+        assertEq(nodes[3].vcNumber, 330);
+        StrategyModuleMock.DVStatus status = StrategyModuleMock(stratModAddrBob).getDVStatus();
+        assertEq(uint(status), uint(StrategyModuleMock.DVStatus.EXITED));
+        console.log("total VCs: ", stakerRewardsMock.totalVCs());
+
+        // The third upkeep should not be triggered
+        vm.warp(block.timestamp + 200);
+        assertEq(stakerRewardsMock.totalActiveDVs(), 0);
+        vm.expectRevert(StakerRewardsMock.UpkeepNotNeeded.selector);
+        stakerRewardsMock.checkUpkeep("");
     }
 
     modifier setupForTestingChainlink() {
-        testPrecreateDVAndCreateStrategyModulesWorkCorrectly();
+        testPrecreateDVAndCreateStrategyModules_WorkCorrectly();
         _;
     }
 }
