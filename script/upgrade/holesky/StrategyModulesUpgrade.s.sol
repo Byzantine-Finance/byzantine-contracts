@@ -43,7 +43,8 @@ contract StrategyModulesUpgrade is ExistingDeploymentParser {
             auction,
             byzNft,
             eigenPodManager,
-            delegation
+            delegation, 
+            stakerRewards
         );
         // Upgrade UpgradeableBeacon
         strategyModuleBeacon.upgradeTo(address(strategyModuleImplementation));

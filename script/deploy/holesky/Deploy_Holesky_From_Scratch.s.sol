@@ -145,7 +145,8 @@ contract Deploy_Holesky_From_Scratch is ExistingDeploymentParser {
             address(stakerRewardsImplementation),
             abi.encodeWithSelector(
                 stakerRewards.initialize.selector,
-                UPKEEP_INTERVAL
+                UPKEEP_INTERVAL,
+                CLAIM_INTERVAL
             )
         );
     }
