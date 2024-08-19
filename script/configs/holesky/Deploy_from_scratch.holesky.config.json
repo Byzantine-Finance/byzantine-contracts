@@ -8,7 +8,10 @@
     "min_Validation_duration": 90,
     "cluster_size": 4
   },
-  "upkeepInterval": 60,
+  "stakerRewardsConfig": {
+    "upkeepInterval": 60,
+    "claimInterval": 4
+  },
   "eigenLayerContractAddr": {
     "eigenPodManager": "0x30770d7E3e71112d7A6b7259542D1f680a70e315",
     "delegation": "0xA44151489861Fe9e3055d95adC98FbD462B948e7"

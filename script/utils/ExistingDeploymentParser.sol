@@ -58,6 +58,7 @@ contract ExistingDeploymentParser is Script, Test {
     uint8 CLUSTER_SIZE;
     // Initial StakerRewards parameters
     uint256 UPKEEP_INTERVAL;
+    uint256 CLAIM_INTERVAL;
 
     /// @notice use for deploying a new set of Byzantine contracts
     function _parseInitialDeploymentParams(string memory initialDeploymentParamsPath) internal virtual {
@@ -82,7 +83,8 @@ contract ExistingDeploymentParser is Script, Test {
         // bidReceiver = stdJson.readAddress(initialDeploymentData, ".bidReceiver");
 
         // read stakerRewards config
-        UPKEEP_INTERVAL = stdJson.readUint(initialDeploymentData, ".upkeepInterval");
+        UPKEEP_INTERVAL = stdJson.readUint(initialDeploymentData, ".stakerRewardsConfig.upkeepInterval");
+        CLAIM_INTERVAL = stdJson.readUint(initialDeploymentData, ".stakerRewardsConfig.claimInterval");
 
         // read eigen layer contract addresses
         eigenPodManager = EigenPodManager(stdJson.readAddress(initialDeploymentData, ".eigenLayerContractAddr.eigenPodManager"));
@@ -236,7 +238,7 @@ contract ExistingDeploymentParser is Script, Test {
         auction.initialize(byzantineAdmin, EXPECTED_POS_DAILY_RETURN_WEI, MAX_DISCOUNT_RATE, MIN_VALIDATION_DURATION, CLUSTER_SIZE);
         // StakerRewards
         vm.expectRevert(bytes("Initializable: contract is already initialized"));
-        stakerRewards.initialize(UPKEEP_INTERVAL);
+        stakerRewards.initialize(UPKEEP_INTERVAL, CLAIM_INTERVAL);
     }
 
     /// @notice Verify params based on config constants that are updated from calling `_parseInitialDeploymentParams`
