@@ -50,7 +50,7 @@ contract EscrowTest is Test {
         escrow.releaseFunds(1000);
         escrow.releaseFunds(100);
         assertEq(address(escrow).balance, 400);
-        assertEq(address(stakerRewards).balance, 100);
+        assertEq(stakerRewardsContractAddr.balance, 100);
         vm.stopPrank();
     }
 

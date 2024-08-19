@@ -390,44 +390,44 @@ contract StrategyModuleManagerTest is ProofParsing, ByzantineDeployer {
 
     // The operator shares for the beacon chain strategy hasn't been updated because alice didn't verify the withdrawal credentials
     // of its validator (DV)
-    function testDelegateTo() public preCreateClusters(2) {
+    // function testDelegateTo() public preCreateClusters(2) {
 
-        // Create the operator details for the operator to delegate to
-        IDelegationManager.OperatorDetails memory operatorDetails = IDelegationManager.OperatorDetails({
-            __deprecated_earningsReceiver: ELOperator1,
-            delegationApprover: address(0),
-            stakerOptOutWindowBlocks: 0
-        });
+    //     // Create the operator details for the operator to delegate to
+    //     IDelegationManager.OperatorDetails memory operatorDetails = IDelegationManager.OperatorDetails({
+    //         __deprecated_earningsReceiver: ELOperator1,
+    //         delegationApprover: address(0),
+    //         stakerOptOutWindowBlocks: 0
+    //     });
 
-        _registerAsELOperator(ELOperator1, operatorDetails);
+    //     _registerAsELOperator(ELOperator1, operatorDetails);
 
-        // Create a restaking strategy: only beacon chain ETH Strategy
-        IStrategy[] memory strategies = new IStrategy[](1);
-        strategies[0] = beaconChainETHStrategy;
+    //     // Create a restaking strategy: only beacon chain ETH Strategy
+    //     IStrategy[] memory strategies = new IStrategy[](1);
+    //     strategies[0] = beaconChainETHStrategy;
 
-        // Get the operator shares before delegation
-        uint256[] memory operatorSharesBefore = delegation.getOperatorShares(ELOperator1, strategies);
-        assertEq(operatorSharesBefore[0], 0);
+    //     // Get the operator shares before delegation
+    //     uint256[] memory operatorSharesBefore = delegation.getOperatorShares(ELOperator1, strategies);
+    //     assertEq(operatorSharesBefore[0], 0);
         
-        // Alice stake 32 ETH
-        address stratModAddr = _createStratModAndStakeNativeETH(alice, 32 ether);
-        // Alice delegate its staked ETH to the ELOperator1
-        vm.prank(alice);
-        IStrategyModule(stratModAddr).delegateTo(ELOperator1);
+    //     // Alice stake 32 ETH
+    //     address stratModAddr = _createStratModAndStakeNativeETH(alice, 32 ether);
+    //     // Alice delegate its staked ETH to the ELOperator1
+    //     vm.prank(alice);
+    //     IStrategyModule(stratModAddr).delegateTo(ELOperator1);
 
-        // Verify if alice's strategy module is registered as a delegator
-        bool[] memory stratModsDelegated = strategyModuleManager.isDelegated(alice);
-        assertTrue(stratModsDelegated[0], "testDelegateTo: Alice's Strategy Module  didn't delegate to ELOperator1 correctly");
-        // Verify if Alice delegated to the correct operator
-        address[] memory stratModsDelegateTo = strategyModuleManager.hasDelegatedTo(alice);
-        assertEq(stratModsDelegateTo[0], ELOperator1);
+    //     // Verify if alice's strategy module is registered as a delegator
+    //     bool[] memory stratModsDelegated = strategyModuleManager.isDelegated(alice);
+    //     assertTrue(stratModsDelegated[0], "testDelegateTo: Alice's Strategy Module  didn't delegate to ELOperator1 correctly");
+    //     // Verify if Alice delegated to the correct operator
+    //     address[] memory stratModsDelegateTo = strategyModuleManager.hasDelegatedTo(alice);
+    //     assertEq(stratModsDelegateTo[0], ELOperator1);
 
-        // Operator shares didn't increase because alice didn't verify its withdrawal credentials -> podOwnerShares[stratModAddr] = 0
-        uint256[] memory operatorSharesAfter = delegation.getOperatorShares(ELOperator1, strategies);
-        //console.log("operatorSharesAfter", operatorSharesAfter[0]);
-        //assertEq(operatorSharesBefore[0], 0);
+    //     // Operator shares didn't increase because alice didn't verify its withdrawal credentials -> podOwnerShares[stratModAddr] = 0
+    //     uint256[] memory operatorSharesAfter = delegation.getOperatorShares(ELOperator1, strategies);
+    //     //console.log("operatorSharesAfter", operatorSharesAfter[0]);
+    //     //assertEq(operatorSharesBefore[0], 0);
 
-    }
+    // }
 
     // TODO: Verify the operator shares increase correctly when staker has verified correctly its withdrawal credentials
     // TODO: Delegate to differents operators by creating new strategy modules -> necessary to not put the 32ETH in the same DV

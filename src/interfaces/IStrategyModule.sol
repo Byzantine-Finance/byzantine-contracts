@@ -142,7 +142,6 @@ interface IStrategyModule {
    */
   function getDVNodesDetails() external view returns (IStrategyModule.Node[4] memory);
 
-
   /// @dev Error when unauthorized call to a function callable only by the Strategy Module Owner (aka the ByzNft holder).
   error OnlyNftOwner();
 
@@ -152,10 +151,12 @@ interface IStrategyModule {
   /// @dev Error when unauthorized call to a function callable only by the StrategyModuleManager.
   error OnlyStrategyModuleManager();
 
+  /// @dev Error when unauthorized call to a function callable only by the StakerRewards contract.
+  error OnlyStakerRewards();
+
   /// @dev Returned when not privided the right number of nodes 
   error InvalidClusterSize();
 
   /// @dev Returned on failed Eigen Layer contracts call
   error CallFailed(bytes data);
-
 }

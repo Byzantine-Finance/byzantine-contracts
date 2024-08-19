@@ -150,7 +150,7 @@ contract StrategyModuleManager is
         }
 
         // Update the staker details in the StakerRewards contract
-        stakerRewards.stakerJoined(address(newStratMod), smallestVC, totalVCs, clusterSize);
+        stakerRewards.strategyModuleDeployed(address(newStratMod), smallestVC, totalVCs, clusterSize);
     }
 
     /**

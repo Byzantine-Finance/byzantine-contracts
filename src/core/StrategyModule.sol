@@ -30,6 +30,12 @@ contract StrategyModule is Initializable, StrategyModuleStorage {
         _;
     }
 
+    modifier onlyStakerRewards() {
+        if (msg.sender != address(stakerRewards)) revert OnlyStakerRewards();
+        _;
+    }
+
+
     /* ============== CONSTRUCTOR & INITIALIZER ============== */
 
     /// @custom:oz-upgrades-unsafe-allow constructor

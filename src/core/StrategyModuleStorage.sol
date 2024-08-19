@@ -5,6 +5,7 @@ import "../interfaces/IStrategyModule.sol";
 import "../interfaces/IByzNft.sol";
 import "../interfaces/IStrategyModuleManager.sol";
 import "../interfaces/IAuction.sol";
+import "../interfaces/IStakerRewards.sol";
 import "eigenlayer-contracts/interfaces/IEigenPodManager.sol";
 import "eigenlayer-contracts/interfaces/IEigenPod.sol";
 import "eigenlayer-contracts/interfaces/IDelegationManager.sol";
@@ -23,6 +24,9 @@ abstract contract StrategyModuleStorage is IStrategyModule {
 
     /// @notice ByzNft contract
     IByzNft public immutable byzNft;
+
+    /// @notice Address of the StakerRewards contract
+    IStakerRewards public immutable stakerRewards;
 
     /// @notice Address of the Auction contract
     IAuction public immutable auction;
