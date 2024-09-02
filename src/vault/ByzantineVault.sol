@@ -1,19 +1,25 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/utils/math/Math.sol";
+import "@openzeppelin-upgrades/contracts/proxy/utils/Initializable.sol";
+import "@openzeppelin-upgrades/contracts/token/ERC20/extensions/ERC4626Upgradeable.sol";
+import "@openzeppelin-upgrades/contracts/token/ERC20/IERC20Upgradeable.sol";
+import "@openzeppelin-upgrades/contracts/token/ERC20/utils/SafeERC20Upgradeable.sol";
+import "@openzeppelin-upgrades/contracts/utils/math/MathUpgradeable.sol";
 
-contract ByzantineVault is ERC4626 {
+contract ByzantineVault is Initializable, ERC4626Upgradeable {
 
     error NotETHVault();
 
-    constructor(IERC20 asset, string memory sharesName, string memory sharesSymbol) 
-        ERC4626(IERC20Metadata(address(asset)))
-        ERC20(sharesName, sharesSymbol)
-    {
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
+    function initialize(IERC20Upgradeable asset, string memory sharesName, string memory sharesSymbol) public initializer {
+        __ERC4626_init(IERC20MetadataUpgradeable(address(asset)));
+        __ERC20_init(sharesName, sharesSymbol);
+        
         sharesName = string(abi.encodePacked("Byzantine ", sharesSymbol));
         sharesSymbol = string(abi.encodePacked("byz", sharesSymbol));
     }
@@ -52,4 +58,6 @@ contract ByzantineVault is ERC4626 {
             return super.redeem(shares, receiver, owner);
         }
     }
+
+    uint256[50] private __gap;
 }
