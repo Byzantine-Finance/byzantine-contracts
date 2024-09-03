@@ -1,13 +1,13 @@
-# IStrategyModule
-[Git Source](https://github.com/Byzantine-Finance/byzantine-contracts/blob/80b6cda4622c51c2217311610eeb15b655b99e2c/src/interfaces/IStrategyModule.sol)
+# IStrategyVault
+[Git Source](https://github.com/Byzantine-Finance/byzantine-contracts/blob/80b6cda4622c51c2217311610eeb15b655b99e2c/src/interfaces/IStrategyVault.sol)
 
 
 ## Functions
 ### initialize
 
-Used to initialize the nftId of that StrategyModule and its owner.
+Used to initialize the nftId of that StrategyVault and its owner.
 
-*Called on construction by the StrategyModuleManager.*
+*Called on construction by the StrategyVaultManager.*
 
 
 ```solidity
@@ -16,7 +16,7 @@ function initialize(uint256 _nftId, address _initialOwner) external;
 
 ### stratModNftId
 
-Returns the owner of this StrategyModule
+Returns the owner of this StrategyVault
 
 
 ```solidity
@@ -25,7 +25,7 @@ function stratModNftId() external view returns (uint256);
 
 ### stratModOwner
 
-Returns the address of the owner of the Strategy Module's ByzNft.
+Returns the address of the owner of the Strategy Vault's ByzNft.
 
 
 ```solidity
@@ -35,11 +35,11 @@ function stratModOwner() external view returns (address);
 ### stakeNativeETH
 
 Deposit 32ETH in the beacon chain to activate a Distributed Validator and start validating on the consensus layer.
-Also creates an EigenPod for the StrategyModule. The NFT owner can staker additional native ETH by calling again this function.
+Also creates an EigenPod for the StrategyVault. The NFT owner can staker additional native ETH by calling again this function.
 
-*Function is callable only by the StrategyModuleManager or the NFT Owner.*
+*Function is callable only by the StrategyVaultManager or the NFT Owner.*
 
-*The first call to this function is done by the StrategyModuleManager and creates the StrategyModule's EigenPod.*
+*The first call to this function is done by the StrategyVaultManager and creates the StrategyVault's EigenPod.*
 
 
 ```solidity
@@ -130,7 +130,7 @@ function verifyBalanceUpdates(
 
 ### delegateTo
 
-The caller delegate its Strategy Module's stake to an Eigen Layer operator.
+The caller delegate its Strategy Vault's stake to an Eigen Layer operator.
 
 /!\ Delegation is all-or-nothing: when a Staker delegates to an Operator, they delegate ALL their stake.
 
@@ -148,14 +148,14 @@ function delegateTo(address operator) external;
 
 |Name|Type|Description|
 |----|----|-----------|
-|`operator`|`address`|The account teh STrategy Module is delegating its assets to for use in serving applications built on EigenLayer.|
+|`operator`|`address`|The account teh Strategy Vault is delegating its assets to for use in serving applications built on EigenLayer.|
 
 
 ### setClusterDetails
 
-Set the `clusterDetails` struct of the StrategyModule.
+Set the `clusterDetails` struct of the StrategyVault.
 
-*Callable only by the StrategyModuleManager and bound a pre-created DV to this StrategyModule.*
+*Callable only by the StrategyVaultManager and bound a pre-created DV to this StrategyVault.*
 
 
 ```solidity
@@ -171,9 +171,9 @@ function setClusterDetails(Node[4] calldata nodes, DVStatus dvStatus) external;
 
 ### withdrawContractBalance
 
-Allow the Strategy Module's owner to withdraw the smart contract's balance.
+Allow the Strategy Vault's owner to withdraw the smart contract's balance.
 
-*Revert if the caller is not the owner of the Strategy Module's ByzNft.*
+*Revert if the caller is not the owner of the Strategy Vault's ByzNft.*
 
 
 ```solidity
@@ -206,37 +206,37 @@ function getDVStatus() external view returns (DVStatus);
 
 ### getDVNodesDetails
 
-Returns the DV nodes details of the Strategy Module
+Returns the DV nodes details of the Strategy Vault
 It returns the eth1Addr, the number of Validation Credit and the reputation score of each nodes.
 
 
 ```solidity
-function getDVNodesDetails() external view returns (IStrategyModule.Node[4] memory);
+function getDVNodesDetails() external view returns (IStrategyVault.Node[4] memory);
 ```
 
 ## Errors
 ### OnlyNftOwner
-*Error when unauthorized call to a function callable only by the Strategy Module Owner (aka the ByzNft holder).*
+*Error when unauthorized call to a function callable only by the Strategy Vault Owner (aka the ByzNft holder).*
 
 
 ```solidity
 error OnlyNftOwner();
 ```
 
-### OnlyNftOwnerOrStrategyModuleManager
-*Error when unauthorized call to a function callable only by the StrategyModuleOwner or the StrategyModuleManager.*
+### OnlyNftOwnerOrStrategyVaultManager
+*Error when unauthorized call to a function callable only by the StrategyVaultOwner or the StrategyVaultManager.*
 
 
 ```solidity
-error OnlyNftOwnerOrStrategyModuleManager();
+error OnlyNftOwnerOrStrategyVaultManager();
 ```
 
-### OnlyStrategyModuleManager
-*Error when unauthorized call to a function callable only by the StrategyModuleManager.*
+### OnlyStrategyVaultManager
+*Error when unauthorized call to a function callable only by the StrategyVaultManager.*
 
 
 ```solidity
-error OnlyStrategyModuleManager();
+error OnlyStrategyVaultManager();
 ```
 
 ### InvalidClusterSize

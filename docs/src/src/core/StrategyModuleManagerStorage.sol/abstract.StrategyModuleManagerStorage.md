@@ -1,13 +1,13 @@
-# StrategyModuleManagerStorage
-[Git Source](https://github.com/Byzantine-Finance/byzantine-contracts/blob/80b6cda4622c51c2217311610eeb15b655b99e2c/src/core/StrategyModuleManagerStorage.sol)
+# StrategyVaultManagerStorage
+[Git Source](https://github.com/Byzantine-Finance/byzantine-contracts/blob/80b6cda4622c51c2217311610eeb15b655b99e2c/src/core/StrategyVaultManagerStorage.sol)
 
 **Inherits:**
-[IStrategyModuleManager](/src/interfaces/IStrategyModuleManager.sol/interface.IStrategyModuleManager.md)
+[IStrategyVaultManager](/src/interfaces/IStrategyVaultManager.sol/interface.IStrategyVaultManager.md)
 
 
 ## State Variables
 ### stratModBeacon
-Beacon proxy to which the StrategyModules point
+Beacon proxy to which the StrategyVaults point
 
 
 ```solidity
@@ -52,7 +52,7 @@ IDelegationManager public immutable delegationManager;
 
 
 ### stakerToStratMods
-Staker to its owned StrategyModules
+Staker to its owned StrategyVaults
 
 
 ```solidity
@@ -61,7 +61,7 @@ mapping(address => address[]) public stakerToStratMods;
 
 
 ### nftIdToStratMod
-ByzNft tokenId to its tied StrategyModule
+ByzNft tokenId to its tied StrategyVault
 
 
 ```solidity
@@ -74,7 +74,7 @@ Mapping to store the pre-created clusters waiting for work
 
 
 ```solidity
-mapping(uint64 => IStrategyModule.ClusterDetails) public pendingClusters;
+mapping(uint64 => IStrategyVault.ClusterDetails) public pendingClusters;
 ```
 
 

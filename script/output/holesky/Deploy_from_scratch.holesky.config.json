@@ -8,10 +8,10 @@
     "emptyContract": "0xb3b18C956f1D0D90a5E45D3249b9C31711aFb8a6",
     "escrow": "0x5FE3eD446e0195E9626744D1047E31C8927535d5",
     "escrowImplementation": "0xD0f7EC487Bf492e1a6341648F4ce597430276439",
-    "strategyModuleBeacon": "0x5504899Eb7a4A21485Fa20C48371776E9E6D4E43",
-    "strategyModuleImplementation": "0x37b1fd2f69aD252534161a7C30A0Bea1e9750182",
-    "strategyModuleManager": "0x6b70ECA73689463C863873154744169Bcc622308",
-    "strategyModuleManagerImplementation": "0x4d67959Ffbaafd79DE45fF73147147185d626bf7"
+    "strategyVaultBeacon": "0x5504899Eb7a4A21485Fa20C48371776E9E6D4E43",
+    "strategyVaultImplementation": "0x37b1fd2f69aD252534161a7C30A0Bea1e9750182",
+    "strategyVaultManager": "0x6b70ECA73689463C863873154744169Bcc622308",
+    "strategyVaultManagerImplementation": "0x4d67959Ffbaafd79DE45fF73147147185d626bf7"
   },
   "chainInfo": {
     "chainId": 17000,

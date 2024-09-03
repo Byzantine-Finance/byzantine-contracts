@@ -29,12 +29,12 @@ IEscrow public immutable escrow;
 ```
 
 
-### strategyModuleManager
-StrategyModuleManager contract
+### strategyVaultManager
+StrategyVaultManager contract
 
 
 ```solidity
-IStrategyModuleManager public immutable strategyModuleManager;
+IStrategyVaultManager public immutable strategyVaultManager;
 ```
 
 
@@ -126,6 +126,6 @@ uint256[44] private __gap;
 
 
 ```solidity
-constructor(IEscrow _escrow, IStrategyModuleManager _strategyModuleManager);
+constructor(IEscrow _escrow, IStrategyVaultManager _strategyVaultManager);
 ```
 

@@ -14,8 +14,8 @@ TODO: Calculation of the reputation score of node operators
 ```solidity
 constructor(
     IEscrow _escrow,
-    IStrategyModuleManager _strategyModuleManager
-) AuctionStorage(_escrow, _strategyModuleManager);
+    IStrategyVaultManager _strategyVaultManager
+) AuctionStorage(_escrow, _strategyVaultManager);
 ```
 
 ### initialize
@@ -69,7 +69,7 @@ function removeNodeOpFromWhitelist(address _nodeOpAddr) external onlyOwner;
 
 ### getAuctionWinners
 
-Function triggered by the StrategyModuleManager every time a staker deposit 32ETH and ask for a DV.
+Function triggered by the StrategyVaultManager every time a staker deposit 32ETH and ask for a DV.
 It allows the pre-creation of a new DV for the next staker.
 It finds the `clusterSize` node operators with the highest auction scores and put them in a DV.
 
@@ -77,7 +77,7 @@ It finds the `clusterSize` node operators with the highest auction scores and pu
 
 
 ```solidity
-function getAuctionWinners() external onlyStategyModuleManager nonReentrant returns (IStrategyModule.Node[] memory);
+function getAuctionWinners() external onlyStategyModuleManager nonReentrant returns (IStrategyVault.Node[] memory);
 ```
 
 ### getPriceToPay
@@ -421,7 +421,7 @@ Function to get the auction winners. It returns the node operators addresses wit
 
 
 ```solidity
-function _getAuctionWinners() internal returns (IStrategyModule.Node[] memory);
+function _getAuctionWinners() internal returns (IStrategyVault.Node[] memory);
 ```
 
 ### onlyStategyModuleManager

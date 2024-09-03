@@ -84,7 +84,7 @@ function removeNodeOpFromWhitelist(address _nodeOpAddr) external;
 
 ### getAuctionWinners
 
-Function triggered by the StrategyModuleManager every time a staker deposit 32ETH and ask for a DV.
+Function triggered by the StrategyVaultManager every time a staker deposit 32ETH and ask for a DV.
 It allows the pre-creation of a new DV for the next staker.
 It finds the `clusterSize` node operators with the highest auction scores and put them in a DV.
 
@@ -92,7 +92,7 @@ It finds the `clusterSize` node operators with the highest auction scores and pu
 
 
 ```solidity
-function getAuctionWinners() external returns (IStrategyModule.Node[] memory);
+function getAuctionWinners() external returns (IStrategyVault.Node[] memory);
 ```
 
 ### getPriceToPay
@@ -344,12 +344,12 @@ function getNodeOpAuctionScoreVcs(
 
 
 ## Errors
-### OnlyStrategyModuleManager
-*Error when unauthorized call to a function callable only by the StrategyModuleManager.*
+### OnlyStrategyVaultManager
+*Error when unauthorized call to a function callable only by the StrategyVaultManager.*
 
 
 ```solidity
-error OnlyStrategyModuleManager();
+error OnlyStrategyVaultManager();
 ```
 
 ### AlreadyWhitelisted

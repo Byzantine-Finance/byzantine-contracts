@@ -1,5 +1,5 @@
-# IStrategyModuleManager
-[Git Source](https://github.com/Byzantine-Finance/byzantine-contracts/blob/80b6cda4622c51c2217311610eeb15b655b99e2c/src/interfaces/IStrategyModuleManager.sol)
+# IStrategyVaultManager
+[Git Source](https://github.com/Byzantine-Finance/byzantine-contracts/blob/80b6cda4622c51c2217311610eeb15b655b99e2c/src/interfaces/IStrategyVaultManager.sol)
 
 
 ## Functions
@@ -14,7 +14,7 @@ function numPreCreatedClusters() external view returns (uint64);
 
 ### numStratMods
 
-Get the total number of Strategy Modules that have been deployed.
+Get the total number of Strategy Vaults that have been deployed.
 
 
 ```solidity
@@ -26,7 +26,7 @@ function numStratMods() external view returns (uint64);
 Function to pre-create Distributed Validators. Must be called at least one time to allow stakers to enter in the protocol.
 
 *This function is only callable by Byzantine Finance. Once the first DVs are pre-created, the stakers
-pre-create a new DV every time they create a new StrategyModule (if enough operators in Auction).*
+pre-create a new DV every time they create a new StrategyVault (if enough operators in Auction).*
 
 
 ```solidity
@@ -41,11 +41,11 @@ function preCreateDVs(uint8 _numDVsToPreCreate) external;
 
 ### createStratModAndStakeNativeETH
 
-A 32ETH staker create a Strategy Module, use a pre-created DV as a validator and activate it by depositing 32ETH.
+A 32ETH staker create a Strategy Vault, use a pre-created DV as a validator and activate it by depositing 32ETH.
 
 *This action triggers a new auction to pre-create a new Distributed Validator for the next staker (if enough operators in Auction).*
 
-*It also fill the ClusterDetails struct of the newly created StrategyModule.*
+*It also fill the ClusterDetails struct of the newly created StrategyVault.*
 
 *Function will revert if not exactly 32 ETH are sent with the transaction.*
 
@@ -68,11 +68,11 @@ function createStratModAndStakeNativeETH(
 
 ### transferStratModOwnership
 
-Strategy Module owner can transfer its Strategy Module to another address.
-Under the hood, he transfers the ByzNft associated to the StrategyModule.
-That action makes him give the ownership of the StrategyModule and all the token it owns.
+Strategy Vault owner can transfer its Strategy Vault to another address.
+Under the hood, he transfers the ByzNft associated to the StrategyVault.
+That action makes him give the ownership of the StrategyVault and all the token it owns.
 
-*The ByzNft owner must first call the `approve` function to allow the StrategyModuleManager to transfer the ByzNft.*
+*The ByzNft owner must first call the `approve` function to allow the StrategyVaultManager to transfer the ByzNft.*
 
 *Function will revert if not called by the ByzNft holder.*
 
@@ -86,13 +86,13 @@ function transferStratModOwnership(address stratModAddr, address newOwner) exter
 
 |Name|Type|Description|
 |----|----|-----------|
-|`stratModAddr`|`address`|The address of the StrategyModule the owner will transfer.|
-|`newOwner`|`address`|The address of the new owner of the StrategyModule.|
+|`stratModAddr`|`address`|The address of the StrategyVault the owner will transfer.|
+|`newOwner`|`address`|The address of the new owner of the StrategyVault.|
 
 
 ### preCalculatePodAddress
 
-Returns the address of the Eigen Pod of a specific StrategyModule.
+Returns the address of the Eigen Pod of a specific StrategyVault.
 
 *Function essential to pre-crete DVs as their withdrawal address has to be the Eigen Pod address.*
 
@@ -104,12 +104,12 @@ function preCalculatePodAddress(uint64 _nounce) external view returns (address);
 
 |Name|Type|Description|
 |----|----|-----------|
-|`_nounce`|`uint64`|The index of the Strategy Module you want to know the Eigen Pod address.|
+|`_nounce`|`uint64`|The index of the Strategy Vault you want to know the Eigen Pod address.|
 
 
 ### getNumPendingClusters
 
-Returns the number of current pending clusters waiting for a Strategy Module.
+Returns the number of current pending clusters waiting for a Strategy Vault.
 
 
 ```solidity
@@ -124,7 +124,7 @@ Returns the node details of a pending cluster.
 
 
 ```solidity
-function getPendingClusterNodeDetails(uint64 clusterIndex) external view returns (IStrategyModule.Node[4] memory);
+function getPendingClusterNodeDetails(uint64 clusterIndex) external view returns (IStrategyVault.Node[4] memory);
 ```
 **Parameters**
 
@@ -135,7 +135,7 @@ function getPendingClusterNodeDetails(uint64 clusterIndex) external view returns
 
 ### getStratModNumber
 
-Returns the number of StrategyModules owned by an address.
+Returns the number of StrategyVaults owned by an address.
 
 
 ```solidity
@@ -145,14 +145,14 @@ function getStratModNumber(address staker) external view returns (uint256);
 
 |Name|Type|Description|
 |----|----|-----------|
-|`staker`|`address`|The address you want to know the number of Strategy Modules it owns.|
+|`staker`|`address`|The address you want to know the number of Strategy Vaults it owns.|
 
 
 ### getStratModByNftId
 
-Returns the StrategyModule address by its bound ByzNft ID.
+Returns the StrategyVault address by its bound ByzNft ID.
 
-*Returns address(0) if the nftId is not bound to a Strategy Module (nftId is not a ByzNft)*
+*Returns address(0) if the nftId is not bound to a Strategy Vault (nftId is not a ByzNft)*
 
 
 ```solidity
@@ -162,14 +162,14 @@ function getStratModByNftId(uint256 nftId) external view returns (address);
 
 |Name|Type|Description|
 |----|----|-----------|
-|`nftId`|`uint256`|The ByzNft ID you want to know the attached Strategy Module.|
+|`nftId`|`uint256`|The ByzNft ID you want to know the attached Strategy Vault.|
 
 
 ### getStratMods
 
-Returns the addresses of the `staker`'s StrategyModules
+Returns the addresses of the `staker`'s StrategyVaults
 
-*Returns an empty array if the staker has no Strategy Modules.*
+*Returns an empty array if the staker has no Strategy Vaults.*
 
 
 ```solidity
@@ -179,14 +179,14 @@ function getStratMods(address staker) external view returns (address[] memory);
 
 |Name|Type|Description|
 |----|----|-----------|
-|`staker`|`address`|The staker address you want to know the Strategy Modules it owns.|
+|`staker`|`address`|The staker address you want to know the Strategy Vaults it owns.|
 
 
 ### getPodByStratModAddr
 
-Returns the address of the Strategy Module's EigenPod (whether it is deployed yet or not).
+Returns the address of the Strategy Vault's EigenPod (whether it is deployed yet or not).
 
-*If the `stratModAddr` is not an instance of a StrategyModule contract, the function will all the same
+*If the `stratModAddr` is not an instance of a StrategyVault contract, the function will all the same
 returns the EigenPod of the input address. SO USE THAT FUNCTION CARREFULLY.*
 
 
@@ -197,12 +197,12 @@ function getPodByStratModAddr(address stratModAddr) external view returns (addre
 
 |Name|Type|Description|
 |----|----|-----------|
-|`stratModAddr`|`address`|The address of the StrategyModule contract you want to know the EigenPod address.|
+|`stratModAddr`|`address`|The address of the StrategyVault contract you want to know the EigenPod address.|
 
 
 ### hasStratMods
 
-Returns 'true' if the `staker` owns at least one StrategyModule, and 'false' otherwise.
+Returns 'true' if the `staker` owns at least one StrategyVault, and 'false' otherwise.
 
 
 ```solidity
@@ -212,14 +212,14 @@ function hasStratMods(address staker) external view returns (bool);
 
 |Name|Type|Description|
 |----|----|-----------|
-|`staker`|`address`|The address you want to know if it owns at least a StrategyModule.|
+|`staker`|`address`|The address you want to know if it owns at least a StrategyVault.|
 
 
 ### isDelegated
 
-Specify which `staker`'s StrategyModules are delegated.
+Specify which `staker`'s StrategyVaults are delegated.
 
-*Revert if the `staker` doesn't have any StrategyModule.*
+*Revert if the `staker` doesn't have any StrategyVault.*
 
 
 ```solidity
@@ -229,14 +229,14 @@ function isDelegated(address staker) external view returns (bool[] memory);
 
 |Name|Type|Description|
 |----|----|-----------|
-|`staker`|`address`|The address of the StrategyModules' owner.|
+|`staker`|`address`|The address of the StrategyVaults' owner.|
 
 
 ### hasDelegatedTo
 
-Specify to which operators `staker`'s StrategyModules has delegated to.
+Specify to which operators `staker`'s StrategyVaults has delegated to.
 
-*Revert if the `staker` doesn't have any StrategyModule.*
+*Revert if the `staker` doesn't have any StrategyVault.*
 
 
 ```solidity
@@ -246,14 +246,14 @@ function hasDelegatedTo(address staker) external view returns (address[] memory)
 
 |Name|Type|Description|
 |----|----|-----------|
-|`staker`|`address`|The address of the StrategyModules' owner.|
+|`staker`|`address`|The address of the StrategyVaults' owner.|
 
 
 ### hasPod
 
 Returns 'true' if the `stratModAddr` has created an EigenPod, and 'false' otherwise.
 
-*If the `stratModAddr` is not an instance of a StrategyModule contract, the function will all the same
+*If the `stratModAddr` is not an instance of a StrategyVault contract, the function will all the same
 returns the EigenPod of the input address. SO USE THAT FUNCTION CARREFULLY.*
 
 
@@ -264,12 +264,12 @@ function hasPod(address stratModAddr) external view returns (bool);
 
 |Name|Type|Description|
 |----|----|-----------|
-|`stratModAddr`|`address`|The StrategyModule Address you want to know if it has created an EigenPod.|
+|`stratModAddr`|`address`|The StrategyVault Address you want to know if it has created an EigenPod.|
 
 
 ## Errors
 ### DoNotHaveStratMod
-*Returned when a specific address doesn't have a StrategyModule*
+*Returned when a specific address doesn't have a StrategyVault*
 
 
 ```solidity
@@ -277,7 +277,7 @@ error DoNotHaveStratMod(address);
 ```
 
 ### NotStratModOwner
-*Returned when unauthorized call to a function only callable by the StrategyModule owner*
+*Returned when unauthorized call to a function only callable by the StrategyVault owner*
 
 
 ```solidity

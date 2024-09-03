@@ -5,8 +5,8 @@ import "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 
-import "../../src/core/StrategyModuleManager.sol";
-import "../../src/core/StrategyModule.sol";
+import "../../src/core/StrategyVaultManager.sol";
+import "../../src/core/StrategyVault.sol";
 import "../../src/tokens/ByzNft.sol";
 import "../../src/core/Auction.sol";
 import "../../src/vault/Escrow.sol";
@@ -24,10 +24,10 @@ import "forge-std/Test.sol";
 contract ExistingDeploymentParser is Script, Test {
     // Byzantine contracts
     ProxyAdmin public byzantineProxyAdmin;
-    StrategyModuleManager public strategyModuleManager;
-    StrategyModuleManager public strategyModuleManagerImplementation;
-    UpgradeableBeacon public strategyModuleBeacon;
-    StrategyModule public strategyModuleImplementation;
+    StrategyVaultManager public strategyVaultManager;
+    StrategyVaultManager public strategyVaultManagerImplementation;
+    UpgradeableBeacon public strategyVaultBeacon;
+    StrategyVault public strategyVaultImplementation;
     ByzNft public byzNft;
     ByzNft public byzNftImplementation;
     Auction public auction;
@@ -100,10 +100,10 @@ contract ExistingDeploymentParser is Script, Test {
         emptyContract = EmptyContract(stdJson.readAddress(contractsAddressesData, ".addresses.emptyContract"));
         escrow = Escrow(payable(stdJson.readAddress(contractsAddressesData, ".addresses.escrow")));
         escrowImplementation = Escrow(payable(stdJson.readAddress(contractsAddressesData, ".addresses.escrowImplementation")));
-        strategyModuleBeacon = UpgradeableBeacon(stdJson.readAddress(contractsAddressesData, ".addresses.strategyModuleBeacon"));
-        strategyModuleImplementation = StrategyModule(payable(stdJson.readAddress(contractsAddressesData, ".addresses.strategyModuleImplementation")));
-        strategyModuleManager = StrategyModuleManager(stdJson.readAddress(contractsAddressesData, ".addresses.strategyModuleManager"));
-        strategyModuleManagerImplementation = StrategyModuleManager(stdJson.readAddress(contractsAddressesData, ".addresses.strategyModuleManagerImplementation"));
+        strategyVaultBeacon = UpgradeableBeacon(stdJson.readAddress(contractsAddressesData, ".addresses.strategyVaultBeacon"));
+        strategyVaultImplementation = StrategyVault(payable(stdJson.readAddress(contractsAddressesData, ".addresses.strategyVaultImplementation")));
+        strategyVaultManager = StrategyVaultManager(stdJson.readAddress(contractsAddressesData, ".addresses.strategyVaultManager"));
+        strategyVaultManagerImplementation = StrategyVaultManager(stdJson.readAddress(contractsAddressesData, ".addresses.strategyVaultManagerImplementation"));
 
         // read byzantineAdmin address
         byzantineAdmin = stdJson.readAddress(contractsAddressesData, ".parameters.byzantineAdmin");
@@ -111,51 +111,51 @@ contract ExistingDeploymentParser is Script, Test {
 
     /// @notice Ensure contracts point at each other correctly via constructors
     function _verifyContractPointers() internal view virtual {
-        // StrategyModuleManager
+        // StrategyVaultManager
         require(
-            strategyModuleManager.stratModBeacon() == strategyModuleBeacon,
-            "strategyModuleManager: stratModBeacon address not set correctly"
+            strategyVaultManager.stratModBeacon() == strategyVaultBeacon,
+            "strategyVaultManager: stratModBeacon address not set correctly"
         );
         require(
-            strategyModuleManager.auction() == auction,
-            "strategyModuleManager: auction address not set correctly"
+            strategyVaultManager.auction() == auction,
+            "strategyVaultManager: auction address not set correctly"
         );
         require(
-            strategyModuleManager.byzNft() == byzNft,
-            "strategyModuleManager: byzNft address not set correctly"
+            strategyVaultManager.byzNft() == byzNft,
+            "strategyVaultManager: byzNft address not set correctly"
         );
         require(
-            strategyModuleManager.eigenPodManager() == eigenPodManager,
-            "strategyModuleManager: eigenPodManager address not set correctly"
+            strategyVaultManager.eigenPodManager() == eigenPodManager,
+            "strategyVaultManager: eigenPodManager address not set correctly"
         );
         require(
-            strategyModuleManager.delegationManager() == delegation,
-            "strategyModuleManager: delegationManager address not set correctly"
+            strategyVaultManager.delegationManager() == delegation,
+            "strategyVaultManager: delegationManager address not set correctly"
         );
         require(
-            strategyModuleManager.pushSplitFactory() == pushSplitFactory,
-            "strategyModuleManager: pushSplitFactory address not set correctly"
+            strategyVaultManager.pushSplitFactory() == pushSplitFactory,
+            "strategyVaultManager: pushSplitFactory address not set correctly"
         );
-        // StrategyModuleImplementation
+        // StrategyVaultImplementation
         require(
-            strategyModuleImplementation.stratModManager() == strategyModuleManager,
-            "strategyModuleImplementation: strategyModuleManager address not set correctly"
-        );
-        require(
-            strategyModuleImplementation.byzNft() == byzNft,
-            "strategyModuleImplementation: byzNft address not set correctly"
+            strategyVaultImplementation.stratModManager() == strategyVaultManager,
+            "strategyVaultImplementation: strategyVaultManager address not set correctly"
         );
         require(
-            strategyModuleImplementation.auction() == auction,
-            "strategyModuleImplementation: auction address not set correctly"
+            strategyVaultImplementation.byzNft() == byzNft,
+            "strategyVaultImplementation: byzNft address not set correctly"
         );
         require(
-            strategyModuleImplementation.eigenPodManager() == eigenPodManager,
-            "strategyModuleImplementation: eigenPodManager address not set correctly"
+            strategyVaultImplementation.auction() == auction,
+            "strategyVaultImplementation: auction address not set correctly"
         );
         require(
-            strategyModuleImplementation.delegationManager() == delegation,
-            "strategyModuleImplementation: delegationManager address not set correctly"
+            strategyVaultImplementation.eigenPodManager() == eigenPodManager,
+            "strategyVaultImplementation: eigenPodManager address not set correctly"
+        );
+        require(
+            strategyVaultImplementation.delegationManager() == delegation,
+            "strategyVaultImplementation: delegationManager address not set correctly"
         );
         // Auction
         require(
@@ -163,8 +163,8 @@ contract ExistingDeploymentParser is Script, Test {
             "auction: escrow address not set correctly"
         );
         require(
-            auction.strategyModuleManager() == strategyModuleManager,
-            "auction: strategyModuleManager address not set correctly"
+            auction.strategyVaultManager() == strategyVaultManager,
+            "auction: strategyVaultManager address not set correctly"
         );
         // Escrow
         require(
@@ -178,15 +178,15 @@ contract ExistingDeploymentParser is Script, Test {
     }
 
     function _verifyImplementations() internal view virtual {
-        // strategyModuleBeacon
+        // strategyVaultBeacon
         require(
-            strategyModuleBeacon.implementation() == address(strategyModuleImplementation),
-            "strategyModuleBeacon: implementation set incorrectly"
+            strategyVaultBeacon.implementation() == address(strategyVaultImplementation),
+            "strategyVaultBeacon: implementation set incorrectly"
         );
-        // StrategyModuleManager
+        // StrategyVaultManager
         require(
-            byzantineProxyAdmin.getProxyImplementation(TransparentUpgradeableProxy(payable(address(strategyModuleManager)))) == address(strategyModuleManagerImplementation),
-            "strategyModuleManager: implementation set incorrectly"
+            byzantineProxyAdmin.getProxyImplementation(TransparentUpgradeableProxy(payable(address(strategyVaultManager)))) == address(strategyVaultManagerImplementation),
+            "strategyVaultManager: implementation set incorrectly"
         );
         // ByzNft
         require(
@@ -210,12 +210,12 @@ contract ExistingDeploymentParser is Script, Test {
      * initialization params if this is the first deployment.
      */
     function _verifyContractsInitialized() internal virtual {
-        // StrategyModuleManager
+        // StrategyVaultManager
         vm.expectRevert(bytes("Initializable: contract is already initialized"));
-        strategyModuleManager.initialize(byzantineAdmin);
+        strategyVaultManager.initialize(byzantineAdmin);
         // ByzNft
         vm.expectRevert(bytes("Initializable: contract is already initialized"));
-        byzNft.initialize(strategyModuleManager);
+        byzNft.initialize(strategyVaultManager);
         // Auction
         vm.expectRevert(bytes("Initializable: contract is already initialized"));
         auction.initialize(byzantineAdmin, EXPECTED_POS_DAILY_RETURN_WEI, MAX_DISCOUNT_RATE, MIN_VALIDATION_DURATION, CLUSTER_SIZE);
@@ -223,12 +223,12 @@ contract ExistingDeploymentParser is Script, Test {
 
     /// @notice Verify params based on config constants that are updated from calling `_parseInitialDeploymentParams`
     function _verifyInitializationParams() internal view virtual {
-        // StrategyModuleManager
-        require(strategyModuleManager.owner() == byzantineAdmin, "strategyModuleManager: owner not set correctly");
-        // StrategyModuleBeacon
-        require(strategyModuleBeacon.owner() == byzantineAdmin, "strategyModuleBeacon: owner not set correctly");
+        // StrategyVaultManager
+        require(strategyVaultManager.owner() == byzantineAdmin, "strategyVaultManager: owner not set correctly");
+        // StrategyVaultBeacon
+        require(strategyVaultBeacon.owner() == byzantineAdmin, "strategyVaultBeacon: owner not set correctly");
         // ByzNft
-        require(byzNft.owner() == address(strategyModuleManager), "byzNft: owner not set correctly");
+        require(byzNft.owner() == address(strategyVaultManager), "byzNft: owner not set correctly");
         // Auction
         require(auction.owner() == byzantineAdmin, "auction: owner not set correctly");
         // Cannot verify _expectedDailyReturnWei, _maxDiscountRate, _minDuration,_clusterSize as it is private variables
@@ -260,10 +260,10 @@ contract ExistingDeploymentParser is Script, Test {
 
         string memory deployed_addresses = "addresses";
         vm.serializeAddress(deployed_addresses, "byzantineProxyAdmin", address(byzantineProxyAdmin));
-        vm.serializeAddress(deployed_addresses, "strategyModuleManager", address(strategyModuleManager));
-        vm.serializeAddress(deployed_addresses, "strategyModuleManagerImplementation", address(strategyModuleManagerImplementation));
-        vm.serializeAddress(deployed_addresses, "strategyModuleBeacon", address(strategyModuleBeacon));
-        vm.serializeAddress(deployed_addresses, "strategyModuleImplementation", address(strategyModuleImplementation));
+        vm.serializeAddress(deployed_addresses, "strategyVaultManager", address(strategyVaultManager));
+        vm.serializeAddress(deployed_addresses, "strategyVaultManagerImplementation", address(strategyVaultManagerImplementation));
+        vm.serializeAddress(deployed_addresses, "strategyVaultBeacon", address(strategyVaultBeacon));
+        vm.serializeAddress(deployed_addresses, "strategyVaultImplementation", address(strategyVaultImplementation));
         vm.serializeAddress(deployed_addresses, "byzNft", address(byzNft));
         vm.serializeAddress(deployed_addresses, "byzNftImplementation", address(byzNftImplementation));
         vm.serializeAddress(deployed_addresses, "auction", address(auction));
@@ -295,10 +295,10 @@ contract ExistingDeploymentParser is Script, Test {
         // WRITE JSON DATA ADDRESSES
         string memory deployed_addresses = "addresses";
         vm.serializeAddress(deployed_addresses, "byzantineProxyAdmin", address(byzantineProxyAdmin));
-        vm.serializeAddress(deployed_addresses, "strategyModuleManager", address(strategyModuleManager));
-        vm.serializeAddress(deployed_addresses, "strategyModuleManagerImplementation", address(strategyModuleManagerImplementation));
-        vm.serializeAddress(deployed_addresses, "strategyModuleBeacon", address(strategyModuleBeacon));
-        vm.serializeAddress(deployed_addresses, "strategyModuleImplementation", address(strategyModuleImplementation));
+        vm.serializeAddress(deployed_addresses, "strategyVaultManager", address(strategyVaultManager));
+        vm.serializeAddress(deployed_addresses, "strategyVaultManagerImplementation", address(strategyVaultManagerImplementation));
+        vm.serializeAddress(deployed_addresses, "strategyVaultBeacon", address(strategyVaultBeacon));
+        vm.serializeAddress(deployed_addresses, "strategyVaultImplementation", address(strategyVaultImplementation));
         vm.serializeAddress(deployed_addresses, "byzNft", address(byzNft));
         vm.serializeAddress(deployed_addresses, "byzNftImplementation", address(byzNftImplementation));
         vm.serializeAddress(deployed_addresses, "auction", address(auction));

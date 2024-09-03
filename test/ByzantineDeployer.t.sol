@@ -9,8 +9,8 @@ import "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 import "./eigenlayer-helper/EigenLayerDeployer.t.sol";
 import "./splits-helper/SplitsV2Deployer.t.sol";
 
-import "../src/core/StrategyModuleManager.sol";
-import "../src/core/StrategyModule.sol";
+import "../src/core/StrategyVaultManager.sol";
+import "../src/core/StrategyVault.sol";
 import "../src/tokens/ByzNft.sol";
 import "../src/core/Auction.sol";
 import "../src/vault/Escrow.sol";
@@ -19,8 +19,8 @@ contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
 
     // Byzantine contracts
     ProxyAdmin public byzantineProxyAdmin;
-    StrategyModuleManager public strategyModuleManager;
-    UpgradeableBeacon public strategyModuleBeacon;
+    StrategyVaultManager public strategyVaultManager;
+    UpgradeableBeacon public strategyVaultBeacon;
     ByzNft public byzNft;
     Auction public auction;
     Escrow public escrow;
@@ -81,7 +81,7 @@ contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
         // First, deploy upgradeable proxy contracts that **will point** to the implementations. Since the implementation contracts are
         // not yet deployed, we give these proxies an empty contract as the initial implementation, to act as if they have no code.
         emptyContract = new EmptyContract();
-        strategyModuleManager = StrategyModuleManager(
+        strategyVaultManager = StrategyVaultManager(
             address(new TransparentUpgradeableProxy(address(emptyContract), address(byzantineProxyAdmin), ""))
         );
         byzNft = ByzNft(
@@ -94,21 +94,21 @@ contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
             payable(address(new TransparentUpgradeableProxy(address(emptyContract), address(byzantineProxyAdmin), "")))
         );
 
-        // StrategyModule implementation contract
-        IStrategyModule strategyModuleImplementation = new StrategyModule(
-            strategyModuleManager,
+        // StrategyVault implementation contract
+        IStrategyVault strategyVaultImplementation = new StrategyVault(
+            strategyVaultManager,
             auction,
             byzNft,
             eigenPodManager,
             delegation
         );
-        // StrategyModule beacon contract. The Beacon Proxy contract is deployed in the StrategyModuleManager
+        // StrategyVault beacon contract. The Beacon Proxy contract is deployed in the StrategyVaultManager
         // This contract points to the implementation contract.
-        strategyModuleBeacon = new UpgradeableBeacon(address(strategyModuleImplementation));
+        strategyVaultBeacon = new UpgradeableBeacon(address(strategyVaultImplementation));
 
         // Second, deploy the *implementation* contracts, using the *proxy contracts* as inputs
-        StrategyModuleManager strategyModuleManagerImplementation = new StrategyModuleManager(
-            strategyModuleBeacon,
+        StrategyVaultManager strategyVaultManagerImplementation = new StrategyVaultManager(
+            strategyVaultBeacon,
             auction,
             byzNft,
             eigenPodManager,
@@ -118,7 +118,7 @@ contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
         ByzNft byzNftImplementation = new ByzNft();
         Auction auctionImplementation = new Auction(
             escrow,
-            strategyModuleManager
+            strategyVaultManager
         );
         Escrow escrowImplementation = new Escrow(
             bidReceiver,
@@ -126,12 +126,12 @@ contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
         );
 
         // Third, upgrade the proxy contracts to use the correct implementation contracts and initialize them.
-        // Upgrade StrategyModuleManager
+        // Upgrade StrategyVaultManager
         byzantineProxyAdmin.upgradeAndCall(
-            TransparentUpgradeableProxy(payable(address(strategyModuleManager))),
-            address(strategyModuleManagerImplementation),
+            TransparentUpgradeableProxy(payable(address(strategyVaultManager))),
+            address(strategyVaultManagerImplementation),
             abi.encodeWithSelector(
-                StrategyModuleManager.initialize.selector,
+                StrategyVaultManager.initialize.selector,
                 byzantineAdmin
             )
         );
@@ -141,7 +141,7 @@ contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
             address(byzNftImplementation),
             abi.encodeWithSelector(
                 ByzNft.initialize.selector,
-                strategyModuleManager
+                strategyVaultManager
             )
         );
         // Upgrade Auction
@@ -166,10 +166,10 @@ contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
     }
 
     function testByzantineContractsInitialization() public view {
-        // StrategyModuleManager
-        assertEq(strategyModuleManager.owner(), byzantineAdmin);
+        // StrategyVaultManager
+        assertEq(strategyVaultManager.owner(), byzantineAdmin);
         // ByzNft
-        assertEq(byzNft.owner(), address(strategyModuleManager));
+        assertEq(byzNft.owner(), address(strategyVaultManager));
         assertEq(byzNft.symbol(), "byzNFT");
         // Auction
         assertEq(auction.owner(), byzantineAdmin);

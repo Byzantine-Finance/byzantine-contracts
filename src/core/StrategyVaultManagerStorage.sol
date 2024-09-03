@@ -3,14 +3,14 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/proxy/beacon/IBeacon.sol";
 
-import "../interfaces/IStrategyModuleManager.sol";
+import "../interfaces/IStrategyVaultManager.sol";
 import "../interfaces/IByzNft.sol";
 import "../interfaces/IAuction.sol";
 import "eigenlayer-contracts/interfaces/IEigenPodManager.sol";
 import "eigenlayer-contracts/interfaces/IDelegationManager.sol";
 import "splits-v2/splitters/push/PushSplitFactory.sol";
 
-abstract contract StrategyModuleManagerStorage is IStrategyModuleManager {
+abstract contract StrategyVaultManagerStorage is IStrategyVaultManager {
     /* ============== CONSTANTS + IMMUTABLES ============== */
 
     /// @notice The split operators allocation
@@ -22,7 +22,7 @@ abstract contract StrategyModuleManagerStorage is IStrategyModuleManager {
     /// @notice The split total allocation
     uint256 public constant SPLIT_TOTAL_ALLOCATION = 1_000_000; // 100% is 1_000_000
 
-    /// @notice Beacon proxy to which the StrategyModules point
+    /// @notice Beacon proxy to which the StrategyVaults point
     IBeacon public immutable stratModBeacon;
 
     /// @notice ByzNft contract
@@ -42,10 +42,10 @@ abstract contract StrategyModuleManagerStorage is IStrategyModuleManager {
 
     /* ============== STATE VARIABLES ============== */
 
-    /// @notice Staker to its owned StrategyModules
+    /// @notice Staker to its owned StrategyVaults
     mapping(address => address[]) public stakerToStratMods;
 
-    /// @notice ByzNft tokenId to its tied StrategyModule
+    /// @notice ByzNft tokenId to its tied StrategyVault
     mapping(uint256 => address) public nftIdToStratMod;
 
     /// @notice Mapping to store the pre-created clusters waiting for work

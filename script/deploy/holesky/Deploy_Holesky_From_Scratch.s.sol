@@ -47,7 +47,7 @@ contract Deploy_Holesky_From_Scratch is ExistingDeploymentParser {
          * not yet deployed, we give these proxies an empty contract as the initial implementation, to act as if they have no code.
          */
         emptyContract = new EmptyContract();
-        strategyModuleManager = StrategyModuleManager(
+        strategyVaultManager = StrategyVaultManager(
             address(new TransparentUpgradeableProxy(address(emptyContract), address(byzantineProxyAdmin), ""))
         );
         byzNft = ByzNft(
@@ -60,21 +60,21 @@ contract Deploy_Holesky_From_Scratch is ExistingDeploymentParser {
             payable(address(new TransparentUpgradeableProxy(address(emptyContract), address(byzantineProxyAdmin), "")))
         );
 
-        // StrategyModule implementation contract
-        strategyModuleImplementation = new StrategyModule(
-            strategyModuleManager,
+        // StrategyVault implementation contract
+        strategyVaultImplementation = new StrategyVault(
+            strategyVaultManager,
             auction,
             byzNft,
             eigenPodManager,
             delegation
         );
-        // StrategyModule beacon contract. The Beacon Proxy contract is deployed in the StrategyModuleManager
+        // StrategyVault beacon contract. The Beacon Proxy contract is deployed in the StrategyVaultManager
         // This contract points to the implementation contract.
-        strategyModuleBeacon = new UpgradeableBeacon(address(strategyModuleImplementation));
+        strategyVaultBeacon = new UpgradeableBeacon(address(strategyVaultImplementation));
 
         // Second, deploy the *implementation* contracts, using the *proxy contracts* as inputs
-        strategyModuleManagerImplementation = new StrategyModuleManager(
-            strategyModuleBeacon,
+        strategyVaultManagerImplementation = new StrategyVaultManager(
+            strategyVaultBeacon,
             auction,
             byzNft,
             eigenPodManager,
@@ -84,7 +84,7 @@ contract Deploy_Holesky_From_Scratch is ExistingDeploymentParser {
         byzNftImplementation = new ByzNft();
         auctionImplementation = new Auction(
             escrow,
-            strategyModuleManager
+            strategyVaultManager
         );
         escrowImplementation = new Escrow(
             bidReceiver,
@@ -92,12 +92,12 @@ contract Deploy_Holesky_From_Scratch is ExistingDeploymentParser {
         );
 
         // Third, upgrade the proxy contracts to use the correct implementation contracts and initialize them.
-        // Upgrade StrategyModuleManager
+        // Upgrade StrategyVaultManager
         byzantineProxyAdmin.upgradeAndCall(
-            TransparentUpgradeableProxy(payable(address(strategyModuleManager))),
-            address(strategyModuleManagerImplementation),
+            TransparentUpgradeableProxy(payable(address(strategyVaultManager))),
+            address(strategyVaultManagerImplementation),
             abi.encodeWithSelector(
-                StrategyModuleManager.initialize.selector,
+                StrategyVaultManager.initialize.selector,
                 byzantineAdmin
             )
         );
@@ -107,7 +107,7 @@ contract Deploy_Holesky_From_Scratch is ExistingDeploymentParser {
             address(byzNftImplementation),
             abi.encodeWithSelector(
                 ByzNft.initialize.selector,
-                strategyModuleManager
+                strategyVaultManager
             )
         );
         // Upgrade Auction

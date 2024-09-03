@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "./IStrategyModule.sol";
+import "./IStrategyVault.sol";
 
 interface IAuction {
 
@@ -66,12 +66,12 @@ interface IAuction {
     function removeNodeOpFromWhitelist(address _nodeOpAddr) external;
 
     /**
-     * @notice Function triggered by the StrategyModuleManager every time a staker deposit 32ETH and ask for a DV.
+     * @notice Function triggered by the StrategyVaultManager every time a staker deposit 32ETH and ask for a DV.
      * It allows the pre-creation of a new DV for the next staker.
      * It finds the `clusterSize` node operators with the highest auction scores and put them in a DV.
      * @dev Reverts if not enough node operators are available.
      */
-    function getAuctionWinners() external returns(IStrategyModule.Node[] memory);
+    function getAuctionWinners() external returns(IStrategyVault.Node[] memory);
 
     /**
      * @notice Fonction to determine the auction price for a validator according to its bids parameters
@@ -203,8 +203,8 @@ interface IAuction {
     )
         external view returns (uint256[] memory);
 
-    /// @dev Error when unauthorized call to a function callable only by the StrategyModuleManager.
-    error OnlyStrategyModuleManager();
+    /// @dev Error when unauthorized call to a function callable only by the StrategyVaultManager.
+    error OnlyStrategyVaultManager();
 
     /// @dev Error when address already whitelisted
     error AlreadyWhitelisted();

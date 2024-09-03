@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "../interfaces/IStrategyModule.sol";
+import "../interfaces/IStrategyVault.sol";
 import "../interfaces/IByzNft.sol";
-import "../interfaces/IStrategyModuleManager.sol";
+import "../interfaces/IStrategyVaultManager.sol";
 import "../interfaces/IAuction.sol";
 import "eigenlayer-contracts/interfaces/IEigenPodManager.sol";
 import "eigenlayer-contracts/interfaces/IEigenPod.sol";
 import "eigenlayer-contracts/interfaces/IDelegationManager.sol";
 
-abstract contract StrategyModuleStorage is IStrategyModule {
+abstract contract StrategyVaultStorage is IStrategyVault {
 
     /* ============== CONSTANTS + IMMUTABLES ============== */
 
@@ -18,8 +18,8 @@ abstract contract StrategyModuleStorage is IStrategyModule {
 
     uint8 internal constant CLUSTER_SIZE = 4;
 
-    /// @notice The single StrategyModuleManager for Byzantine
-    IStrategyModuleManager public immutable stratModManager;
+    /// @notice The single StrategyVaultManager for Byzantine
+    IStrategyVaultManager public immutable stratModManager;
 
     /// @notice ByzNft contract
     IByzNft public immutable byzNft;
@@ -36,8 +36,8 @@ abstract contract StrategyModuleStorage is IStrategyModule {
 
     /* ============== STATE VARIABLES ============== */
 
-    /// @notice The ByzNft associated to this StrategyModule.
-    /// @notice The owner of the ByzNft is the StrategyModule owner.
+    /// @notice The ByzNft associated to this StrategyVault.
+    /// @notice The owner of the ByzNft is the StrategyVault owner.
     /// TODO When non-upgradeable put that variable immutable and set it in the constructor
     uint256 public stratModNftId;
 

@@ -7,11 +7,11 @@ import "eigenlayer-contracts/interfaces/ISignatureUtils.sol";
 import "eigenlayer-contracts/libraries/BeaconChainProofs.sol";
 import { PushSplit } from "splits-v2/splitters/push/PushSplit.sol";
 
-import "./StrategyModuleStorage.sol";
+import "./StrategyVaultStorage.sol";
 
-// TODO: Allow Strategy Module ByzNft to be tradeable => conceive a fair exchange mechanism between the seller and the buyer
+// TODO: Allow Strategy Vault ByzNft to be tradeable => conceive a fair exchange mechanism between the seller and the buyer
 
-contract StrategyModule is Initializable, StrategyModuleStorage {
+contract StrategyVault is Initializable, StrategyVaultStorage {
     using BeaconChainProofs for *;
 
     /* ============== MODIFIERS ============== */
@@ -22,12 +22,12 @@ contract StrategyModule is Initializable, StrategyModuleStorage {
     }
 
     modifier onlyNftOwnerOrStratModManager() {
-        if (msg.sender != stratModOwner() && msg.sender != address(stratModManager)) revert OnlyNftOwnerOrStrategyModuleManager();
+        if (msg.sender != stratModOwner() && msg.sender != address(stratModManager)) revert OnlyNftOwnerOrStrategyVaultManager();
         _;
     }
 
     modifier onlyStratModManager() {
-        if (msg.sender != address(stratModManager)) revert OnlyStrategyModuleManager();
+        if (msg.sender != address(stratModManager)) revert OnlyStrategyVaultManager();
         _;
     }
 
@@ -40,7 +40,7 @@ contract StrategyModule is Initializable, StrategyModuleStorage {
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor(
-        IStrategyModuleManager _stratModManager,
+        IStrategyVaultManager _stratModManager,
         IAuction _auction,
         IByzNft _byzNft,
         IEigenPodManager _eigenPodManager,
@@ -56,23 +56,23 @@ contract StrategyModule is Initializable, StrategyModuleStorage {
     }
 
     /**
-     * @notice Used to initialize the nftId of that StrategyModule and its owner.
-     * @dev Called on construction by the StrategyModuleManager.
+     * @notice Used to initialize the nftId of that StrategyVault and its owner.
+     * @dev Called on construction by the StrategyVaultManager.
      */
     function initialize(uint256 _nftId, address _initialOwner) external initializer {
         try byzNft.ownerOf(_nftId) returns (address nftOwner) {
-            require(nftOwner == _initialOwner, "Only NFT owner can initialize the StrategyModule");
+            require(nftOwner == _initialOwner, "Only NFT owner can initialize the StrategyVault");
             stratModNftId = _nftId;
         } catch Error(string memory reason) {
-            revert(string.concat("Cannot initialize StrategyModule: ", reason));
+            revert(string.concat("Cannot initialize StrategyVault: ", reason));
         }
     }
 
     /* =================== FALLBACK =================== */
 
     /**
-     * @notice Payable fallback function that receives ether deposited to the StrategyModule contract
-     * @dev Strategy Module is the address where to send the principal ethers post exit.
+     * @notice Payable fallback function that receives ether deposited to the StrategyVault contract
+     * @dev Strategy Vault is the address where to send the principal ethers post exit.
      */
     receive() external payable {
         // TODO: emit an event to notify
@@ -82,12 +82,12 @@ contract StrategyModule is Initializable, StrategyModuleStorage {
 
     /**
      * @notice Deposit 32ETH in the beacon chain to activate a Distributed Validator and start validating on the consensus layer.
-     * Also creates an EigenPod for the StrategyModule. The NFT owner can staker additional native ETH by calling again this function.
+     * Also creates an EigenPod for the StrategyVault. The NFT owner can staker additional native ETH by calling again this function.
      * @param pubkey The 48 bytes public key of the beacon chain DV.
      * @param signature The DV's signature of the deposit data.
      * @param depositDataRoot The root/hash of the deposit data for the DV's deposit.
-     * @dev Function is callable only by the StrategyModuleManager or the NFT Owner.
-     * @dev The first call to this function is done by the StrategyModuleManager and creates the StrategyModule's EigenPod.
+     * @dev Function is callable only by the StrategyVaultManager or the NFT Owner.
+     * @dev The first call to this function is done by the StrategyVaultManager and creates the StrategyVault's EigenPod.
      */
     function stakeNativeETH(
         bytes calldata pubkey, 
@@ -148,9 +148,9 @@ contract StrategyModule is Initializable, StrategyModuleStorage {
     }
 
     /**
-     * @notice The caller delegate its Strategy Module's stake to an Eigen Layer operator.
+     * @notice The caller delegate its Strategy Vault's stake to an Eigen Layer operator.
      * @notice /!\ Delegation is all-or-nothing: when a Staker delegates to an Operator, they delegate ALL their stake.
-     * @param operator The account teh STrategy Module is delegating its assets to for use in serving applications built on EigenLayer.
+     * @param operator The account teh Strategy Vault is delegating its assets to for use in serving applications built on EigenLayer.
      * @dev The operator must not have set a delegation approver, everyone can delegate to it without permission.
      * @dev Ensures that:
      *          1) the `staker` is not already delegated to an operator
@@ -165,11 +165,11 @@ contract StrategyModule is Initializable, StrategyModuleStorage {
     }
 
     /**
-     * @notice Set the `clusterDetails` struct of the StrategyModule.
+     * @notice Set the `clusterDetails` struct of the StrategyVault.
      * @param nodes An array of Node making up the DV
      * @param splitAddr The address of the Split contract.
      * @param dvStatus The status of the DV, refer to the DVStatus enum for details.
-     * @dev Callable only by the StrategyModuleManager and bound a pre-created DV to this StrategyModule.
+     * @dev Callable only by the StrategyVaultManager and bound a pre-created DV to this StrategyVault.
      */
     function setClusterDetails(
         Node[4] calldata nodes,
@@ -189,7 +189,7 @@ contract StrategyModule is Initializable, StrategyModuleStorage {
 
     /**
      * @notice Distributes the tokens issued from the PoS rewards evenly between the node operators.
-     * @param _split The current split struct of the StrategyModule. Can be reconstructed offchain since the only variable is the `recipients` field.
+     * @param _split The current split struct of the StrategyVault. Can be reconstructed offchain since the only variable is the `recipients` field.
      * @param _token The address of the token to distribute. NATIVE_TOKEN_ADDR = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE
      * @dev The distributor is the msg.sender. He will earn the distribution fees.
      * @dev If the push failed, the tokens will be sent to the SplitWarehouse. NodeOp will have to call the withdraw function.
@@ -203,8 +203,8 @@ contract StrategyModule is Initializable, StrategyModuleStorage {
     }
 
     /**
-     * @notice Allow the Strategy Module's owner to withdraw the smart contract's balance.
-     * @dev Revert if the caller is not the owner of the Strategy Module's ByzNft.
+     * @notice Allow the Strategy Vault's owner to withdraw the smart contract's balance.
+     * @dev Revert if the caller is not the owner of the Strategy Vault's ByzNft.
      */
     function withdrawContractBalance() external onlyNftOwner {
         payable(msg.sender).transfer(address(this).balance);
@@ -213,7 +213,7 @@ contract StrategyModule is Initializable, StrategyModuleStorage {
     /* ================ VIEW FUNCTIONS ================ */
 
     /**
-     * @notice Returns the address of the owner of the Strategy Module's ByzNft.
+     * @notice Returns the address of the owner of the Strategy Vault's ByzNft.
      */
     function stratModOwner() public view returns (address) {
         return byzNft.ownerOf(stratModNftId);
@@ -227,10 +227,10 @@ contract StrategyModule is Initializable, StrategyModuleStorage {
     }
 
     /**
-     * @notice Returns the DV nodes details of the Strategy Module
+     * @notice Returns the DV nodes details of the Strategy Vault
      * It returns the eth1Addr, the number of Validation Credit and the reputation score of each nodes.
      */
-    function getDVNodesDetails() public view onlyIfNativeRestaking returns (IStrategyModule.Node[4] memory) {
+    function getDVNodesDetails() public view onlyIfNativeRestaking returns (IStrategyVault.Node[4] memory) {
         return clusterDetails.nodes;
     }
 

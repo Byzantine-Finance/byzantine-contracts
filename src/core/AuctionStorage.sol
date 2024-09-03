@@ -2,7 +2,7 @@
 pragma solidity ^0.8.20;
 
 import "../interfaces/IAuction.sol";
-import "../interfaces/IStrategyModuleManager.sol";
+import "../interfaces/IStrategyVaultManager.sol";
 import "../interfaces/IEscrow.sol";
 
 import "../libraries/HitchensOrderStatisticsTreeLib.sol";
@@ -16,8 +16,8 @@ abstract contract AuctionStorage is IAuction {
     /// @notice Escrow contract
     IEscrow public immutable escrow;
 
-    /// @notice StrategyModuleManager contract
-    IStrategyModuleManager public immutable strategyModuleManager;
+    /// @notice StrategyVaultManager contract
+    IStrategyVaultManager public immutable strategyVaultManager;
 
     /* ===================== STATE VARIABLES ===================== */
 
@@ -46,10 +46,10 @@ abstract contract AuctionStorage is IAuction {
 
     constructor(
         IEscrow _escrow,
-        IStrategyModuleManager _strategyModuleManager
+        IStrategyVaultManager _strategyVaultManager
     ) {
         escrow = _escrow;
-        strategyModuleManager = _strategyModuleManager;
+        strategyVaultManager = _strategyVaultManager;
     }
 
     /**

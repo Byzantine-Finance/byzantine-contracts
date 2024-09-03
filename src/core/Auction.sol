@@ -26,8 +26,8 @@ contract Auction is
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor(
         IEscrow _escrow,
-        IStrategyModuleManager _strategyModuleManager
-    ) AuctionStorage(_escrow, _strategyModuleManager) {
+        IStrategyVaultManager _strategyVaultManager
+    ) AuctionStorage(_escrow, _strategyVaultManager) {
         // Disable initializer in the context of the implementation contract
         _disableInitializers();
     }
@@ -73,7 +73,7 @@ contract Auction is
     }
 
     /**
-     * @notice Function triggered by the StrategyModuleManager every time a staker deposit 32ETH and ask for a DV.
+     * @notice Function triggered by the StrategyVaultManager every time a staker deposit 32ETH and ask for a DV.
      * It allows the pre-creation of a new DV for the next staker.
      * It finds the `clusterSize` node operators with the highest auction scores and put them in a DV.
      * @dev Reverts if not enough node operators are available.
@@ -82,7 +82,7 @@ contract Auction is
         external
         onlyStategyModuleManager
         nonReentrant
-        returns(IStrategyModule.Node[] memory)
+        returns(IStrategyVault.Node[] memory)
     {
         // Check if enough node ops in the auction to create a DV
         require(numNodeOpsInAuction >= clusterSize, "Not enough node ops in auction");
@@ -519,10 +519,10 @@ contract Auction is
      * @dev We assume the winners directly accept to join the DV, therefore this function cleans the auction tree and releases the bid price locked in the escrow.
      * @dev A same Eth address can not figure more than one time a same cluster.  
      */
-    function _getAuctionWinners() internal returns (IStrategyModule.Node[] memory) {
+    function _getAuctionWinners() internal returns (IStrategyVault.Node[] memory) {
 
-        // Create the Node structure array for the Strategy Module
-        IStrategyModule.Node[] memory auctionWinners = new IStrategyModule.Node[](clusterSize);
+        // Create the Node structure array for the Strategy Vault
+        IStrategyVault.Node[] memory auctionWinners = new IStrategyVault.Node[](clusterSize);
 
         // Create the best auctionScores array
         uint256[] memory bestAuctionScores = new uint256[](clusterSize);
@@ -573,8 +573,8 @@ contract Auction is
                     // Unlock the winner's bid price from the escrow
                     escrow.releaseFunds(_nodeOpsInfo[winnerAddr].auctionScoreToBidPrices[bestAuctionScores[i]][numSameBids - 1]);
 
-                    // Create Node structure for the Strategy Module
-                    auctionWinners[count] = IStrategyModule.Node(
+                    // Create Node structure for the Strategy Vault
+                    auctionWinners[count] = IStrategyVault.Node(
                         _nodeOpsInfo[winnerAddr].auctionScoreToVcNumbers[bestAuctionScores[i]][numSameBids - 1], // Validation Credits number associated to the auction score
                         _nodeOpsInfo[winnerAddr].reputationScore, // Reputation score of the node
                         winnerAddr // Winner address
@@ -617,7 +617,7 @@ contract Auction is
     /* ===================== MODIFIERS ===================== */
 
     modifier onlyStategyModuleManager() {
-        if (msg.sender != address(strategyModuleManager)) revert OnlyStrategyModuleManager();
+        if (msg.sender != address(strategyVaultManager)) revert OnlyStrategyVaultManager();
         _;
     }
 

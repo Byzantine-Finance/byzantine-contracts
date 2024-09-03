@@ -7,7 +7,7 @@ pragma solidity ^0.8.20;
 
 import "./ByzantineDeployer.t.sol";
 import "../src/interfaces/IAuction.sol";
-import "../src/interfaces/IStrategyModule.sol";
+import "../src/interfaces/IStrategyVault.sol";
 
 contract AuctionTest is ByzantineDeployer {
 
@@ -422,12 +422,12 @@ contract AuctionTest is ByzantineDeployer {
         assertEq(address(escrow).balance, totalBidsPrice + totalBonds);
 
         // Revert if not SrategyModuleManager calls createDV
-        vm.expectRevert(IAuction.OnlyStrategyModuleManager.selector);
+        vm.expectRevert(IAuction.OnlyStrategyVaultManager.selector);
         auction.getAuctionWinners();
 
         // DV: nodeOps[0], nodeOps[1], nodeOps[2], nodeOps[9]
-        vm.prank(address(strategyModuleManager));
-        IStrategyModule.Node[] memory winnersDV = auction.getAuctionWinners();
+        vm.prank(address(strategyVaultManager));
+        IStrategyVault.Node[] memory winnersDV = auction.getAuctionWinners();
 
         // Verify Escrow contract has been drained
         assertEq(address(escrow).balance, totalBonds);
@@ -454,7 +454,7 @@ contract AuctionTest is ByzantineDeployer {
 
         // Revert when not enough nodeOps in Auction
         assertEq(auction.numNodeOpsInAuction(), 0);
-        vm.prank(address(strategyModuleManager));
+        vm.prank(address(strategyVaultManager));
         vm.expectRevert(bytes("Not enough node ops in auction"));
         auction.getAuctionWinners();
 
@@ -483,8 +483,8 @@ contract AuctionTest is ByzantineDeployer {
         /* ============= 1st DV ============= */
 
         // DV1: nodeOps[0], nodeOps[1], nodeOps[2], nodeOps[3]
-        vm.prank(address(strategyModuleManager));
-        IStrategyModule.Node[] memory winnersDV1 = auction.getAuctionWinners();
+        vm.prank(address(strategyVaultManager));
+        IStrategyVault.Node[] memory winnersDV1 = auction.getAuctionWinners();
 
         // Verify the DV composition
         assertEq(winnersDV1[0].eth1Addr, nodeOps[0]);
@@ -501,8 +501,8 @@ contract AuctionTest is ByzantineDeployer {
         /* ============= 2nd DV ============= */
 
         // DV2: nodeOps[0], nodeOps[1], nodeOps[2], nodeOps[3]
-        vm.prank(address(strategyModuleManager));
-        IStrategyModule.Node[] memory winnersDV2 = auction.getAuctionWinners();
+        vm.prank(address(strategyVaultManager));
+        IStrategyVault.Node[] memory winnersDV2 = auction.getAuctionWinners();
 
         // Verify the DV composition
         assertEq(winnersDV2[0].eth1Addr, nodeOps[0]);
@@ -526,8 +526,8 @@ contract AuctionTest is ByzantineDeployer {
         assertEq(auction.numNodeOpsInAuction(), 4);
 
         // DV: nodeOps[0], nodeOps[1], nodeOps[2], nodeOps[3]
-        vm.prank(address(strategyModuleManager));
-        IStrategyModule.Node[] memory winnersDV = auction.getAuctionWinners();
+        vm.prank(address(strategyVaultManager));
+        IStrategyVault.Node[] memory winnersDV = auction.getAuctionWinners();
         
         // Verify the DV composition
         assertEq(winnersDV[0].eth1Addr, nodeOps[0]);
@@ -572,8 +572,8 @@ contract AuctionTest is ByzantineDeployer {
         /* ===================== FIRST DV ===================== */
 
         // DV1: nodeOps[0], nodeOps[6], nodeOps[2], nodeOps[4]
-        vm.prank(address(strategyModuleManager));
-        IStrategyModule.Node[] memory winnersDV1 = auction.getAuctionWinners();
+        vm.prank(address(strategyVaultManager));
+        IStrategyVault.Node[] memory winnersDV1 = auction.getAuctionWinners();
         
         // Verify the DV1 composition
         assertEq(winnersDV1[0].eth1Addr, nodeOps[0]);
@@ -587,8 +587,8 @@ contract AuctionTest is ByzantineDeployer {
         /* ===================== SECOND DV ===================== */
 
         // DV2: nodeOps[0], nodeOps[6], nodeOps[2], nodeOps[5]
-        vm.prank(address(strategyModuleManager));
-        IStrategyModule.Node[] memory winnersDV2 = auction.getAuctionWinners();
+        vm.prank(address(strategyVaultManager));
+        IStrategyVault.Node[] memory winnersDV2 = auction.getAuctionWinners();
         
         // Verify the DV2 composition
         assertEq(winnersDV2[0].eth1Addr, nodeOps[0]);
@@ -602,8 +602,8 @@ contract AuctionTest is ByzantineDeployer {
         /* ===================== THIRD DV ===================== */
 
         // DV2: nodeOps[0], nodeOps[6], nodeOps[2], nodeOps[1]
-        vm.prank(address(strategyModuleManager));
-        IStrategyModule.Node[] memory winnersDV3 = auction.getAuctionWinners();
+        vm.prank(address(strategyVaultManager));
+        IStrategyVault.Node[] memory winnersDV3 = auction.getAuctionWinners();
         
         // Verify the DV3 composition
         assertEq(winnersDV3[0].eth1Addr, nodeOps[0]);
@@ -617,8 +617,8 @@ contract AuctionTest is ByzantineDeployer {
         /* ===================== FOURTH DV ===================== */
 
         // DV2: nodeOps[1], nodeOps[3], nodeOps[7], nodeOps[9]
-        vm.prank(address(strategyModuleManager));
-        IStrategyModule.Node[] memory winnersDV4 = auction.getAuctionWinners();
+        vm.prank(address(strategyVaultManager));
+        IStrategyVault.Node[] memory winnersDV4 = auction.getAuctionWinners();
         
         // Verify the DV4 composition
         assertEq(winnersDV4[0].eth1Addr, nodeOps[1]);
@@ -630,7 +630,7 @@ contract AuctionTest is ByzantineDeployer {
         assertEq(auction.numNodeOpsInAuction(), 3);
 
         /* ===================== NOT ENOUGH NODE OPS IN AUCTION ===================== */
-        vm.prank(address(strategyModuleManager));
+        vm.prank(address(strategyVaultManager));
         vm.expectRevert(bytes("Not enough node ops in auction"));
         auction.getAuctionWinners();
 
