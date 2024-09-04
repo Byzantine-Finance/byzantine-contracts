@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
 import "@openzeppelin-upgrades/contracts/token/ERC20/extensions/ERC4626Upgradeable.sol";
@@ -49,10 +50,7 @@ contract ERC4626MultiRewardVault is Initializable, ERC4626Upgradeable, OwnableUp
 
     function totalAssets() public view override returns (uint256) {
         uint256 totalValue = super.totalAssets();
-        for (uint i = 0; i < rewardTokens.length; i++) {
-            IERC20Upgradeable rewardToken = rewardTokens[i];
-            totalValue += rewardToken.balanceOf(address(this));
-        }
+        // TODO: Integrate with oracle to determine total value of all tokens in vault
         return totalValue;
     }
 
