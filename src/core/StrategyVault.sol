@@ -9,8 +9,6 @@ import { PushSplit } from "splits-v2/splitters/push/PushSplit.sol";
 
 import "./StrategyVaultStorage.sol";
 
-// TODO: Allow Strategy Vault ByzNft to be tradeable => conceive a fair exchange mechanism between the seller and the buyer
-
 contract StrategyVault is Initializable, StrategyVaultStorage {
     using BeaconChainProofs for *;
 

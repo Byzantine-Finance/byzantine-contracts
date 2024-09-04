@@ -42,14 +42,14 @@ contract ByzNft is
     }
 
     /**
-     * @dev Overrides `_beforeTokenTransfer` to restrict token transfers to the StrategyVaultManager contract.
+     * @dev Overrides `_beforeTokenTransfer` to restrict token transfers.
      */
     function _beforeTokenTransfer(
         address from,
         address to,
         uint256 tokenId
     ) internal override view {
-        require(msg.sender == owner(), "ByzNft._transfer: Token transfer can only be initiated by the StrategyVaultManager, call StrategyVaultManager.transferStratModOwnership");
+        revert("ByzNft is non-transferable");
     }
 
 }
