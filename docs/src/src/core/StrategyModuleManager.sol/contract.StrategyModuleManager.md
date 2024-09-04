@@ -11,12 +11,12 @@ Initializable, OwnableUpgradeable, [StrategyVaultManagerStorage](/src/core/Strat
 
 ```solidity
 constructor(
-    IBeacon _stratModBeacon,
+    IBeacon _stratVaultBeacon,
     IAuction _auction,
     IByzNft _byzNft,
     IEigenPodManager _eigenPodManager,
     IDelegationManager _delegationManager
-) StrategyVaultManagerStorage(_stratModBeacon, _auction, _byzNft, _eigenPodManager, _delegationManager);
+) StrategyVaultManagerStorage(_stratVaultBeacon, _auction, _byzNft, _eigenPodManager, _delegationManager);
 ```
 
 ### initialize
@@ -28,11 +28,11 @@ constructor(
 function initialize(address initialOwner) external initializer;
 ```
 
-### onlyStratModOwner
+### onlyStratVaultOwner
 
 
 ```solidity
-modifier onlyStratModOwner(address owner, address stratMod);
+modifier onlyStratVaultOwner(address owner, address stratVault);
 ```
 
 ### preCreateDVs
@@ -53,7 +53,7 @@ function preCreateDVs(uint8 _numDVsToPreCreate) external onlyOwner;
 |`_numDVsToPreCreate`|`uint8`|Number of Distributed Validators to pre-create.|
 
 
-### createStratModAndStakeNativeETH
+### createStratVaultAndStakeNativeETH
 
 A 32ETH staker create a Strategy Vault, use a pre-created DV as a validator and activate it by depositing 32ETH.
 
@@ -65,7 +65,7 @@ A 32ETH staker create a Strategy Vault, use a pre-created DV as a validator and 
 
 
 ```solidity
-function createStratModAndStakeNativeETH(
+function createStratVaultAndStakeNativeETH(
     bytes calldata pubkey,
     bytes calldata signature,
     bytes32 depositDataRoot
@@ -80,7 +80,7 @@ function createStratModAndStakeNativeETH(
 |`depositDataRoot`|`bytes32`|The root/hash of the deposit data for the DV's deposit.|
 
 
-### transferStratModOwnership
+### transferStratVaultOwnership
 
 TODO Verify the pubkey in arguments to be sure it is using the right pubkey of a pre-created cluster
 
@@ -96,16 +96,16 @@ That action makes him give the ownership of the StrategyVault and all the token 
 
 
 ```solidity
-function transferStratModOwnership(
-    address stratModAddr,
+function transferStratVaultOwnership(
+    address stratVaultAddr,
     address newOwner
-) external onlyStratModOwner(msg.sender, stratModAddr);
+) external onlyStratVaultOwner(msg.sender, stratVaultAddr);
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`stratModAddr`|`address`|The address of the StrategyVault the owner will transfer.|
+|`stratVaultAddr`|`address`|The address of the StrategyVault the owner will transfer.|
 |`newOwner`|`address`|The address of the new owner of the StrategyVault.|
 
 
@@ -152,13 +152,13 @@ function getPendingClusterNodeDetails(uint64 clusterIndex) public view returns (
 |`clusterIndex`|`uint64`|The index of the pending cluster you want to know the node details.|
 
 
-### getStratModNumber
+### getStratVaultNumber
 
 Returns the number of StrategyVaults owned by an address.
 
 
 ```solidity
-function getStratModNumber(address staker) public view returns (uint256);
+function getStratVaultNumber(address staker) public view returns (uint256);
 ```
 **Parameters**
 
@@ -167,7 +167,7 @@ function getStratModNumber(address staker) public view returns (uint256);
 |`staker`|`address`|The address you want to know the number of Strategy Vaults it owns.|
 
 
-### getStratModByNftId
+### getStratVaultByNftId
 
 Returns the StrategyVault address by its bound ByzNft ID.
 
@@ -175,7 +175,7 @@ Returns the StrategyVault address by its bound ByzNft ID.
 
 
 ```solidity
-function getStratModByNftId(uint256 nftId) public view returns (address);
+function getStratVaultByNftId(uint256 nftId) public view returns (address);
 ```
 **Parameters**
 
@@ -184,7 +184,7 @@ function getStratModByNftId(uint256 nftId) public view returns (address);
 |`nftId`|`uint256`|The ByzNft ID you want to know the attached Strategy Vault.|
 
 
-### getStratMods
+### getStratVaults
 
 Returns the addresses of the `staker`'s StrategyVaults
 
@@ -192,7 +192,7 @@ Returns the addresses of the `staker`'s StrategyVaults
 
 
 ```solidity
-function getStratMods(address staker) public view returns (address[] memory);
+function getStratVaults(address staker) public view returns (address[] memory);
 ```
 **Parameters**
 
@@ -201,13 +201,13 @@ function getStratMods(address staker) public view returns (address[] memory);
 |`staker`|`address`|The staker address you want to know the Strategy Vaults it owns.|
 
 
-### hasStratMods
+### hasStratVaults
 
 Returns 'true' if the `staker` owns at least one StrategyVault, and 'false' otherwise.
 
 
 ```solidity
-function hasStratMods(address staker) public view returns (bool);
+function hasStratVaults(address staker) public view returns (bool);
 ```
 **Parameters**
 
@@ -250,46 +250,46 @@ function hasDelegatedTo(address staker) public view returns (address[] memory);
 |`staker`|`address`|The address of the StrategyVaults' owner.|
 
 
-### getPodByStratModAddr
+### getPodByStratVaultAddr
 
 Returns the address of the Strategy Vault's EigenPod (whether it is deployed yet or not).
 
-*If the `stratModAddr` is not an instance of a StrategyVault contract, the function will all the same
+*If the `stratVaultAddr` is not an instance of a StrategyVault contract, the function will all the same
 returns the EigenPod of the input address. SO USE THAT FUNCTION CARREFULLY.*
 
 
 ```solidity
-function getPodByStratModAddr(address stratModAddr) public view returns (address);
+function getPodByStratVaultAddr(address stratVaultAddr) public view returns (address);
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`stratModAddr`|`address`|The address of the StrategyVault contract you want to know the EigenPod address.|
+|`stratVaultAddr`|`address`|The address of the StrategyVault contract you want to know the EigenPod address.|
 
 
 ### hasPod
 
-Returns 'true' if the `stratModAddr` has created an EigenPod, and 'false' otherwise.
+Returns 'true' if the `stratVaultAddr` has created an EigenPod, and 'false' otherwise.
 
-*If the `stratModAddr` is not an instance of a StrategyVault contract, the function will all the same
+*If the `stratVaultAddr` is not an instance of a StrategyVault contract, the function will all the same
 returns the EigenPod of the input address. SO USE THAT FUNCTION CARREFULLY.*
 
 
 ```solidity
-function hasPod(address stratModAddr) public view returns (bool);
+function hasPod(address stratVaultAddr) public view returns (bool);
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`stratModAddr`|`address`|The StrategyVault Address you want to know if it has created an EigenPod.|
+|`stratVaultAddr`|`address`|The StrategyVault Address you want to know if it has created an EigenPod.|
 
 
-### _deployStratMod
+### _deployStratVault
 
 
 ```solidity
-function _deployStratMod() internal returns (IStrategyVault);
+function _deployStratVault() internal returns (IStrategyVault);
 ```
 

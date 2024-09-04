@@ -77,7 +77,7 @@ It finds the `clusterSize` node operators with the highest auction scores and pu
 
 
 ```solidity
-function getAuctionWinners() external onlyStategyModuleManager nonReentrant returns (IStrategyVault.Node[] memory);
+function getAuctionWinners() external onlyStategyVaultManager nonReentrant returns (IStrategyVault.Node[] memory);
 ```
 
 ### getPriceToPay
@@ -424,10 +424,10 @@ Function to get the auction winners. It returns the node operators addresses wit
 function _getAuctionWinners() internal returns (IStrategyVault.Node[] memory);
 ```
 
-### onlyStategyModuleManager
+### onlyStategyVaultManager
 
 
 ```solidity
-modifier onlyStategyModuleManager();
+modifier onlyStategyVaultManager();
 ```
 

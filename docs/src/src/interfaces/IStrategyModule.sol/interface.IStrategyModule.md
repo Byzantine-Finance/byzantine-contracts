@@ -14,22 +14,22 @@ Used to initialize the nftId of that StrategyVault and its owner.
 function initialize(uint256 _nftId, address _initialOwner) external;
 ```
 
-### stratModNftId
+### stratVaultNftId
 
 Returns the owner of this StrategyVault
 
 
 ```solidity
-function stratModNftId() external view returns (uint256);
+function stratVaultNftId() external view returns (uint256);
 ```
 
-### stratModOwner
+### stratVaultOwner
 
 Returns the address of the owner of the Strategy Vault's ByzNft.
 
 
 ```solidity
-function stratModOwner() external view returns (address);
+function stratVaultOwner() external view returns (address);
 ```
 
 ### stakeNativeETH
@@ -57,7 +57,7 @@ function stakeNativeETH(bytes calldata pubkey, bytes calldata signature, bytes32
 ### verifyWithdrawalCredentials
 
 This function verifies that the withdrawal credentials of the Distributed Validator(s) owned by
-the stratModOwner are pointed to the EigenPod of this contract. It also verifies the effective balance of the DV.
+the stratVaultOwner are pointed to the EigenPod of this contract. It also verifies the effective balance of the DV.
 It verifies the provided proof of the ETH DV against the beacon chain state root, marks the validator as 'active'
 in EigenLayer, and credits the restaked ETH in Eigenlayer.
 

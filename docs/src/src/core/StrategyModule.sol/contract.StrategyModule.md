@@ -22,12 +22,12 @@ uint8 internal constant CLUSTER_SIZE = 4;
 ```
 
 
-### stratModManager
+### stratVaultManager
 The single StrategyVaultManager for Byzantine
 
 
 ```solidity
-IStrategyVaultManager public immutable stratModManager;
+IStrategyVaultManager public immutable stratVaultManager;
 ```
 
 
@@ -69,7 +69,7 @@ IDelegationManager public immutable delegationManager;
 ```
 
 
-### stratModNftId
+### stratVaultNftId
 The ByzNft associated to this StrategyVault.
 
 The owner of the ByzNft is the StrategyVault owner.
@@ -77,7 +77,7 @@ TODO When non-upgradeable put that variable immutable and set it in the construc
 
 
 ```solidity
-uint256 public stratModNftId;
+uint256 public stratVaultNftId;
 ```
 
 
@@ -96,18 +96,18 @@ ClusterDetails public clusterDetails;
 modifier onlyNftOwner();
 ```
 
-### onlyNftOwnerOrStratModManager
+### onlyNftOwnerOrStratVaultManager
 
 
 ```solidity
-modifier onlyNftOwnerOrStratModManager();
+modifier onlyNftOwnerOrStratVaultManager();
 ```
 
-### onlyStratModManager
+### onlyStratVaultManager
 
 
 ```solidity
-modifier onlyStratModManager();
+modifier onlyStratVaultManager();
 ```
 
 ### constructor
@@ -115,7 +115,7 @@ modifier onlyStratModManager();
 
 ```solidity
 constructor(
-    IStrategyVaultManager _stratModManager,
+    IStrategyVaultManager _stratVaultManager,
     IAuction _auction,
     IByzNft _byzNft,
     IEigenPodManager _eigenPodManager,
@@ -160,7 +160,7 @@ function stakeNativeETH(
     bytes calldata pubkey,
     bytes calldata signature,
     bytes32 depositDataRoot
-) external payable onlyNftOwnerOrStratModManager;
+) external payable onlyNftOwnerOrStratVaultManager;
 ```
 **Parameters**
 
@@ -189,7 +189,7 @@ function callEigenPodManager(bytes calldata data) external payable onlyNftOwner 
 ### verifyWithdrawalCredentials
 
 This function verifies that the withdrawal credentials of the Distributed Validator(s) owned by
-the stratModOwner are pointed to the EigenPod of this contract. It also verifies the effective balance of the DV.
+the stratVaultOwner are pointed to the EigenPod of this contract. It also verifies the effective balance of the DV.
 It verifies the provided proof of the ETH DV against the beacon chain state root, marks the validator as 'active'
 in EigenLayer, and credits the restaked ETH in Eigenlayer.
 
@@ -291,7 +291,7 @@ Set the `clusterDetails` struct of the StrategyVault.
 
 
 ```solidity
-function setClusterDetails(Node[4] calldata nodes, DVStatus dvStatus) external onlyStratModManager;
+function setClusterDetails(Node[4] calldata nodes, DVStatus dvStatus) external onlyStratVaultManager;
 ```
 **Parameters**
 
@@ -312,13 +312,13 @@ Allow the Strategy Vault's owner to withdraw the smart contract's balance.
 function withdrawContractBalance() external onlyNftOwner;
 ```
 
-### stratModOwner
+### stratVaultOwner
 
 Returns the address of the owner of the Strategy Vault's ByzNft.
 
 
 ```solidity
-function stratModOwner() public view returns (address);
+function stratVaultOwner() public view returns (address);
 ```
 
 ### getDVStatus

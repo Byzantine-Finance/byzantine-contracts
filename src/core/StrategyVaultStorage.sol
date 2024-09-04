@@ -19,7 +19,7 @@ abstract contract StrategyVaultStorage is IStrategyVault {
     uint8 internal constant CLUSTER_SIZE = 4;
 
     /// @notice The single StrategyVaultManager for Byzantine
-    IStrategyVaultManager public immutable stratModManager;
+    IStrategyVaultManager public immutable stratVaultManager;
 
     /// @notice ByzNft contract
     IByzNft public immutable byzNft;
@@ -39,7 +39,7 @@ abstract contract StrategyVaultStorage is IStrategyVault {
     /// @notice The ByzNft associated to this StrategyVault.
     /// @notice The owner of the ByzNft is the StrategyVault owner.
     /// TODO When non-upgradeable put that variable immutable and set it in the constructor
-    uint256 public stratModNftId;
+    uint256 public stratVaultNftId;
 
     // Empty struct, all the fields have their default value
     ClusterDetails public clusterDetails;

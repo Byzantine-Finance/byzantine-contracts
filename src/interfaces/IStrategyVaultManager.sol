@@ -19,7 +19,7 @@ interface IStrategyVaultManager {
     function numPreCreatedClusters() external view returns (uint64);
 
     /// @notice Get the total number of Strategy Vaults that have been deployed.
-    function numStratMods() external view returns (uint64);
+    function numStratVaults() external view returns (uint64);
 
     /**
      * @notice Function to pre-create Distributed Validators. Must be called at least one time to allow stakers to enter in the protocol.
@@ -40,7 +40,7 @@ interface IStrategyVaultManager {
      * @dev It also fill the ClusterDetails struct of the newly created StrategyVault.
      * @dev Function will revert if not exactly 32 ETH are sent with the transaction.
      */
-    function createStratModAndStakeNativeETH(
+    function createStratVaultAndStakeNativeETH(
         bytes calldata pubkey,
         bytes calldata signature,
         bytes32 depositDataRoot
@@ -51,13 +51,13 @@ interface IStrategyVaultManager {
      * @notice Strategy Vault owner can transfer its Strategy Vault to another address.
      * Under the hood, he transfers the ByzNft associated to the StrategyVault.
      * That action makes him give the ownership of the StrategyVault and all the token it owns.
-     * @param stratModAddr The address of the StrategyVault the owner will transfer.
+     * @param stratVaultAddr The address of the StrategyVault the owner will transfer.
      * @param newOwner The address of the new owner of the StrategyVault.
      * @dev The ByzNft owner must first call the `approve` function to allow the StrategyVaultManager to transfer the ByzNft.
      * @dev Function will revert if not called by the ByzNft holder.
      * @dev Function will revert if the new owner is the same as the old owner.
      */
-    function transferStratModOwnership(address stratModAddr, address newOwner) external;
+    function transferStratVaultOwnership(address stratVaultAddr, address newOwner) external;
 
     /**
      * @notice Returns the address of the EigenPod and the Split contract of the next StrategyVault to be created.
@@ -81,35 +81,35 @@ interface IStrategyVaultManager {
      * @notice Returns the number of StrategyVaults owned by an address.
      * @param staker The address you want to know the number of Strategy Vaults it owns.
      */
-    function getStratModNumber(address staker) external view returns (uint256);
+    function getStratVaultNumber(address staker) external view returns (uint256);
 
     /**
      * @notice Returns the StrategyVault address by its bound ByzNft ID.
      * @param nftId The ByzNft ID you want to know the attached Strategy Vault.
      * @dev Returns address(0) if the nftId is not bound to a Strategy Vault (nftId is not a ByzNft)
      */
-    function getStratModByNftId(uint256 nftId) external view returns (address);
+    function getStratVaultByNftId(uint256 nftId) external view returns (address);
 
     /**
      * @notice Returns the addresses of the `staker`'s StrategyVaults
      * @param staker The staker address you want to know the Strategy Vaults it owns.
      * @dev Returns an empty array if the staker has no Strategy Vaults.
      */
-    function getStratMods(address staker) external view returns (address[] memory);
+    function getStratVaults(address staker) external view returns (address[] memory);
 
     /**
      * @notice Returns the address of the Strategy Vault's EigenPod (whether it is deployed yet or not).
-     * @param stratModAddr The address of the StrategyVault contract you want to know the EigenPod address.
-     * @dev If the `stratModAddr` is not an instance of a StrategyVault contract, the function will all the same 
+     * @param stratVaultAddr The address of the StrategyVault contract you want to know the EigenPod address.
+     * @dev If the `stratVaultAddr` is not an instance of a StrategyVault contract, the function will all the same 
      * returns the EigenPod of the input address. SO USE THAT FUNCTION CARREFULLY.
      */
-    function getPodByStratModAddr(address stratModAddr) external view returns (address);
+    function getPodByStratVaultAddr(address stratVaultAddr) external view returns (address);
 
     /**
      * @notice Returns 'true' if the `staker` owns at least one StrategyVault, and 'false' otherwise.
      * @param staker The address you want to know if it owns at least a StrategyVault.
      */
-    function hasStratMods(address staker) external view returns (bool);
+    function hasStratVaults(address staker) external view returns (bool);
 
     /**
      * @notice Specify which `staker`'s StrategyVaults are delegated.
@@ -126,17 +126,17 @@ interface IStrategyVaultManager {
     function hasDelegatedTo(address staker) external view returns (address[] memory);
 
     /**
-     * @notice Returns 'true' if the `stratModAddr` has created an EigenPod, and 'false' otherwise.
-     * @param stratModAddr The StrategyVault Address you want to know if it has created an EigenPod.
-     * @dev If the `stratModAddr` is not an instance of a StrategyVault contract, the function will all the same 
+     * @notice Returns 'true' if the `stratVaultAddr` has created an EigenPod, and 'false' otherwise.
+     * @param stratVaultAddr The StrategyVault Address you want to know if it has created an EigenPod.
+     * @dev If the `stratVaultAddr` is not an instance of a StrategyVault contract, the function will all the same 
      * returns the EigenPod of the input address. SO USE THAT FUNCTION CARREFULLY.
      */
-    function hasPod(address stratModAddr) external view returns (bool);
+    function hasPod(address stratVaultAddr) external view returns (bool);
 
     /// @dev Returned when a specific address doesn't have a StrategyVault
-    error DoNotHaveStratMod(address);
+    error DoNotHaveStratVault(address);
 
     /// @dev Returned when unauthorized call to a function only callable by the StrategyVault owner
-    error NotStratModOwner();
+    error NotStratVaultOwner();
     
 }

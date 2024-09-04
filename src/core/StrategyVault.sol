@@ -15,17 +15,17 @@ contract StrategyVault is Initializable, StrategyVaultStorage {
     /* ============== MODIFIERS ============== */
 
     modifier onlyNftOwner() {
-        if (msg.sender != stratModOwner()) revert OnlyNftOwner();
+        if (msg.sender != stratVaultOwner()) revert OnlyNftOwner();
         _;
     }
 
-    modifier onlyNftOwnerOrStratModManager() {
-        if (msg.sender != stratModOwner() && msg.sender != address(stratModManager)) revert OnlyNftOwnerOrStrategyVaultManager();
+    modifier onlyNftOwnerOrStratVaultManager() {
+        if (msg.sender != stratVaultOwner() && msg.sender != address(stratVaultManager)) revert OnlyNftOwnerOrStrategyVaultManager();
         _;
     }
 
-    modifier onlyStratModManager() {
-        if (msg.sender != address(stratModManager)) revert OnlyStrategyVaultManager();
+    modifier onlyStratVaultManager() {
+        if (msg.sender != address(stratVaultManager)) revert OnlyStrategyVaultManager();
         _;
     }
 
@@ -38,13 +38,13 @@ contract StrategyVault is Initializable, StrategyVaultStorage {
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor(
-        IStrategyVaultManager _stratModManager,
+        IStrategyVaultManager _stratVaultManager,
         IAuction _auction,
         IByzNft _byzNft,
         IEigenPodManager _eigenPodManager,
         IDelegationManager _delegationManager
     ) {
-        stratModManager = _stratModManager;
+        stratVaultManager = _stratVaultManager;
         auction = _auction;
         byzNft = _byzNft;
         eigenPodManager = _eigenPodManager;
@@ -60,7 +60,7 @@ contract StrategyVault is Initializable, StrategyVaultStorage {
     function initialize(uint256 _nftId, address _initialOwner) external initializer {
         try byzNft.ownerOf(_nftId) returns (address nftOwner) {
             require(nftOwner == _initialOwner, "Only NFT owner can initialize the StrategyVault");
-            stratModNftId = _nftId;
+            stratVaultNftId = _nftId;
         } catch Error(string memory reason) {
             revert(string.concat("Cannot initialize StrategyVault: ", reason));
         }
@@ -91,7 +91,7 @@ contract StrategyVault is Initializable, StrategyVaultStorage {
         bytes calldata pubkey, 
         bytes calldata signature,
         bytes32 depositDataRoot
-    ) external payable onlyNftOwnerOrStratModManager {
+    ) external payable onlyNftOwnerOrStratVaultManager {
         // Create Eigen Pod (if not already has one) and stake the native ETH
         eigenPodManager.stake{value: msg.value}(pubkey, signature, depositDataRoot);
     }
@@ -106,7 +106,7 @@ contract StrategyVault is Initializable, StrategyVaultStorage {
 
     /**
      * @notice This function verifies that the withdrawal credentials of the Distributed Validator(s) owned by
-     * the stratModOwner are pointed to the EigenPod of this contract. It also verifies the effective balance of the DV.
+     * the stratVaultOwner are pointed to the EigenPod of this contract. It also verifies the effective balance of the DV.
      * It verifies the provided proof of the ETH DV against the beacon chain state root, marks the validator as 'active'
      * in EigenLayer, and credits the restaked ETH in Eigenlayer.
      * @param proofTimestamp is the exact timestamp where the proof was generated
@@ -173,7 +173,7 @@ contract StrategyVault is Initializable, StrategyVaultStorage {
         Node[4] calldata nodes,
         address splitAddr,
         DVStatus dvStatus
-    ) external onlyStratModManager {
+    ) external onlyStratVaultManager {
 
         for (uint8 i = 0; i < CLUSTER_SIZE;) {
             clusterDetails.nodes[i] = nodes[i];
@@ -213,8 +213,8 @@ contract StrategyVault is Initializable, StrategyVaultStorage {
     /**
      * @notice Returns the address of the owner of the Strategy Vault's ByzNft.
      */
-    function stratModOwner() public view returns (address) {
-        return byzNft.ownerOf(stratModNftId);
+    function stratVaultOwner() public view returns (address) {
+        return byzNft.ownerOf(stratVaultNftId);
     }
     
     /**

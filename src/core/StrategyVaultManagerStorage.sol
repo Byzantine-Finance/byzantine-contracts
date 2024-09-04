@@ -23,7 +23,7 @@ abstract contract StrategyVaultManagerStorage is IStrategyVaultManager {
     uint256 public constant SPLIT_TOTAL_ALLOCATION = 1_000_000; // 100% is 1_000_000
 
     /// @notice Beacon proxy to which the StrategyVaults point
-    IBeacon public immutable stratModBeacon;
+    IBeacon public immutable stratVaultBeacon;
 
     /// @notice ByzNft contract
     IByzNft public immutable byzNft;
@@ -43,10 +43,10 @@ abstract contract StrategyVaultManagerStorage is IStrategyVaultManager {
     /* ============== STATE VARIABLES ============== */
 
     /// @notice Staker to its owned StrategyVaults
-    mapping(address => address[]) public stakerToStratMods;
+    mapping(address => address[]) public stakerToStratVaults;
 
     /// @notice ByzNft tokenId to its tied StrategyVault
-    mapping(uint256 => address) public nftIdToStratMod;
+    mapping(uint256 => address) public nftIdToStratVault;
 
     /// @notice Mapping to store the pre-created clusters waiting for work
     mapping(uint64 => PendingClusterDetails) public pendingClusters;
@@ -54,20 +54,20 @@ abstract contract StrategyVaultManagerStorage is IStrategyVaultManager {
     /// @notice The number of pre-created clusters. Used as the mapping index.
     uint64 public numPreCreatedClusters;
 
-    /// @notice The number of StratMods that have been deployed
-    uint64 public numStratMods; // This is also the number of ByzNft minted
+    /// @notice The number of StratVaults that have been deployed
+    uint64 public numStratVaults; // This is also the number of ByzNft minted
 
     /* ================= CONSTRUCTOR ================= */ 
 
     constructor(
-        IBeacon _stratModBeacon,
+        IBeacon _stratVaultBeacon,
         IAuction _auction,
         IByzNft _byzNft,
         IEigenPodManager _eigenPodManager,
         IDelegationManager _delegationManager,
         PushSplitFactory _pushSplitFactory
     ) {
-        stratModBeacon = _stratModBeacon;
+        stratVaultBeacon = _stratVaultBeacon;
         auction = _auction;
         byzNft = _byzNft;
         eigenPodManager = _eigenPodManager;

@@ -6,12 +6,12 @@
 
 
 ## State Variables
-### stratModBeacon
+### stratVaultBeacon
 Beacon proxy to which the StrategyVaults point
 
 
 ```solidity
-IBeacon public immutable stratModBeacon;
+IBeacon public immutable stratVaultBeacon;
 ```
 
 
@@ -51,21 +51,21 @@ IDelegationManager public immutable delegationManager;
 ```
 
 
-### stakerToStratMods
+### stakerToStratVaults
 Staker to its owned StrategyVaults
 
 
 ```solidity
-mapping(address => address[]) public stakerToStratMods;
+mapping(address => address[]) public stakerToStratVaults;
 ```
 
 
-### nftIdToStratMod
+### nftIdToStratVault
 ByzNft tokenId to its tied StrategyVault
 
 
 ```solidity
-mapping(uint256 => address) public nftIdToStratMod;
+mapping(uint256 => address) public nftIdToStratVault;
 ```
 
 
@@ -87,12 +87,12 @@ uint64 public numPreCreatedClusters;
 ```
 
 
-### numStratMods
-The number of StratMods that have been deployed
+### numStratVaults
+The number of StratVaults that have been deployed
 
 
 ```solidity
-uint64 public numStratMods;
+uint64 public numStratVaults;
 ```
 
 
@@ -113,7 +113,7 @@ uint256[44] private __gap;
 
 ```solidity
 constructor(
-    IBeacon _stratModBeacon,
+    IBeacon _stratVaultBeacon,
     IAuction _auction,
     IByzNft _byzNft,
     IEigenPodManager _eigenPodManager,

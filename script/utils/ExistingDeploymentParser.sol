@@ -113,8 +113,8 @@ contract ExistingDeploymentParser is Script, Test {
     function _verifyContractPointers() internal view virtual {
         // StrategyVaultManager
         require(
-            strategyVaultManager.stratModBeacon() == strategyVaultBeacon,
-            "strategyVaultManager: stratModBeacon address not set correctly"
+            strategyVaultManager.stratVaultBeacon() == strategyVaultBeacon,
+            "strategyVaultManager: stratVaultBeacon address not set correctly"
         );
         require(
             strategyVaultManager.auction() == auction,
@@ -138,7 +138,7 @@ contract ExistingDeploymentParser is Script, Test {
         );
         // StrategyVaultImplementation
         require(
-            strategyVaultImplementation.stratModManager() == strategyVaultManager,
+            strategyVaultImplementation.stratVaultManager() == strategyVaultManager,
             "strategyVaultImplementation: strategyVaultManager address not set correctly"
         );
         require(

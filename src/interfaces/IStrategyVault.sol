@@ -43,12 +43,12 @@ interface IStrategyVault {
   /**
    * @notice Returns the owner of this StrategyVault
    */
-  function stratModNftId() external view returns (uint256);
+  function stratVaultNftId() external view returns (uint256);
 
   /**
    * @notice Returns the address of the owner of the Strategy Vault's ByzNft.
    */
-  function stratModOwner() external view returns (address);
+  function stratVaultOwner() external view returns (address);
 
   /**
    * @notice Deposit 32ETH in the beacon chain to activate a Distributed Validator and start validating on the consensus layer.
@@ -68,7 +68,7 @@ interface IStrategyVault {
 
   /**
    * @notice This function verifies that the withdrawal credentials of the Distributed Validator(s) owned by
-   * the stratModOwner are pointed to the EigenPod of this contract. It also verifies the effective balance of the DV.
+   * the stratVaultOwner are pointed to the EigenPod of this contract. It also verifies the effective balance of the DV.
    * It verifies the provided proof of the ETH DV against the beacon chain state root, marks the validator as 'active'
    * in EigenLayer, and credits the restaked ETH in Eigenlayer.
    * @param proofTimestamp is the exact timestamp where the proof was generated

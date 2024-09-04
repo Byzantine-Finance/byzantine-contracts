@@ -24,7 +24,7 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
     /// @notice Canonical, virtual beacon chain ETH strategy
     IStrategy public constant beaconChainETHStrategy = IStrategy(0xbeaC0eeEeeeeEEeEeEEEEeeEEeEeeeEeeEEBEaC0);
 
-    /// @notice Random validator deposit data to be able to call `createStratModAndStakeNativeETH` function
+    /// @notice Random validator deposit data to be able to call `createStratVaultAndStakeNativeETH` function
     bytes pubkey;
     bytes signature;
     bytes32 depositDataRoot;
@@ -54,7 +54,7 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
         _getDepositData(abi.encodePacked("./test/test-data/deposit-data-DV0-noPod.json"));
     }
 
-    function testStratModManagerOwner() public view {
+    function testStratVaultManagerOwner() public view {
         assertEq(strategyVaultManager.owner(), address(this));
     }
 
@@ -65,8 +65,8 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
 
     function testPreCreateDVs() public {
         // Alice would like to create a StrategyVault but no pending clusters
-        vm.expectRevert(bytes("StrategyVaultManager.createStratModAndStakeNativeETH: no pending DVs"));
-        _createStratModAndStakeNativeETH(alice, 32 ether);
+        vm.expectRevert(bytes("StrategyVaultManager.createStratVaultAndStakeNativeETH: no pending DVs"));
+        _createStratVaultAndStakeNativeETH(alice, 32 ether);
 
         // Alice tries to pre-create 2 DVs but she is not allowed
         vm.expectRevert(bytes("Ownable: caller is not the owner"));
@@ -101,7 +101,7 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
         assertEq(nodesDV2[3].vcNumber, 300);
 
         // Alice creates a StrategyVault and activates the first DV
-        _createStratModAndStakeNativeETH(alice, 32 ether);
+        _createStratVaultAndStakeNativeETH(alice, 32 ether);
         assertEq(alice.balance, STARTING_BALANCE - 32 ether);
 
         // Verify the first pending DV has been deleted from the pending container
@@ -120,27 +120,27 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
         assertEq(strategyVaultManager.getNumPendingClusters(), 1);
     }
 
-    function testCreateStratMods() public preCreateClusters(2) {
+    function testCreateStratVaults() public preCreateClusters(2) {
 
         // Node ops bids again
         _8NodeOpsBid();
 
         // First, verify if Alice and Bob have StrategyVaults
-        assertFalse(strategyVaultManager.hasStratMods(alice));
-        assertFalse(strategyVaultManager.hasStratMods(bob));
+        assertFalse(strategyVaultManager.hasStratVaults(alice));
+        assertFalse(strategyVaultManager.hasStratVaults(bob));
 
         // Alice creates a StrategyVault
-        address aliceStratModAddr1 = _createStratModAndStakeNativeETH(alice, 32 ether);
-        uint256 nft1 = IStrategyVault(aliceStratModAddr1).stratModNftId();
-        assertTrue(strategyVaultManager.hasStratMods(alice));
-        assertEq(strategyVaultManager.numStratMods(), 1);
-        assertEq(strategyVaultManager.getStratModNumber(alice), 1);
-        assertEq(IStrategyVault(aliceStratModAddr1).stratModOwner(), alice);
-        assertEq(strategyVaultManager.getStratModByNftId(nft1), aliceStratModAddr1);
+        address aliceStratVaultAddr1 = _createStratVaultAndStakeNativeETH(alice, 32 ether);
+        uint256 nft1 = IStrategyVault(aliceStratVaultAddr1).stratVaultNftId();
+        assertTrue(strategyVaultManager.hasStratVaults(alice));
+        assertEq(strategyVaultManager.numStratVaults(), 1);
+        assertEq(strategyVaultManager.getStratVaultNumber(alice), 1);
+        assertEq(IStrategyVault(aliceStratVaultAddr1).stratVaultOwner(), alice);
+        assertEq(strategyVaultManager.getStratVaultByNftId(nft1), aliceStratVaultAddr1);
 
-        // Verify alice strat mod 1 DV details
-        IStrategyVault.Node[4] memory nodesDV1Alice = IStrategyVault(aliceStratModAddr1).getDVNodesDetails();
-        IStrategyVault.DVStatus dvStatusDV1Alice = IStrategyVault(aliceStratModAddr1).getDVStatus();
+        // Verify alice strat vault 1 DV details
+        IStrategyVault.Node[4] memory nodesDV1Alice = IStrategyVault(aliceStratVaultAddr1).getDVNodesDetails();
+        IStrategyVault.DVStatus dvStatusDV1Alice = IStrategyVault(aliceStratVaultAddr1).getDVStatus();
         // Verify the nodes details
         for (uint i = 0; i < clusterSize; i++) {
             assertEq(nodesDV1Alice[i].eth1Addr, nodeOps[i]);
@@ -157,17 +157,17 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
         assertEq(strategyVaultManager.getNumPendingClusters(), 2);
 
         // Bob creates a StrategyVault
-        address bobStratModAddr1 = _createStratModAndStakeNativeETH(bob, 32 ether);
-        uint256 nft2 = IStrategyVault(bobStratModAddr1).stratModNftId();
-        assertTrue(strategyVaultManager.hasStratMods(bob));
-        assertEq(strategyVaultManager.numStratMods(), 2);
-        assertEq(strategyVaultManager.getStratModNumber(bob), 1);
-        assertEq(IStrategyVault(bobStratModAddr1).stratModOwner(), bob);
-        assertEq(strategyVaultManager.getStratModByNftId(nft2), bobStratModAddr1);
+        address bobStratVaultAddr1 = _createStratVaultAndStakeNativeETH(bob, 32 ether);
+        uint256 nft2 = IStrategyVault(bobStratVaultAddr1).stratVaultNftId();
+        assertTrue(strategyVaultManager.hasStratVaults(bob));
+        assertEq(strategyVaultManager.numStratVaults(), 2);
+        assertEq(strategyVaultManager.getStratVaultNumber(bob), 1);
+        assertEq(IStrategyVault(bobStratVaultAddr1).stratVaultOwner(), bob);
+        assertEq(strategyVaultManager.getStratVaultByNftId(nft2), bobStratVaultAddr1);
 
-        // Verify bob strat mod 1 DV details
-        IStrategyVault.Node[4] memory nodesDV1Bob = IStrategyVault(bobStratModAddr1).getDVNodesDetails();
-        IStrategyVault.DVStatus dvStatusDV1Bob = IStrategyVault(bobStratModAddr1).getDVStatus();
+        // Verify bob strat vault 1 DV details
+        IStrategyVault.Node[4] memory nodesDV1Bob = IStrategyVault(bobStratVaultAddr1).getDVNodesDetails();
+        IStrategyVault.DVStatus dvStatusDV1Bob = IStrategyVault(bobStratVaultAddr1).getDVStatus();
         // Verify the nodes details
         for (uint i = 0; i < clusterSize; i++) {
            assertEq(nodesDV1Bob[i].eth1Addr, nodeOps[i + 4]);
@@ -184,16 +184,16 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
         assertEq(strategyVaultManager.getNumPendingClusters(), 2);
 
         // Alice creates a second StrategyVault
-        address aliceStratModAddr2 = _createStratModAndStakeNativeETH(alice, 32 ether);
-        uint256 nft3 = IStrategyVault(aliceStratModAddr2).stratModNftId();
-        assertEq(strategyVaultManager.numStratMods(), 3);
-        assertEq(strategyVaultManager.getStratModNumber(alice), 2);
-        assertEq(IStrategyVault(aliceStratModAddr2).stratModOwner(), alice);
-        assertEq(strategyVaultManager.getStratModByNftId(nft3), aliceStratModAddr2);
+        address aliceStratVaultAddr2 = _createStratVaultAndStakeNativeETH(alice, 32 ether);
+        uint256 nft3 = IStrategyVault(aliceStratVaultAddr2).stratVaultNftId();
+        assertEq(strategyVaultManager.numStratVaults(), 3);
+        assertEq(strategyVaultManager.getStratVaultNumber(alice), 2);
+        assertEq(IStrategyVault(aliceStratVaultAddr2).stratVaultOwner(), alice);
+        assertEq(strategyVaultManager.getStratVaultByNftId(nft3), aliceStratVaultAddr2);
 
-        // Verify alice strat mod 2 DV details
-        IStrategyVault.Node[4] memory nodesDV2Alice = IStrategyVault(aliceStratModAddr2).getDVNodesDetails();
-        IStrategyVault.DVStatus dvStatusDV2Alice = IStrategyVault(aliceStratModAddr2).getDVStatus();
+        // Verify alice strat vault 2 DV details
+        IStrategyVault.Node[4] memory nodesDV2Alice = IStrategyVault(aliceStratVaultAddr2).getDVNodesDetails();
+        IStrategyVault.DVStatus dvStatusDV2Alice = IStrategyVault(aliceStratVaultAddr2).getDVStatus();
         // Verify the nodes details
         for (uint i = 0; i < clusterSize; i++) {
             assertEq(nodesDV2Alice[i].eth1Addr, nodeOps[i]);
@@ -225,8 +225,8 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
         _8NodeOpsBid();
 
         // Alice creates two StrategyVaults
-        address aliceStratModAddr1 = _createStratModAndStakeNativeETH(alice, 32 ether);
-        address aliceStratModAddr2 = _createStratModAndStakeNativeETH(alice, 32 ether);
+        address aliceStratVaultAddr1 = _createStratVaultAndStakeNativeETH(alice, 32 ether);
+        address aliceStratVaultAddr2 = _createStratVaultAndStakeNativeETH(alice, 32 ether);
 
         // Should revert because DV1 is already created
         vm.expectRevert(bytes("StrategyVaultManager.preCalculatePodAndSplitAddr: invalid nounce. Should be in the precreated clusters range"));
@@ -235,43 +235,43 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
         (podAddressDV3, splitAddressDV3) = strategyVaultManager.preCalculatePodAndSplitAddr(2);
 
         // Bob creates a StrategyVault
-        address bobStratModAddr1 = _createStratModAndStakeNativeETH(bob, 32 ether);
+        address bobStratVaultAddr1 = _createStratVaultAndStakeNativeETH(bob, 32 ether);
 
         // Verify pod addresses of DV1, DV2 and DV3
-        assertEq(strategyVaultManager.getPodByStratModAddr(aliceStratModAddr1), podAddressDV1);
-        assertEq(strategyVaultManager.getPodByStratModAddr(aliceStratModAddr2), podAddressDV2);
-        assertEq(strategyVaultManager.getPodByStratModAddr(bobStratModAddr1), podAddressDV3);
+        assertEq(strategyVaultManager.getPodByStratVaultAddr(aliceStratVaultAddr1), podAddressDV1);
+        assertEq(strategyVaultManager.getPodByStratVaultAddr(aliceStratVaultAddr2), podAddressDV2);
+        assertEq(strategyVaultManager.getPodByStratVaultAddr(bobStratVaultAddr1), podAddressDV3);
 
         // Verify split addresses of DV1, DV2 and DV3
-        assertEq(IStrategyVault(aliceStratModAddr1).getSplitAddress(), splitAddressDV1);
-        assertEq(IStrategyVault(aliceStratModAddr2).getSplitAddress(), splitAddressDV2);
-        assertEq(IStrategyVault(bobStratModAddr1).getSplitAddress(), splitAddressDV3);
+        assertEq(IStrategyVault(aliceStratVaultAddr1).getSplitAddress(), splitAddressDV1);
+        assertEq(IStrategyVault(aliceStratVaultAddr2).getSplitAddress(), splitAddressDV2);
+        assertEq(IStrategyVault(bobStratVaultAddr1).getSplitAddress(), splitAddressDV3);
     }
 
     // Within foundry, resulting address of a contract deployed with CREATE2 differs according to the msg.sender.
     // Why??
-    function testFrontRunStratModDeployment() public preCreateClusters(2) {
+    function testFrontRunStratVaultDeployment() public preCreateClusters(2) {
         // Bob a hacker, front run the deployment of the first StrategyVault
         vm.startPrank(bob);
         uint256 firstNftId = uint256(keccak256(abi.encode(0)));
-        address stratModAddr = Create2.deploy(
+        address stratVaultAddr = Create2.deploy(
             0,
             bytes32(firstNftId),
             abi.encodePacked(type(BeaconProxy).creationCode, abi.encode(strategyVaultBeacon, ""))
         );
         // Bob wants to initialize the StrategyVault but can't because he doesn't own the nft
         vm.expectRevert(bytes("Cannot initialize StrategyVault: ERC721: invalid token ID"));
-        IStrategyVault(stratModAddr).initialize(firstNftId, bob);
+        IStrategyVault(stratVaultAddr).initialize(firstNftId, bob);
         vm.stopPrank();
     }
 
     function testSplitDistribution() public preCreateClusters(2) {
         // Alice creates a StrategyVault
-        IStrategyVault stratModAlice = IStrategyVault(_createStratModAndStakeNativeETH(alice, 32 ether));
-        address stratModAliceSplit = stratModAlice.getSplitAddress();
+        IStrategyVault stratVaultAlice = IStrategyVault(_createStratVaultAndStakeNativeETH(alice, 32 ether));
+        address stratVaultAliceSplit = stratVaultAlice.getSplitAddress();
 
         // Create the recipients array
-        IStrategyVault.Node[4] memory nodesDVAlice = stratModAlice.getDVNodesDetails();
+        IStrategyVault.Node[4] memory nodesDVAlice = stratVaultAlice.getDVNodesDetails();
         address[] memory recipients = new address[](nodesDVAlice.length);
         for (uint i = 0; i < nodesDVAlice.length; i++) {
             recipients[i] = nodesDVAlice[i].eth1Addr;
@@ -285,17 +285,17 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
         // Get distributor's balance
         uint256 distributorBalance = bob.balance;
 
-        // Fake the PoS rewards and add 100ETH in stratModAliceSplit contract
-        vm.deal(stratModAliceSplit, 100 ether);
-        assertEq(stratModAliceSplit.balance, 100 ether);
+        // Fake the PoS rewards and add 100ETH in stratVaultAliceSplit contract
+        vm.deal(stratVaultAliceSplit, 100 ether);
+        assertEq(stratVaultAliceSplit.balance, 100 ether);
 
         SplitV2Lib.Split memory split = _createSplit(recipients);
         // Bob distributes the Split balance to DV's node ops
         vm.prank(bob);
-        stratModAlice.distributeSplitBalance(split, SPLIT_NATIVE_TOKEN_ADDR);
+        stratVaultAlice.distributeSplitBalance(split, SPLIT_NATIVE_TOKEN_ADDR);
 
         // Verify the Split contract balance has been drained
-        assertEq(stratModAliceSplit.balance, 1); // 0xSplits decided to left 1 wei to save gas. Only impact the distributor rewards
+        assertEq(stratVaultAliceSplit.balance, 1); // 0xSplits decided to left 1 wei to save gas. Only impact the distributor rewards
 
         // Verify the new balances of the DV's node ops
         for (uint i = 0; i < nodesDVAlice.length; i++) {
@@ -306,108 +306,108 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
         assertEq(bob.balance, distributorBalance + 2 ether - 1);
     }
 
-    function testStratModTransfer() public preCreateClusters(2) {
+    function testStratVaultTransfer() public preCreateClusters(2) {
         // Alice creates a StrategyVault
-        address stratModAddrAlice = _createStratModAndStakeNativeETH(alice, 32 ether);
-        uint256 nftId = IStrategyVault(stratModAddrAlice).stratModNftId();
+        address stratVaultAddrAlice = _createStratVaultAndStakeNativeETH(alice, 32 ether);
+        uint256 nftId = IStrategyVault(stratVaultAddrAlice).stratVaultNftId();
 
         // Verify Alice owns the nft
         ByzNft byzNftContract = _getByzNftContract();
         assertEq(byzNftContract.ownerOf(nftId), alice);
 
         // Alice tries to transfer the StrategyVault by call the ERC721 `safeTransferFrom` function
-        // It's forbidden because the nft owner will change but the mapping `stakerToStratMods` won't be updated
+        // It's forbidden because the nft owner will change but the mapping `stakerToStratVaults` won't be updated
         vm.startPrank(alice);
-        vm.expectRevert(bytes("ByzNft._transfer: Token transfer can only be initiated by the StrategyVaultManager, call StrategyVaultManager.transferStratModOwnership"));
+        vm.expectRevert(bytes("ByzNft._transfer: Token transfer can only be initiated by the StrategyVaultManager, call StrategyVaultManager.transferStratVaultOwnership"));
         byzNftContract.safeTransferFrom(alice, bob, nftId);
         vm.stopPrank();
 
         // Alice approves the StrategyVaultManager to transfer to Bob
-        _approveNftTransferByStratModManager(alice, IStrategyVault(stratModAddrAlice).stratModNftId());
+        _approveNftTransferByStratVaultManager(alice, IStrategyVault(stratVaultAddrAlice).stratVaultNftId());
 
         // Alice transfers the StrategyVault to Bob
         vm.prank(alice);
-        strategyVaultManager.transferStratModOwnership(stratModAddrAlice, bob);
-        assertEq(strategyVaultManager.getStratModNumber(alice), 0);
+        strategyVaultManager.transferStratVaultOwnership(stratVaultAddrAlice, bob);
+        assertEq(strategyVaultManager.getStratVaultNumber(alice), 0);
 
         // Verify if Bob is the new owner
-        assertEq(bob, IStrategyVault(stratModAddrAlice).stratModOwner());
-        assertEq(strategyVaultManager.getStratModNumber(bob), 1);
+        assertEq(bob, IStrategyVault(stratVaultAddrAlice).stratVaultOwner());
+        assertEq(strategyVaultManager.getStratVaultNumber(bob), 1);
 
         // Verify if the mappings has been correctly updated
-        address[] memory aliceStratMods = strategyVaultManager.getStratMods(alice);
-        assertEq(aliceStratMods.length, 0);
-        assertEq(aliceStratMods, new address[](0));
-        address[] memory bobStratMods = strategyVaultManager.getStratMods(bob);
-        assertEq(bobStratMods.length, 1);
-        assertEq(bobStratMods[0], stratModAddrAlice);
+        address[] memory aliceStratVaults = strategyVaultManager.getStratVaults(alice);
+        assertEq(aliceStratVaults.length, 0);
+        assertEq(aliceStratVaults, new address[](0));
+        address[] memory bobStratVaults = strategyVaultManager.getStratVaults(bob);
+        assertEq(bobStratVaults.length, 1);
+        assertEq(bobStratVaults[0], stratVaultAddrAlice);
     }
 
-    function test_RevertWhen_NonStratModOwnerTransfersStratMod() public preCreateClusters(2) {
+    function test_RevertWhen_NonStratVaultOwnerTransfersStratVault() public preCreateClusters(2) {
         // Alice creates a StrategyVault
-        address stratModAddrAlice = _createStratModAndStakeNativeETH(alice, 32 ether);
+        address stratVaultAddrAlice = _createStratVaultAndStakeNativeETH(alice, 32 ether);
 
         // Alice approves the StrategyVaultManager to transfer to Bob
-        _approveNftTransferByStratModManager(alice, IStrategyVault(stratModAddrAlice).stratModNftId());
+        _approveNftTransferByStratVaultManager(alice, IStrategyVault(stratVaultAddrAlice).stratVaultNftId());
 
         // This smart contract transfers the StrategyVault to Bob
-        vm.expectRevert(IStrategyVaultManager.NotStratModOwner.selector);
-        strategyVaultManager.transferStratModOwnership(stratModAddrAlice, bob);
+        vm.expectRevert(IStrategyVaultManager.NotStratVaultOwner.selector);
+        strategyVaultManager.transferStratVaultOwnership(stratVaultAddrAlice, bob);
     }
 
-    function test_RevertWhen_TransferStratModToItself() public preCreateClusters(2) {
+    function test_RevertWhen_TransferStratVaultToItself() public preCreateClusters(2) {
         // Alice creates a StrategyVault
-        address stratModAddrAlice = _createStratModAndStakeNativeETH(alice, 32 ether);
+        address stratVaultAddrAlice = _createStratVaultAndStakeNativeETH(alice, 32 ether);
 
         // Alice approves the StrategyVault to transfer to herself
-        _approveNftTransferByStratModManager(alice, IStrategyVault(stratModAddrAlice).stratModNftId());     
+        _approveNftTransferByStratVaultManager(alice, IStrategyVault(stratVaultAddrAlice).stratVaultNftId());     
 
-        vm.expectRevert(bytes("StrategyVaultManager.transferStratModOwnership: cannot transfer ownership to the same address"));
+        vm.expectRevert(bytes("StrategyVaultManager.transferStratVaultOwnership: cannot transfer ownership to the same address"));
         vm.prank(alice);
-        strategyVaultManager.transferStratModOwnership(stratModAddrAlice, alice);
+        strategyVaultManager.transferStratVaultOwnership(stratVaultAddrAlice, alice);
     }
 
     function test_HasPod() public preCreateClusters(2) {
         // Alice creates a StrategyVault
-        address stratModAddrAlice = _createStratModAndStakeNativeETH(alice, 32 ether);
-        assertTrue(strategyVaultManager.hasPod(stratModAddrAlice));
+        address stratVaultAddrAlice = _createStratVaultAndStakeNativeETH(alice, 32 ether);
+        assertTrue(strategyVaultManager.hasPod(stratVaultAddrAlice));
     }
 
     function test_callEigenPodManager() public preCreateClusters(2) {
         // Alice creates a StrategyVault
-        address stratModAddr = _createStratModAndStakeNativeETH(alice, 32 ether);
+        address stratVaultAddr = _createStratVaultAndStakeNativeETH(alice, 32 ether);
 
         // Alice wants to call EigenPodManager directly
-        bytes memory functionToCall = abi.encodeWithSignature("ownerToPod(address)", stratModAddr);
+        bytes memory functionToCall = abi.encodeWithSignature("ownerToPod(address)", stratVaultAddr);
         vm.prank(alice);
-        bytes memory ret = IStrategyVault(stratModAddr).callEigenPodManager(functionToCall);
+        bytes memory ret = IStrategyVault(stratVaultAddr).callEigenPodManager(functionToCall);
         IEigenPod pod = abi.decode(ret, (IEigenPod));
 
-        assertEq(address(pod), strategyVaultManager.getPodByStratModAddr(stratModAddr));
+        assertEq(address(pod), strategyVaultManager.getPodByStratVaultAddr(stratVaultAddr));
     }
 
     function test_RevertWhen_Not32ETHDeposited() public preCreateClusters(2) {
 
         // Alice create StrategyVault and stake 31 ETH in the contract
-        vm.expectRevert(bytes("StrategyVaultManager.createStratModAndStakeNativeETH: must initially stake for any validator with 32 ether"));
-        _createStratModAndStakeNativeETH(alice, 31 ether);
+        vm.expectRevert(bytes("StrategyVaultManager.createStratVaultAndStakeNativeETH: must initially stake for any validator with 32 ether"));
+        _createStratVaultAndStakeNativeETH(alice, 31 ether);
 
     }
 
-    function testStakerWithdrawStratModBalance() public preCreateClusters(2) {
+    function testStakerWithdrawStratVaultBalance() public preCreateClusters(2) {
 
         // Alice creates a StrategyVault
-        address stratModAddr = _createStratModAndStakeNativeETH(alice, 32 ether);
+        address stratVaultAddr = _createStratVaultAndStakeNativeETH(alice, 32 ether);
 
         // Alice's Strategy Vault get 64ETH
-        vm.deal(stratModAddr, 64 ether);
-        assertEq(stratModAddr.balance, 64 ether);
+        vm.deal(stratVaultAddr, 64 ether);
+        assertEq(stratVaultAddr.balance, 64 ether);
 
         // Alice withdraw the Strategy Vault balance
         vm.prank(alice);
-        IStrategyVault(stratModAddr).withdrawContractBalance();
+        IStrategyVault(stratVaultAddr).withdrawContractBalance();
         assertEq(alice.balance, STARTING_BALANCE - 32 ether + 64 ether);
-        assertEq(stratModAddr.balance, 0 ether);
+        assertEq(stratVaultAddr.balance, 0 ether);
     }
 
     // That test reverts because the `withdrawal_credential_proof` file generated with the Byzantine API
@@ -425,7 +425,7 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
         // Start the test
 
         // Alice creates a Strategy Vault and stake ETH
-        address stratModAddr = _createStratModAndStakeNativeETH(alice, 32 ether);
+        address stratVaultAddr = _createStratVaultAndStakeNativeETH(alice, 32 ether);
 
         // Deposit received on the Beacon Chain
         uint64 timestamp = uint64(block.timestamp + 16 hours);
@@ -440,7 +440,7 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
             bytes("EigenPod.verifyCorrectWithdrawalCredentials: Proof is not for this EigenPod")
         );
         /// TODO: Update API to to have the exact timestamp where the proof was generated
-        IStrategyVault(stratModAddr).verifyWithdrawalCredentials(timestamp, stateRootProofStruct, validatorIndices, proofsArray, validatorFieldsArray);
+        IStrategyVault(stratVaultAddr).verifyWithdrawalCredentials(timestamp, stateRootProofStruct, validatorIndices, proofsArray, validatorFieldsArray);
 
     }
 
@@ -468,19 +468,19 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
         assertEq(operatorSharesBefore[0], 0);
         
         // Alice stake 32 ETH
-        address stratModAddr = _createStratModAndStakeNativeETH(alice, 32 ether);
+        address stratVaultAddr = _createStratVaultAndStakeNativeETH(alice, 32 ether);
         // Alice delegate its staked ETH to the ELOperator1
         vm.prank(alice);
-        IStrategyVault(stratModAddr).delegateTo(ELOperator1);
+        IStrategyVault(stratVaultAddr).delegateTo(ELOperator1);
 
         // Verify if alice's strategy vault is registered as a delegator
-        bool[] memory stratModsDelegated = strategyVaultManager.isDelegated(alice);
-        assertTrue(stratModsDelegated[0], "testDelegateTo: Alice's Strategy Vault  didn't delegate to ELOperator1 correctly");
+        bool[] memory stratVaultsDelegated = strategyVaultManager.isDelegated(alice);
+        assertTrue(stratVaultsDelegated[0], "testDelegateTo: Alice's Strategy Vault  didn't delegate to ELOperator1 correctly");
         // Verify if Alice delegated to the correct operator
-        address[] memory stratModsDelegateTo = strategyVaultManager.hasDelegatedTo(alice);
-        assertEq(stratModsDelegateTo[0], ELOperator1);
+        address[] memory stratVaultsDelegateTo = strategyVaultManager.hasDelegatedTo(alice);
+        assertEq(stratVaultsDelegateTo[0], ELOperator1);
 
-        // Operator shares didn't increase because alice didn't verify its withdrawal credentials -> podOwnerShares[stratModAddr] = 0
+        // Operator shares didn't increase because alice didn't verify its withdrawal credentials -> podOwnerShares[stratVaultAddr] = 0
         uint256[] memory operatorSharesAfter = delegation.getOperatorShares(ELOperator1, strategies);
         //console.log("operatorSharesAfter", operatorSharesAfter[0]);
         //assertEq(operatorSharesBefore[0], 0);
@@ -494,21 +494,21 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
     //------------------------------  INTERNAL FUNCTIONS  ----------------------------------
     //--------------------------------------------------------------------------------------
 
-    function _createStratModAndStakeNativeETH(address _staker, uint256 _stake) internal returns (address) {
+    function _createStratVaultAndStakeNativeETH(address _staker, uint256 _stake) internal returns (address) {
         vm.prank(_staker);
-        strategyVaultManager.createStratModAndStakeNativeETH{value: _stake}(pubkey, signature, depositDataRoot);
-        uint256 stratModNumber = strategyVaultManager.getStratModNumber(_staker);
-        if (stratModNumber == 0) {
+        strategyVaultManager.createStratVaultAndStakeNativeETH{value: _stake}(pubkey, signature, depositDataRoot);
+        uint256 stratVaultNumber = strategyVaultManager.getStratVaultNumber(_staker);
+        if (stratVaultNumber == 0) {
             return address(0);
         }
-        return strategyVaultManager.getStratMods(_staker)[stratModNumber - 1];
+        return strategyVaultManager.getStratVaults(_staker)[stratVaultNumber - 1];
     }
 
     function _getByzNftContract() internal view returns (ByzNft) {
         return ByzNft(address(strategyVaultManager.byzNft()));
     }
 
-    function _approveNftTransferByStratModManager(address approver, uint256 nftId) internal {
+    function _approveNftTransferByStratVaultManager(address approver, uint256 nftId) internal {
         ByzNft byzNftContract = _getByzNftContract();
         vm.prank(approver);
         byzNftContract.approve(address(strategyVaultManager), nftId);

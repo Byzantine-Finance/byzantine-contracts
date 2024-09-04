@@ -26,13 +26,13 @@ contract StrategyVaultManager is
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor(
-        IBeacon _stratModBeacon,
+        IBeacon _stratVaultBeacon,
         IAuction _auction,
         IByzNft _byzNft,
         IEigenPodManager _eigenPodManager,
         IDelegationManager _delegationManager,
         PushSplitFactory _pushSplitFactory
-    ) StrategyVaultManagerStorage(_stratModBeacon, _auction, _byzNft, _eigenPodManager, _delegationManager, _pushSplitFactory) {
+    ) StrategyVaultManagerStorage(_stratVaultBeacon, _auction, _byzNft, _eigenPodManager, _delegationManager, _pushSplitFactory) {
         // Disable initializer in the context of the implementation contract
         _disableInitializers();
     }
@@ -48,9 +48,9 @@ contract StrategyVaultManager is
 
     /* ================== MODIFIERS ================== */
 
-    modifier onlyStratModOwner(address owner, address stratMod) {
-        uint256 stratModNftId = IStrategyVault(stratMod).stratModNftId();
-        if (byzNft.ownerOf(stratModNftId) != owner) revert NotStratModOwner();
+    modifier onlyStratVaultOwner(address owner, address stratVault) {
+        uint256 stratVaultNftId = IStrategyVault(stratVault).stratVaultNftId();
+        if (byzNft.ownerOf(stratVaultNftId) != owner) revert NotStratVaultOwner();
         _;
     }
 
@@ -89,36 +89,36 @@ contract StrategyVaultManager is
      * @dev It also fill the ClusterDetails struct of the newly created StrategyVault.
      * @dev Function will revert if not exactly 32 ETH are sent with the transaction.
      */
-    function createStratModAndStakeNativeETH(
+    function createStratVaultAndStakeNativeETH(
         bytes calldata pubkey,
         bytes calldata signature,
         bytes32 depositDataRoot
     ) external payable {
-        require (getNumPendingClusters() > 0, "StrategyVaultManager.createStratModAndStakeNativeETH: no pending DVs");
-        require(msg.value == 32 ether, "StrategyVaultManager.createStratModAndStakeNativeETH: must initially stake for any validator with 32 ether");
+        require (getNumPendingClusters() > 0, "StrategyVaultManager.createStratVaultAndStakeNativeETH: no pending DVs");
+        require(msg.value == 32 ether, "StrategyVaultManager.createStratVaultAndStakeNativeETH: must initially stake for any validator with 32 ether");
         /// TODO Verify the pubkey in arguments to be sure it is using the right pubkey of a pre-created cluster. Use a monolithic blockchain
 
         // Create a StrategyVault
-        IStrategyVault newStratMod = _deployStratMod();
+        IStrategyVault newStratVault = _deployStratVault();
 
         // Stake 32 ETH in the Beacon Chain
-        newStratMod.stakeNativeETH{value: msg.value}(pubkey, signature, depositDataRoot);
+        newStratVault.stakeNativeETH{value: msg.value}(pubkey, signature, depositDataRoot);
 
-        uint256 clusterSize = pendingClusters[numStratMods].nodes.length;
+        uint256 clusterSize = pendingClusters[numStratVaults].nodes.length;
 
         // deploy the Split contract
-        address splitAddr = pushSplitFactory.createSplitDeterministic(pendingClusters[numStratMods].splitParams, owner(), owner(), bytes32(uint256(keccak256(abi.encode(numStratMods)))));
+        address splitAddr = pushSplitFactory.createSplitDeterministic(pendingClusters[numStratVaults].splitParams, owner(), owner(), bytes32(uint256(keccak256(abi.encode(numStratVaults)))));
 
         // Set the ClusterDetails struct of the new StrategyVault
-        newStratMod.setClusterDetails(
-            pendingClusters[numStratMods].nodes,
+        newStratVault.setClusterDetails(
+            pendingClusters[numStratVaults].nodes,
             splitAddr,
             IStrategyVault.DVStatus.DEPOSITED_NOT_VERIFIED
         );
 
         // Update pending clusters container and cursor
-        delete pendingClusters[numStratMods];
-        ++numStratMods;
+        delete pendingClusters[numStratVaults];
+        ++numStratVaults;
 
         // If enough node ops in Auction, trigger a new auction for the next staker's DV
         if (auction.numNodeOpsInAuction() >= clusterSize) {
@@ -133,25 +133,25 @@ contract StrategyVaultManager is
      * @notice Strategy Vault owner can transfer its Strategy Vault to another address.
      * Under the hood, he transfers the ByzNft associated to the StrategyVault.
      * That action makes him give the ownership of the StrategyVault and all the token it owns.
-     * @param stratModAddr The address of the StrategyVault the owner will transfer.
+     * @param stratVaultAddr The address of the StrategyVault the owner will transfer.
      * @param newOwner The address of the new owner of the StrategyVault.
      * @dev The ByzNft owner must first call the `approve` function to allow the StrategyVaultManager to transfer the ByzNft.
      * @dev Function will revert if not called by the ByzNft holder.
      * @dev Function will revert if the new owner is the same as the old owner.
      */
-    function transferStratModOwnership(address stratModAddr, address newOwner) external onlyStratModOwner(msg.sender, stratModAddr) {
+    function transferStratVaultOwnership(address stratVaultAddr, address newOwner) external onlyStratVaultOwner(msg.sender, stratVaultAddr) {
         
-        require(newOwner != msg.sender, "StrategyVaultManager.transferStratModOwnership: cannot transfer ownership to the same address");
+        require(newOwner != msg.sender, "StrategyVaultManager.transferStratVaultOwnership: cannot transfer ownership to the same address");
         
         // Transfer the ByzNft
-        byzNft.safeTransferFrom(msg.sender, newOwner, IStrategyVault(stratModAddr).stratModNftId());
+        byzNft.safeTransferFrom(msg.sender, newOwner, IStrategyVault(stratVaultAddr).stratVaultNftId());
 
-        // Delete stratMod from owner's portfolio
-        address[] storage stratMods = stakerToStratMods[msg.sender];
-        for (uint256 i = 0; i < stratMods.length;) {
-            if (stratMods[i] == stratModAddr) {
-                stratMods[i] = stratMods[stratMods.length - 1];
-                stratMods.pop();
+        // Delete stratVault from owner's portfolio
+        address[] storage stratVaults = stakerToStratVaults[msg.sender];
+        for (uint256 i = 0; i < stratVaults.length;) {
+            if (stratVaults[i] == stratVaultAddr) {
+                stratVaults[i] = stratVaults[stratVaults.length - 1];
+                stratVaults.pop();
                 break;
             }
             unchecked {
@@ -159,8 +159,8 @@ contract StrategyVaultManager is
             }
         }
 
-        // Add stratMod to newOwner's portfolio
-        stakerToStratMods[newOwner].push(stratModAddr);
+        // Add stratVault to newOwner's portfolio
+        stakerToStratVaults[newOwner].push(stratVaultAddr);
     }
 
     /* ============== VIEW FUNCTIONS ============== */
@@ -172,21 +172,21 @@ contract StrategyVaultManager is
      * @dev Function essential to pre-create DVs as their withdrawal address has to be the EigenPod and fee recipient address the Split.
      */
     function preCalculatePodAndSplitAddr(uint64 _nounce) external view returns (address podAddr, address splitAddr) {
-        require(_nounce < numPreCreatedClusters && _nounce >= numStratMods, "StrategyVaultManager.preCalculatePodAndSplitAddr: invalid nounce. Should be in the precreated clusters range");
+        require(_nounce < numPreCreatedClusters && _nounce >= numStratVaults, "StrategyVaultManager.preCalculatePodAndSplitAddr: invalid nounce. Should be in the precreated clusters range");
 
         // Pre-calculate next nft id
         uint256 preNftId = uint256(keccak256(abi.encode(_nounce)));
 
         // Pre-calculate the address of the next Strategy Vault
-        address stratModAddr = address(
+        address stratVaultAddr = address(
             Create2.computeAddress(
                 bytes32(preNftId), //salt
-                keccak256(abi.encodePacked(type(BeaconProxy).creationCode, abi.encode(stratModBeacon, ""))) //bytecode
+                keccak256(abi.encodePacked(type(BeaconProxy).creationCode, abi.encode(stratVaultBeacon, ""))) //bytecode
             )
         );
 
         // Returns the next StrategyVault's EigenPod address
-        podAddr = getPodByStratModAddr(stratModAddr);
+        podAddr = getPodByStratVaultAddr(stratVaultAddr);
 
         // Returns the next StrategyVault's Split address
         splitAddr = pushSplitFactory.predictDeterministicAddress(
@@ -198,7 +198,7 @@ contract StrategyVaultManager is
 
     /// @notice Returns the number of current pending clusters waiting for a Strategy Vault.
     function getNumPendingClusters() public view returns (uint64) {
-        return numPreCreatedClusters - numStratMods;
+        return numPreCreatedClusters - numStratVaults;
     }
 
     /**
@@ -214,8 +214,8 @@ contract StrategyVaultManager is
      * @notice Returns the number of StrategyVaults owned by an address.
      * @param staker The address you want to know the number of Strategy Vaults it owns.
      */
-    function getStratModNumber(address staker) public view returns (uint256) {
-        return stakerToStratMods[staker].length;
+    function getStratVaultNumber(address staker) public view returns (uint256) {
+        return stakerToStratVaults[staker].length;
     }
 
     /**
@@ -223,8 +223,8 @@ contract StrategyVaultManager is
      * @param nftId The ByzNft ID you want to know the attached Strategy Vault.
      * @dev Returns address(0) if the nftId is not bound to a Strategy Vault (nftId is not a ByzNft)
      */
-    function getStratModByNftId(uint256 nftId) public view returns (address) {
-        return nftIdToStratMod[nftId];
+    function getStratVaultByNftId(uint256 nftId) public view returns (address) {
+        return nftIdToStratVault[nftId];
     }
 
     /**
@@ -232,19 +232,19 @@ contract StrategyVaultManager is
      * @param staker The staker address you want to know the Strategy Vaults it owns.
      * @dev Returns an empty array if the staker has no Strategy Vaults.
      */
-    function getStratMods(address staker) public view returns (address[] memory) {
-        if (!hasStratMods(staker)) {
+    function getStratVaults(address staker) public view returns (address[] memory) {
+        if (!hasStratVaults(staker)) {
             return new address[](0);
         }
-        return stakerToStratMods[staker];
+        return stakerToStratVaults[staker];
     }
 
     /**
      * @notice Returns 'true' if the `staker` owns at least one StrategyVault, and 'false' otherwise.
      * @param staker The address you want to know if it owns at least a StrategyVault.
      */
-    function hasStratMods(address staker) public view returns (bool) {
-        if (getStratModNumber(staker) == 0) {
+    function hasStratVaults(address staker) public view returns (bool) {
+        if (getStratVaultNumber(staker) == 0) {
             return false;
         }
         return true;
@@ -258,17 +258,17 @@ contract StrategyVaultManager is
      * @dev Revert if the `staker` doesn't have any StrategyVault.
      */
     function isDelegated(address staker) public view returns (bool[] memory) {
-        if (!hasStratMods(staker)) revert DoNotHaveStratMod(staker);
+        if (!hasStratVaults(staker)) revert DoNotHaveStratVault(staker);
 
-        address[] memory stratMods = getStratMods(staker);
-        bool[] memory stratModsDelegated = new bool[](stratMods.length);
-        for (uint256 i = 0; i < stratMods.length;) {
-            stratModsDelegated[i] = delegationManager.isDelegated(stratMods[i]);
+        address[] memory stratVaults = getStratVaults(staker);
+        bool[] memory stratVaultsDelegated = new bool[](stratVaults.length);
+        for (uint256 i = 0; i < stratVaults.length;) {
+            stratVaultsDelegated[i] = delegationManager.isDelegated(stratVaults[i]);
             unchecked {
                 ++i;
             }
         }
-        return stratModsDelegated;
+        return stratVaultsDelegated;
     }
 
     /**
@@ -277,60 +277,60 @@ contract StrategyVaultManager is
      * @dev Revert if the `staker` doesn't have any StrategyVault.
      */
     function hasDelegatedTo(address staker) public view returns (address[] memory) {
-        if (!hasStratMods(staker)) revert DoNotHaveStratMod(staker);
+        if (!hasStratVaults(staker)) revert DoNotHaveStratVault(staker);
 
-        address[] memory stratMods = getStratMods(staker);
-        address[] memory stratModsDelegateTo = new address[](stratMods.length);
-        for (uint256 i = 0; i < stratMods.length;) {
-            stratModsDelegateTo[i] = delegationManager.delegatedTo(stratMods[i]);
+        address[] memory stratVaults = getStratVaults(staker);
+        address[] memory stratVaultsDelegateTo = new address[](stratVaults.length);
+        for (uint256 i = 0; i < stratVaults.length;) {
+            stratVaultsDelegateTo[i] = delegationManager.delegatedTo(stratVaults[i]);
             unchecked {
                 ++i;
             }
         }
-        return stratModsDelegateTo;
+        return stratVaultsDelegateTo;
     }
 
     /**
      * @notice Returns the address of the Strategy Vault's EigenPod (whether it is deployed yet or not).
-     * @param stratModAddr The address of the StrategyVault contract you want to know the EigenPod address.
-     * @dev If the `stratModAddr` is not an instance of a StrategyVault contract, the function will all the same 
+     * @param stratVaultAddr The address of the StrategyVault contract you want to know the EigenPod address.
+     * @dev If the `stratVaultAddr` is not an instance of a StrategyVault contract, the function will all the same 
      * returns the EigenPod of the input address. SO USE THAT FUNCTION CARREFULLY.
      */
-    function getPodByStratModAddr(address stratModAddr) public view returns (address) {
-        return address(eigenPodManager.getPod(stratModAddr));
+    function getPodByStratVaultAddr(address stratVaultAddr) public view returns (address) {
+        return address(eigenPodManager.getPod(stratVaultAddr));
     }
 
     /**
-     * @notice Returns 'true' if the `stratModAddr` has created an EigenPod, and 'false' otherwise.
-     * @param stratModAddr The StrategyVault Address you want to know if it has created an EigenPod.
-     * @dev If the `stratModAddr` is not an instance of a StrategyVault contract, the function will all the same 
+     * @notice Returns 'true' if the `stratVaultAddr` has created an EigenPod, and 'false' otherwise.
+     * @param stratVaultAddr The StrategyVault Address you want to know if it has created an EigenPod.
+     * @dev If the `stratVaultAddr` is not an instance of a StrategyVault contract, the function will all the same 
      * returns the EigenPod of the input address. SO USE THAT FUNCTION CARREFULLY.
      */
-    function hasPod(address stratModAddr) public view returns (bool) {
-        return eigenPodManager.hasPod(stratModAddr);
+    function hasPod(address stratVaultAddr) public view returns (bool) {
+        return eigenPodManager.hasPod(stratVaultAddr);
     }
 
     /* ============== INTERNAL FUNCTIONS ============== */
 
-    function _deployStratMod() internal returns (IStrategyVault) {
+    function _deployStratVault() internal returns (IStrategyVault) {
         // mint a byzNft for the Strategy Vault's creator
-        uint256 nftId = byzNft.mint(msg.sender, numStratMods);
+        uint256 nftId = byzNft.mint(msg.sender, numStratVaults);
 
-        // create the stratMod
-        address stratMod = Create2.deploy(
+        // create the stratVault
+        address stratVault = Create2.deploy(
             0,
             bytes32(nftId),
-            abi.encodePacked(type(BeaconProxy).creationCode, abi.encode(stratModBeacon, ""))
+            abi.encodePacked(type(BeaconProxy).creationCode, abi.encode(stratVaultBeacon, ""))
         );
-        IStrategyVault(stratMod).initialize(nftId, msg.sender);
+        IStrategyVault(stratVault).initialize(nftId, msg.sender);
 
-        // store the stratMod in the nftId mapping
-        nftIdToStratMod[nftId] = stratMod;
+        // store the stratVault in the nftId mapping
+        nftIdToStratVault[nftId] = stratVault;
 
-        // store the stratMod in the staker mapping
-        stakerToStratMods[msg.sender].push(stratMod);
+        // store the stratVault in the staker mapping
+        stakerToStratVaults[msg.sender].push(stratVault);
 
-        return IStrategyVault(stratMod);
+        return IStrategyVault(stratVault);
     }
 
     function _createSplitParams() internal pure returns (
