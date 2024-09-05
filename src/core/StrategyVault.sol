@@ -54,9 +54,10 @@ contract StrategyVault is Initializable, StrategyVaultStorage, AccessControlUpgr
      * @param _nftId The id of the ByzNft associated to this StrategyVault.
      * @param _initialOwner The initial owner of the ByzNft.
      * @param _whitelistedDeposit Whether the deposit function is whitelisted or not.
+     * @param _upgradeable Whether the StrategyVault is upgradeable or not.
      * @dev Called on construction by the StrategyVaultManager.
      */
-    function initialize(uint256 _nftId, address _initialOwner, bool _whitelistedDeposit) external initializer {
+    function initialize(uint256 _nftId, address _initialOwner, bool _whitelistedDeposit, bool _upgradeable) external initializer {
         try byzNft.ownerOf(_nftId) returns (address nftOwner) {
             require(nftOwner == _initialOwner, "Only NFT owner can initialize the StrategyVault");
             stratVaultNftId = _nftId;
@@ -65,6 +66,11 @@ contract StrategyVault is Initializable, StrategyVaultStorage, AccessControlUpgr
         }
 
         whitelistedDeposit = _whitelistedDeposit;
+
+        // If contract is not upgradeable, disable initialization (removing ability to upgrade contract)
+        if (!_upgradeable) {
+            _disableInitializers();
+        }
     }
 
     /* =================== FALLBACK =================== */

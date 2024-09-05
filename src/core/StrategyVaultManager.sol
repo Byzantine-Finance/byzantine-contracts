@@ -86,6 +86,7 @@ contract StrategyVaultManager is
      * @param signature The DV's signature of the deposit data.
      * @param depositDataRoot The root/hash of the deposit data for the DV's deposit.
      * @param whitelistedDeposit If false, anyone can deposit into the Strategy Vault. If true, only whitelisted addresses can deposit into the Strategy Vault.
+     * @param upgradeable If true, the Strategy Vault is upgradeable. If false, the Strategy Vault is not upgradeable.
      * @dev This action triggers a new auction to pre-create a new Distributed Validator for the next staker (if enough operators in Auction).
      * @dev It also fill the ClusterDetails struct of the newly created StrategyVault.
      * @dev Function will revert if not exactly 32 ETH are sent with the transaction.
@@ -94,14 +95,15 @@ contract StrategyVaultManager is
         bytes calldata pubkey,
         bytes calldata signature,
         bytes32 depositDataRoot,
-        bool whitelistedDeposit
+        bool whitelistedDeposit,
+        bool upgradeable
     ) external payable {
         require (getNumPendingClusters() > 0, "StrategyVaultManager.createStratVaultAndStakeNativeETH: no pending DVs");
         require(msg.value == 32 ether, "StrategyVaultManager.createStratVaultAndStakeNativeETH: must initially stake for any validator with 32 ether");
         /// TODO Verify the pubkey in arguments to be sure it is using the right pubkey of a pre-created cluster. Use a monolithic blockchain
 
         // Create a StrategyVault
-        IStrategyVault newStratVault = _deployStratVault(whitelistedDeposit);
+        IStrategyVault newStratVault = _deployStratVault(whitelistedDeposit, upgradeable);
 
         // Stake 32 ETH in the Beacon Chain
         newStratVault.stakeNativeETH{value: msg.value}(pubkey, signature, depositDataRoot);
@@ -314,7 +316,7 @@ contract StrategyVaultManager is
 
     /* ============== INTERNAL FUNCTIONS ============== */
 
-    function _deployStratVault(bool whitelistedDeposit) internal returns (IStrategyVault) {
+    function _deployStratVault(bool whitelistedDeposit, bool upgradeable) internal returns (IStrategyVault) {
         // mint a byzNft for the Strategy Vault's creator
         uint256 nftId = byzNft.mint(msg.sender, numStratVaults);
 
@@ -324,7 +326,7 @@ contract StrategyVaultManager is
             bytes32(nftId),
             abi.encodePacked(type(BeaconProxy).creationCode, abi.encode(stratVaultBeacon, ""))
         );
-        IStrategyVault(stratVault).initialize(nftId, msg.sender, whitelistedDeposit);
+        IStrategyVault(stratVault).initialize(nftId, msg.sender, whitelistedDeposit, upgradeable);
 
         // store the stratVault in the nftId mapping
         nftIdToStratVault[nftId] = stratVault;
