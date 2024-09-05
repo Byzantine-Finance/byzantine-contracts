@@ -67,6 +67,9 @@ contract StrategyVault is Initializable, StrategyVaultStorage, AccessControlUpgr
 
         whitelistedDeposit = _whitelistedDeposit;
 
+        __AccessControl_init();
+        _grantRole(DEFAULT_ADMIN_ROLE, _initialOwner);
+
         // If contract is not upgradeable, disable initialization (removing ability to upgrade contract)
         if (!_upgradeable) {
             _disableInitializers();
