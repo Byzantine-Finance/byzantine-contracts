@@ -7,6 +7,7 @@ import "@openzeppelin-upgrades/contracts/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
 
 import "eigenlayer-contracts/interfaces/IEigenPodManager.sol";
+import "eigenlayer-contracts/interfaces/IStrategyManager.sol";
 import "eigenlayer-contracts/interfaces/IDelegationManager.sol";
 
 import "./StrategyVaultManagerStorage.sol";
@@ -103,7 +104,7 @@ contract StrategyVaultManager is
         /// TODO Verify the pubkey in arguments to be sure it is using the right pubkey of a pre-created cluster. Use a monolithic blockchain
 
         // Create a StrategyVault
-        IStrategyVault newStratVault = _deployStratVault(whitelistedDeposit, upgradeable);
+        IStrategyVault newStratVault = _deployStratVault(address(0),whitelistedDeposit, upgradeable);
 
         // Stake 32 ETH in the Beacon Chain
         newStratVault.stakeNativeETH{value: msg.value}(pubkey, signature, depositDataRoot);
@@ -131,6 +132,30 @@ contract StrategyVaultManager is
             _getNewPendingCluster(recipients, allocations);
             ++numPreCreatedClusters;
         }
+    }
+
+    /**
+     * @notice Staker creates a Strategy Vault and stakes ERC20.
+     * @param strategy The EigenLayer StrategyBaseTVLLimits contract for the depositing token.
+     * @param token The ERC20 token to stake.
+     * @param amount The amount of token to stake.
+     * @param whitelistedDeposit If false, anyone can deposit into the Strategy Vault. If true, only whitelisted addresses can deposit into the Strategy Vault.
+     * @param upgradeable If true, the Strategy Vault is upgradeable. If false, the Strategy Vault is not upgradeable.
+     */
+    function createStratVaultAndStakeERC20(
+        IStrategy strategy,
+        IERC20 token,
+        uint256 amount,
+        bool whitelistedDeposit,
+        bool upgradeable
+    ) external {
+
+        // Create a StrategyVault
+        IStrategyVault newStratVault = _deployStratVault(address(token), whitelistedDeposit, upgradeable);
+
+        // Stake ERC20
+        newStratVault.depositIntoStrategy(strategy,token, amount);
+
     }
 
     /**
@@ -316,7 +341,14 @@ contract StrategyVaultManager is
 
     /* ============== INTERNAL FUNCTIONS ============== */
 
-    function _deployStratVault(bool whitelistedDeposit, bool upgradeable) internal returns (IStrategyVault) {
+    /**
+     * @notice Deploy a new Strategy Vault.
+     * @param token The address of the token to be staked. Address(0) if staking ETH.
+     * @param whitelistedDeposit If false, anyone can deposit into the Strategy Vault. If true, only whitelisted addresses can deposit into the Strategy Vault.
+     * @param upgradeable If true, the Strategy Vault is upgradeable. If false, the Strategy Vault is not upgradeable.
+     * @return The address of the newly deployed Strategy Vault.
+     */
+    function _deployStratVault(address token, bool whitelistedDeposit, bool upgradeable) internal returns (IStrategyVault) {
         // mint a byzNft for the Strategy Vault's creator
         uint256 nftId = byzNft.mint(msg.sender, numStratVaults);
 
@@ -326,7 +358,7 @@ contract StrategyVaultManager is
             bytes32(nftId),
             abi.encodePacked(type(BeaconProxy).creationCode, abi.encode(stratVaultBeacon, ""))
         );
-        IStrategyVault(stratVault).initialize(nftId, msg.sender, whitelistedDeposit, upgradeable);
+        IStrategyVault(stratVault).initialize(nftId, msg.sender, token, whitelistedDeposit, upgradeable);
 
         // store the stratVault in the nftId mapping
         nftIdToStratVault[nftId] = stratVault;

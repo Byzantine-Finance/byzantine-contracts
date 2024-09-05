@@ -178,4 +178,10 @@ interface IStrategyVault {
   /// @dev Returned when trying to access DV data but no ETH has been deposited
   error NativeRestakingNotActivated();
 
+  /// @dev Returned when trying to deposit an incorrect token
+  error IncorrectToken();
+
+  /// @dev Returned when trying to deposit ETH into a token StrategyVault
+  error CannotDepositETHIntoTokenVault();
+
 }

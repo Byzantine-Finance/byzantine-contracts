@@ -7,6 +7,8 @@ import "../interfaces/IStrategyVaultManager.sol";
 import "../interfaces/IAuction.sol";
 import "eigenlayer-contracts/interfaces/IEigenPodManager.sol";
 import "eigenlayer-contracts/interfaces/IEigenPod.sol";
+import "eigenlayer-contracts/interfaces/IStrategyManager.sol";
+import "eigenlayer-contracts/interfaces/IStrategy.sol";
 import "eigenlayer-contracts/interfaces/IDelegationManager.sol";
 
 abstract contract StrategyVaultStorage is IStrategyVault {
@@ -31,8 +33,14 @@ abstract contract StrategyVaultStorage is IStrategyVault {
     /// @dev this is the pod manager transparent proxy
     IEigenPodManager public immutable eigenPodManager;
 
+    /// @notice EigenLayer's StrategyManager contract
+    IStrategyManager public immutable strategyManager;
+
     /// @notice EigenLayer's DelegationManager contract
     IDelegationManager public immutable delegationManager;
+
+    /// @notice The token to be staked. Address(0) if staking ETH.
+    uint256 public immutable depositToken;
 
     /* ============== STATE VARIABLES ============== */
 

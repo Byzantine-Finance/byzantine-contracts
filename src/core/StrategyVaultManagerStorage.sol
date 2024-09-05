@@ -7,6 +7,7 @@ import "../interfaces/IStrategyVaultManager.sol";
 import "../interfaces/IByzNft.sol";
 import "../interfaces/IAuction.sol";
 import "eigenlayer-contracts/interfaces/IEigenPodManager.sol";
+import "eigenlayer-contracts/interfaces/IStrategyManager.sol";
 import "eigenlayer-contracts/interfaces/IDelegationManager.sol";
 import "splits-v2/splitters/push/PushSplitFactory.sol";
 

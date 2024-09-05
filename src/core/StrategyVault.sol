@@ -53,11 +53,12 @@ contract StrategyVault is Initializable, StrategyVaultStorage, AccessControlUpgr
      * @notice Used to initialize the StrategyVault given it's setup parameters.
      * @param _nftId The id of the ByzNft associated to this StrategyVault.
      * @param _initialOwner The initial owner of the ByzNft.
+     * @param _token The address of the token to be staked. Address(0) if staking ETH.
      * @param _whitelistedDeposit Whether the deposit function is whitelisted or not.
      * @param _upgradeable Whether the StrategyVault is upgradeable or not.
      * @dev Called on construction by the StrategyVaultManager.
      */
-    function initialize(uint256 _nftId, address _initialOwner, bool _whitelistedDeposit, bool _upgradeable) external initializer {
+    function initialize(uint256 _nftId, address _initialOwner, address _token, bool _whitelistedDeposit, bool _upgradeable) external initializer {
         try byzNft.ownerOf(_nftId) returns (address nftOwner) {
             require(nftOwner == _initialOwner, "Only NFT owner can initialize the StrategyVault");
             stratVaultNftId = _nftId;
@@ -65,8 +66,11 @@ contract StrategyVault is Initializable, StrategyVaultStorage, AccessControlUpgr
             revert(string.concat("Cannot initialize StrategyVault: ", reason));
         }
 
-        whitelistedDeposit = _whitelistedDeposit;
+        // Define the token to be staked
+        depositToken = _token;
 
+        // Setup whitelist
+        whitelistedDeposit = _whitelistedDeposit;
         __AccessControl_init();
         _grantRole(DEFAULT_ADMIN_ROLE, _initialOwner);
 
@@ -106,6 +110,23 @@ contract StrategyVault is Initializable, StrategyVaultStorage, AccessControlUpgr
         if (whitelistedDeposit && !hasRole(whitelisted, msg.sender)) revert OnlyWhitelistedDeposit();
         // Create Eigen Pod (if not already has one) and stake the native ETH
         eigenPodManager.stake{value: msg.value}(pubkey, signature, depositDataRoot);
+    }
+
+    /**
+     * @notice Deposit ERC20 tokens into the StrategyVault.
+     * @param strategy The EigenLayer StrategyBaseTVLLimits contract for the depositing token.
+     * @param token The address of the ERC20 token to deposit.
+     * @param amount The amount of tokens to deposit.
+     */
+    function stakeERC20(IStrategy strategy, IERC20 token, uint256 amount) external {
+        // If whitelistedDeposit is true, then only users with the whitelisted role can call this function.
+        if (whitelistedDeposit && !hasRole(whitelisted, msg.sender)) revert OnlyWhitelistedDeposit();
+
+        // Check the correct token is being deposited
+        if (token != depositToken) revert IncorrectToken();
+
+        // Deposit the ERC20 tokens into the StrategyVault
+        strategyManager.depositIntoStrategy(strategy, token, amount);
     }
 
     /**
