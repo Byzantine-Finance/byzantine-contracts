@@ -163,8 +163,8 @@ interface IStrategyVault {
   /// @dev Error when unauthorized call to a function callable only by the Strategy Vault Owner (aka the ByzNft holder).
   error OnlyNftOwner();
 
-  /// @dev Error when unauthorized call to a function callable only by the StrategyVaultOwner or the StrategyVaultManager.
-  error OnlyNftOwnerOrStrategyVaultManager();
+  /// @dev Error when unauthorized call to the deposit function when whitelistedDeposit is true and caller is not whitelisted.
+  error OnlyWhitelistedDeposit();
 
   /// @dev Error when unauthorized call to a function callable only by the StrategyVaultManager.
   error OnlyStrategyVaultManager();

@@ -44,6 +44,9 @@ abstract contract StrategyVaultStorage is IStrategyVault {
     // Empty struct, all the fields have their default value
     ClusterDetails public clusterDetails;
 
+    /// @notice Whether the deposit function is whitelisted or not.
+    bool public whitelistedDeposit;
+
     /**
      * @dev This empty reserved space is put in place to allow future versions to add new
      * variables without shifting down storage in the inheritance chain.

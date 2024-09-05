@@ -2,6 +2,7 @@
 pragma solidity ^0.8.20;
 
 import "@openzeppelin-upgrades/contracts/proxy/utils/Initializable.sol";
+import "@openzeppelin-upgrades/contracts/access/AccessControlUpgradeable.sol";
 
 import "eigenlayer-contracts/interfaces/ISignatureUtils.sol";
 import "eigenlayer-contracts/libraries/BeaconChainProofs.sol";
@@ -9,18 +10,13 @@ import { PushSplit } from "splits-v2/splitters/push/PushSplit.sol";
 
 import "./StrategyVaultStorage.sol";
 
-contract StrategyVault is Initializable, StrategyVaultStorage {
+contract StrategyVault is Initializable, StrategyVaultStorage, AccessControlUpgradeable {
     using BeaconChainProofs for *;
 
     /* ============== MODIFIERS ============== */
 
     modifier onlyNftOwner() {
         if (msg.sender != stratVaultOwner()) revert OnlyNftOwner();
-        _;
-    }
-
-    modifier onlyNftOwnerOrStratVaultManager() {
-        if (msg.sender != stratVaultOwner() && msg.sender != address(stratVaultManager)) revert OnlyNftOwnerOrStrategyVaultManager();
         _;
     }
 
@@ -54,16 +50,21 @@ contract StrategyVault is Initializable, StrategyVaultStorage {
     }
 
     /**
-     * @notice Used to initialize the nftId of that StrategyVault and its owner.
+     * @notice Used to initialize the StrategyVault given it's setup parameters.
+     * @param _nftId The id of the ByzNft associated to this StrategyVault.
+     * @param _initialOwner The initial owner of the ByzNft.
+     * @param _whitelistedDeposit Whether the deposit function is whitelisted or not.
      * @dev Called on construction by the StrategyVaultManager.
      */
-    function initialize(uint256 _nftId, address _initialOwner) external initializer {
+    function initialize(uint256 _nftId, address _initialOwner, bool _whitelistedDeposit) external initializer {
         try byzNft.ownerOf(_nftId) returns (address nftOwner) {
             require(nftOwner == _initialOwner, "Only NFT owner can initialize the StrategyVault");
             stratVaultNftId = _nftId;
         } catch Error(string memory reason) {
             revert(string.concat("Cannot initialize StrategyVault: ", reason));
         }
+
+        whitelistedDeposit = _whitelistedDeposit;
     }
 
     /* =================== FALLBACK =================== */
@@ -80,18 +81,20 @@ contract StrategyVault is Initializable, StrategyVaultStorage {
 
     /**
      * @notice Deposit 32ETH in the beacon chain to activate a Distributed Validator and start validating on the consensus layer.
-     * Also creates an EigenPod for the StrategyVault. The NFT owner can staker additional native ETH by calling again this function.
+     * Also creates an EigenPod for the StrategyVault.
      * @param pubkey The 48 bytes public key of the beacon chain DV.
      * @param signature The DV's signature of the deposit data.
      * @param depositDataRoot The root/hash of the deposit data for the DV's deposit.
-     * @dev Function is callable only by the StrategyVaultManager or the NFT Owner.
+     * @dev If whitelistedDeposit is true, then only users with the whitelisted role can call this function.
      * @dev The first call to this function is done by the StrategyVaultManager and creates the StrategyVault's EigenPod.
      */
     function stakeNativeETH(
         bytes calldata pubkey, 
         bytes calldata signature,
         bytes32 depositDataRoot
-    ) external payable onlyNftOwnerOrStratVaultManager {
+    ) external payable {
+        // If whitelistedDeposit is true, then only users with the whitelisted role can call this function.
+        if (whitelistedDeposit && !hasRole(whitelisted, msg.sender)) revert OnlyWhitelistedDeposit();
         // Create Eigen Pod (if not already has one) and stake the native ETH
         eigenPodManager.stake{value: msg.value}(pubkey, signature, depositDataRoot);
     }
@@ -206,6 +209,14 @@ contract StrategyVault is Initializable, StrategyVaultStorage {
      */
     function withdrawContractBalance() external onlyNftOwner {
         payable(msg.sender).transfer(address(this).balance);
+    }
+
+    /**
+     * @notice Change the whitelistedDeposit flag.
+     * @dev Callable only by the owner of the Strategy Vault's ByzNft.
+     */
+    function changeWhitelistedDeposit(bool _whitelistedDeposit) external onlyNftOwner {
+        whitelistedDeposit = _whitelistedDeposit;
     }
 
     /* ================ VIEW FUNCTIONS ================ */
