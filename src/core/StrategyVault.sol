@@ -106,8 +106,12 @@ contract StrategyVault is Initializable, StrategyVaultStorage, AccessControlUpgr
         bytes calldata signature,
         bytes32 depositDataRoot
     ) external payable {
+        // Check that the deposit is a multiple of 32 ETH
+        if (deposit % 32 ether != 0) revert CanOnlyDepositMultipleOf32ETH();
+        
         // If whitelistedDeposit is true, then only users with the whitelisted role can call this function.
         if (whitelistedDeposit && !hasRole(whitelisted, msg.sender)) revert OnlyWhitelistedDeposit();
+        
         // Create Eigen Pod (if not already has one) and stake the native ETH
         eigenPodManager.stake{value: msg.value}(pubkey, signature, depositDataRoot);
     }

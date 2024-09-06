@@ -184,4 +184,7 @@ interface IStrategyVault {
   /// @dev Returned when trying to deposit ETH into a token StrategyVault
   error CannotDepositETHIntoTokenVault();
 
+  /// @dev Returned when trying to deposit an incorrect amount of ETH. Can only deposit a multiple of 32 ETH. (32, 64, 96, 128, etc.)
+  error CanOnlyDepositMultipleOf32ETH();
+
 }
