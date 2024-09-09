@@ -4,9 +4,9 @@ pragma solidity ^0.8.20;
 import "@openzeppelin-upgrades/contracts/proxy/utils/Initializable.sol";
 import "@openzeppelin-upgrades/contracts/access/OwnableUpgradeable.sol";
 import "@openzeppelin-upgrades/contracts/security/ReentrancyGuardUpgradeable.sol";
-import "ds-math/math.sol";
 
 import "../libraries/HitchensOrderStatisticsTreeLib.sol";
+import "../libraries/ByzantineAuctionMath.sol";
 
 import "./AuctionStorage.sol";
 
@@ -16,8 +16,7 @@ contract Auction is
     Initializable,
     OwnableUpgradeable,
     ReentrancyGuardUpgradeable,
-    AuctionStorage,
-    DSMath
+    AuctionStorage
 {
     using HitchensOrderStatisticsTreeLib for HitchensOrderStatisticsTreeLib.Tree;
 
@@ -116,8 +115,8 @@ contract Auction is
             if (_timesInDays[i] < minDuration) revert DurationTooShort();
 
             // Calculate operator's bid price and add it to the total price
-            dailyVcPrice = _calculateDailyVcPrice(_discountRates[i]);
-            totalBidPrice += _calculateBidPrice(_timesInDays[i], dailyVcPrice);
+            dailyVcPrice = ByzantineAuctionMath.calculateVCPrice(expectedDailyReturnWei, _discountRates[i], clusterSize);
+            totalBidPrice += ByzantineAuctionMath.calculateBidPrice(_timesInDays[i], dailyVcPrice);
 
             unchecked {
                 ++i;
@@ -178,10 +177,10 @@ contract Auction is
             if (_timesInDays[i] < minDuration) revert DurationTooShort();
 
             /// @notice Calculate operator's bid details
-            dailyVcPrice = _calculateDailyVcPrice(_discountRates[i]);
-            bidPrice = _calculateBidPrice(_timesInDays[i], dailyVcPrice);
+            dailyVcPrice = ByzantineAuctionMath.calculateVCPrice(expectedDailyReturnWei, _discountRates[i], clusterSize);
+            bidPrice = ByzantineAuctionMath.calculateBidPrice(_timesInDays[i], dailyVcPrice);
             totalBidPrice += bidPrice;
-            auctionScores[i] = _calculateAuctionScore(dailyVcPrice, _timesInDays[i], reputationScore);
+            auctionScores[i] = ByzantineAuctionMath.calculateAuctionScore(dailyVcPrice, _timesInDays[i], reputationScore);
 
             // Update auction tree if necessary
             if (!_auctionTree.keyExists(bidder, auctionScores[i])) {
@@ -253,8 +252,8 @@ contract Auction is
         uint256 lastBidPrice = _nodeOpsInfo[_nodeOpAddr].auctionScoreToBidPrices[_oldAuctionScore][numSameBids - 1];
 
         // Calculate operator's new bid price
-        uint256 newDailyVcPrice = _calculateDailyVcPrice(_newDiscountRate);
-        uint256 newBidPrice = _calculateBidPrice(_newTimeInDays, newDailyVcPrice);
+        uint256 newDailyVcPrice = ByzantineAuctionMath.calculateVCPrice(expectedDailyReturnWei, _newDiscountRate, clusterSize);
+        uint256 newBidPrice = ByzantineAuctionMath.calculateBidPrice(_newTimeInDays, newDailyVcPrice);
 
         if (newBidPrice > lastBidPrice) {
             unchecked {
@@ -310,9 +309,9 @@ contract Auction is
         uint32 reputationScore = 1;
 
         /// @notice Calculate operator's new bid price and new auction score
-        uint256 newDailyVcPrice = _calculateDailyVcPrice(_newDiscountRate);
-        uint256 newBidPrice = _calculateBidPrice(_newTimeInDays, newDailyVcPrice);
-        uint256 newAuctionScore = _calculateAuctionScore(newDailyVcPrice, _newTimeInDays, reputationScore);
+        uint256 newDailyVcPrice = ByzantineAuctionMath.calculateVCPrice(expectedDailyReturnWei, _newDiscountRate, clusterSize);
+        uint256 newBidPrice = ByzantineAuctionMath.calculateBidPrice(_newTimeInDays, newDailyVcPrice);
+        uint256 newAuctionScore = ByzantineAuctionMath.calculateAuctionScore(newDailyVcPrice, _newTimeInDays, reputationScore);
 
         // Verify if new Auction score doesn't already exist
         if (!_auctionTree.keyExists(bidder, newAuctionScore)) {
@@ -464,55 +463,6 @@ contract Auction is
     }
 
     /* ===================== INTERNAL FUNCTIONS ===================== */
-
-    /**
-     * @notice Calculate and returns the daily Validation Credit price (in WEI)
-     * @param _discountRate: discount rate (i.e the desired profit margin) in percentage (scale from 0 to 10000)
-     * @dev vc_price = Re*(1 - D)/cluster_size
-     * @dev The `expectedDailyReturnWei` is set by Byzantine and corresponds to the Ethereum daily staking return.
-     */
-    function _calculateDailyVcPrice(uint16 _discountRate) internal view returns (uint256) {
-        return (expectedDailyReturnWei * (10000 - _discountRate)) / (clusterSize * 10000);
-    }
-
-    /**
-     * @notice Calculate and returns the bid price that should be paid by the node operator (in WEI)
-     * @param _timeInDays: duration of being a validator, in days
-     * @param _dailyVcPrice: daily Validation Credit price (in WEI)
-     * @dev bid_price = time_in_days * vc_price
-     */
-    function _calculateBidPrice(
-        uint32 _timeInDays,
-        uint256 _dailyVcPrice
-    ) internal pure returns (uint256) {
-        return _timeInDays * _dailyVcPrice;
-    }
-
-    /**
-     * @notice Calculate and returns the auction score of a node operator
-     * @param _dailyVcPrice: daily Validation Credit price in WEI
-     * @param _timeInDays: duration of being a validator, in days
-     * @param _reputation: reputation score of the operator
-     * @dev powerValue = 1.001**_timeInDays, calculated from `_pow` function
-     * @dev The result is divided by 1e18 to downscaled from 1e36 to 1e18
-     */
-    function _calculateAuctionScore(
-        uint256 _dailyVcPrice,
-        uint32 _timeInDays,
-        uint32 _reputation
-    ) internal pure returns (uint256) {
-        uint256 powerValue = _pow(_timeInDays);
-        return (_dailyVcPrice * powerValue * _reputation) / _WAD;
-    }
-
-    /**
-     * @notice Calculate the power value of 1.001**_timeInDays
-     * @dev The result is divided by 1e9 to downscaled to 1e18 as the return value of `rpow` is upscaled to 1e27
-     */
-    function _pow(uint32 _timeIndays) internal pure returns (uint256) {
-        uint256 fixedPoint = 1001 * 1e24;
-        return DSMath.rpow(fixedPoint, uint256(_timeIndays)) / 1e9;
-    }
 
     /**
      * @notice Function to get the auction winners. It returns the node operators addresses with the highest auction score.
