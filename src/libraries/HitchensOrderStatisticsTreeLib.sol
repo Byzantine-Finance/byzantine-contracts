@@ -78,7 +78,7 @@ library HitchensOrderStatisticsTreeLib {
         }
     }
     function prev(Tree storage self, uint value) internal view returns (uint _cursor) {
-        //require(value != EMPTY, "OrderStatisticsTree(402) - Starting value cannot be zero");
+        require(value != EMPTY, "OrderStatisticsTree(402) - Starting value cannot be zero");
         if (self.nodes[value].left != EMPTY) {
             _cursor = treeMaximum(self, self.nodes[value].left);
         } else {
