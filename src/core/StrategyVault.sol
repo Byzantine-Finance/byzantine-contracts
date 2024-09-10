@@ -53,7 +53,7 @@ contract StrategyVault is Initializable, StrategyVaultStorage, AccessControlUpgr
      * @notice Used to initialize the StrategyVault given it's setup parameters.
      * @param _nftId The id of the ByzNft associated to this StrategyVault.
      * @param _initialOwner The initial owner of the ByzNft.
-     * @param _token The address of the token to be staked. Address(0) if staking ETH.
+     * @param _token The address of the token to be staked. 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE if staking ETH.
      * @param _whitelistedDeposit Whether the deposit function is whitelisted or not.
      * @param _upgradeable Whether the StrategyVault is upgradeable or not.
      * @dev Called on construction by the StrategyVaultManager.

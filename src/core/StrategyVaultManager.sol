@@ -104,7 +104,7 @@ contract StrategyVaultManager is
         /// TODO Verify the pubkey in arguments to be sure it is using the right pubkey of a pre-created cluster. Use a monolithic blockchain
 
         // Create a StrategyVault
-        IStrategyVault newStratVault = _deployStratVault(address(0),whitelistedDeposit, upgradeable);
+        IStrategyVault newStratVault = _deployStratVault(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE, whitelistedDeposit, upgradeable);
 
         // Stake 32 ETH in the Beacon Chain
         newStratVault.stakeNativeETH{value: msg.value}(pubkey, signature, depositDataRoot);
