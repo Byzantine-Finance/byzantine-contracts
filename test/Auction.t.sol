@@ -120,6 +120,7 @@ contract AuctionTest is ByzantineDeployer {
         assertEq(bid0Details.vcNumbersValidator, 100);
         assertEq(bid0Details.discountRate, 10e2);
         assertEq(bid0Details.numValidators, NUM_VALIDATORS_CLUSTER_4);
+        assertEq(uint256(bid0Details.auctionType), uint256(IAuction.AuctionType.JOIN_CLUSTER_4));
 
         // Second bid parameter: 13.75%, 129 days
         bytes32 bid1Id = _bidCluster4(nodeOps[1], 1375, 129);
@@ -131,6 +132,7 @@ contract AuctionTest is ByzantineDeployer {
         assertEq(bid1Details.vcNumbersValidator, 129);
         assertEq(bid1Details.discountRate, 1375);
         assertEq(bid1Details.numValidators, NUM_VALIDATORS_CLUSTER_4);
+        assertEq(uint256(bid1Details.auctionType), uint256(IAuction.AuctionType.JOIN_CLUSTER_4));
     }
 
     function test_bidCluster4() external {

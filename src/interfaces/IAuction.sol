@@ -5,6 +5,15 @@ import "./IStrategyModule.sol";
 
 interface IAuction {
 
+    /* ===================== ENUMS ===================== */
+
+    /// @notice Defines the types of auctions available
+    enum AuctionType {
+        JOIN_CLUSTER_4,
+        JOIN_CLUSTER_7,
+        ALREADY_EXISTING_CLUSTER
+    }
+
     /* ===================== STRUCTS ===================== */
 
     /// @notice Stores the details of a specific bid
@@ -21,6 +30,8 @@ interface IAuction {
         uint16 discountRate;
         // The number of validators to bid for
         uint8 numValidators;
+        // Auction type to know if we must update a sub-auction tree
+        AuctionType auctionType;
     }
 
     /// @notice Stores the node operators global auction's details

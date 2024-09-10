@@ -153,7 +153,8 @@ contract Auction is
             nodeOp: msg.sender,
             vcNumbersValidator: _timeInDays, /// TODO: Split the VC among the different validators (or do it in another contract)
             discountRate: _discountRate,
-            numValidators: NUM_VALIDATORS_CLUSTER_4
+            numValidators: NUM_VALIDATORS_CLUSTER_4,
+            auctionType: AuctionType.JOIN_CLUSTER_4
         });
         // Increment the bid number of the node op
         _nodeOpsDetails[msg.sender].numBidsCluster4 += 1;
