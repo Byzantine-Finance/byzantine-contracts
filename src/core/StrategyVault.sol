@@ -9,8 +9,9 @@ import "eigenlayer-contracts/libraries/BeaconChainProofs.sol";
 import { PushSplit } from "splits-v2/splitters/push/PushSplit.sol";
 
 import "./StrategyVaultStorage.sol";
+import "../vault/ERC4626MultiRewardVault.sol";
 
-contract StrategyVault is Initializable, StrategyVaultStorage, AccessControlUpgradeable {
+contract StrategyVault is Initializable, StrategyVaultStorage, AccessControlUpgradeable, ERC4626MultiRewardVault {
     using BeaconChainProofs for *;
 
     /* ============== MODIFIERS ============== */
@@ -74,6 +75,9 @@ contract StrategyVault is Initializable, StrategyVaultStorage, AccessControlUpgr
         __AccessControl_init();
         _grantRole(DEFAULT_ADMIN_ROLE, _initialOwner);
 
+        // Initialize the ERC4626MultiRewardVault
+        ERC4626MultiRewardVault.initialize(_token);
+
         // If contract is not upgradeable, disable initialization (removing ability to upgrade contract)
         if (!_upgradeable) {
             _disableInitializers();
@@ -100,6 +104,7 @@ contract StrategyVault is Initializable, StrategyVaultStorage, AccessControlUpgr
      * @param depositDataRoot The root/hash of the deposit data for the DV's deposit.
      * @dev If whitelistedDeposit is true, then only users with the whitelisted role can call this function.
      * @dev The first call to this function is done by the StrategyVaultManager and creates the StrategyVault's EigenPod.
+     * @dev The caller receives Byzantine StrategyVault shares in return for the ETH staked.
      */
     function stakeNativeETH(
         bytes calldata pubkey, 
@@ -112,6 +117,9 @@ contract StrategyVault is Initializable, StrategyVaultStorage, AccessControlUpgr
         // If whitelistedDeposit is true, then only users with the whitelisted role can call this function.
         if (whitelistedDeposit && !hasRole(whitelisted, msg.sender)) revert OnlyWhitelistedDeposit();
         
+        // Stake the native ETH into StrategyVault
+        ERC4626MultiRewardVault.deposit(msg.value, msg.sender);
+
         // Create Eigen Pod (if not already has one) and stake the native ETH
         eigenPodManager.stake{value: msg.value}(pubkey, signature, depositDataRoot);
     }
@@ -121,6 +129,7 @@ contract StrategyVault is Initializable, StrategyVaultStorage, AccessControlUpgr
      * @param strategy The EigenLayer StrategyBaseTVLLimits contract for the depositing token.
      * @param token The address of the ERC20 token to deposit.
      * @param amount The amount of tokens to deposit.
+     * @dev The caller receives Byzantine StrategyVault shares in return for the ERC20 tokens staked.
      */
     function stakeERC20(IStrategy strategy, IERC20 token, uint256 amount) external {
         // If whitelistedDeposit is true, then only users with the whitelisted role can call this function.
@@ -129,7 +138,10 @@ contract StrategyVault is Initializable, StrategyVaultStorage, AccessControlUpgr
         // Check the correct token is being deposited
         if (token != depositToken) revert IncorrectToken();
 
-        // Deposit the ERC20 tokens into the StrategyVault
+        // Stake the ERC20 tokens into StrategyVault
+        ERC4626MultiRewardVault.deposit(amount, msg.sender);
+
+        // Deposit the ERC20 tokens into the EigenLayer StrategyManager
         strategyManager.depositIntoStrategy(strategy, token, amount);
     }
 

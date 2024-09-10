@@ -48,6 +48,23 @@ interface IStrategyVaultManager {
         external payable;
 
     /**
+     * @notice Staker creates a Strategy Vault and stakes ERC20.
+     * @param strategy The EigenLayer StrategyBaseTVLLimits contract for the depositing token.
+     * @param token The ERC20 token to stake.
+     * @param amount The amount of token to stake.
+     * @param whitelistedDeposit If false, anyone can deposit into the Strategy Vault. If true, only whitelisted addresses can deposit into the Strategy Vault.
+     * @param upgradeable If true, the Strategy Vault is upgradeable. If false, the Strategy Vault is not upgradeable.
+     * @dev The caller receives Byzantine StrategyVault shares in return for the ERC20 tokens staked.
+     */
+    function createStratVaultAndStakeERC20(
+        IStrategy strategy,
+        IERC20 token,
+        uint256 amount,
+        bool whitelistedDeposit,
+        bool upgradeable
+    ) external;
+
+    /**
      * @notice Strategy Vault owner can transfer its Strategy Vault to another address.
      * Under the hood, he transfers the ByzNft associated to the StrategyVault.
      * That action makes him give the ownership of the StrategyVault and all the token it owns.

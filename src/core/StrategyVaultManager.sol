@@ -91,6 +91,7 @@ contract StrategyVaultManager is
      * @dev This action triggers a new auction to pre-create a new Distributed Validator for the next staker (if enough operators in Auction).
      * @dev It also fill the ClusterDetails struct of the newly created StrategyVault.
      * @dev Function will revert if not exactly 32 ETH are sent with the transaction.
+     * @dev The caller receives Byzantine StrategyVault shares in return for the ETH staked.
      */
     function createStratVaultAndStakeNativeETH(
         bytes calldata pubkey,
@@ -141,6 +142,7 @@ contract StrategyVaultManager is
      * @param amount The amount of token to stake.
      * @param whitelistedDeposit If false, anyone can deposit into the Strategy Vault. If true, only whitelisted addresses can deposit into the Strategy Vault.
      * @param upgradeable If true, the Strategy Vault is upgradeable. If false, the Strategy Vault is not upgradeable.
+     * @dev The caller receives Byzantine StrategyVault shares in return for the ERC20 tokens staked.
      */
     function createStratVaultAndStakeERC20(
         IStrategy strategy,
@@ -154,8 +156,7 @@ contract StrategyVaultManager is
         IStrategyVault newStratVault = _deployStratVault(address(token), whitelistedDeposit, upgradeable);
 
         // Stake ERC20
-        newStratVault.depositIntoStrategy(strategy,token, amount);
-
+        newStratVault.stakeERC20(strategy, token, amount);
     }
 
     /**
