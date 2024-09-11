@@ -5,8 +5,9 @@ import "@openzeppelin-upgrades/contracts/token/ERC20/extensions/ERC4626Upgradeab
 import "@openzeppelin-upgrades/contracts/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import "@openzeppelin-upgrades/contracts/access/OwnableUpgradeable.sol";
 import "@openzeppelin-upgrades/contracts/token/ERC20/extensions/IERC20MetadataUpgradeable.sol";
+import "@openzeppelin-upgrades/contracts/security/ReentrancyGuardUpgradeable.sol";
 
-contract ERC4626MultiRewardVault is Initializable, ERC4626Upgradeable, OwnableUpgradeable {
+contract ERC4626MultiRewardVault is Initializable, ERC4626Upgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
     using SafeERC20Upgradeable for IERC20Upgradeable;
 
     IERC20Upgradeable[] public rewardTokens;
@@ -14,18 +15,19 @@ contract ERC4626MultiRewardVault is Initializable, ERC4626Upgradeable, OwnableUp
     function initialize(IERC20Upgradeable _asset) public initializer {
         string memory assetSymbol = IERC20MetadataUpgradeable(address(_asset)).symbol();
         string memory vaultName = string(abi.encodePacked(assetSymbol, " Byzantine StrategyVault Token"));
-        string memory vaultSymbol = string(abi.encodePacked("bv", assetSymbol));
+        string memory vaultSymbol = string(abi.encodePacked("bvz", assetSymbol));
 
         __ERC4626_init(IERC20MetadataUpgradeable(address(_asset)));
         __ERC20_init(vaultName, vaultSymbol);
         __Ownable_init();
+        __ReentrancyGuard_init();
     }
 
     function addRewardToken(IERC20Upgradeable _rewardToken) external onlyOwner {
         rewardTokens.push(_rewardToken);
     }
 
-    function withdraw(uint256 assets, address receiver, address owner) public virtual override returns (uint256) {
+    function withdraw(uint256 assets, address receiver, address owner) public virtual override nonReentrant returns (uint256) {
         uint256 shares = super.withdraw(assets, receiver, owner);
         _distributeRewards(receiver, shares);
         return shares;

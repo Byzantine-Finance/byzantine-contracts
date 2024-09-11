@@ -5,8 +5,9 @@ import "@openzeppelin-upgrades/contracts/token/ERC20/extensions/ERC4626Upgradeab
 import "@openzeppelin-upgrades/contracts/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import "@openzeppelin-upgrades/contracts/access/OwnableUpgradeable.sol";
 import "@openzeppelin-upgrades/contracts/token/ERC20/extensions/IERC20MetadataUpgradeable.sol";
+import "@openzeppelin-upgrades/contracts/security/ReentrancyGuardUpgradeable.sol";
 
-contract ERC4626MultiRewardVault is Initializable, ERC4626Upgradeable, OwnableUpgradeable {
+contract ERC4626MultiRewardVault is Initializable, ERC4626Upgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
     using SafeERC20Upgradeable for IERC20Upgradeable;
 
     IERC20Upgradeable[] public rewardTokens;
@@ -19,20 +20,21 @@ contract ERC4626MultiRewardVault is Initializable, ERC4626Upgradeable, OwnableUp
         __ERC4626_init(IERC20MetadataUpgradeable(address(_asset)));
         __ERC20_init(vaultName, vaultSymbol);
         __Ownable_init();
+        __ReentrancyGuard_init();
     }
 
     function addRewardToken(IERC20Upgradeable _rewardToken) external onlyOwner {
         rewardTokens.push(_rewardToken);
     }
 
-    function deposit(uint256 assets, address receiver) public virtual override payable returns (uint256) {
+    function deposit(uint256 assets, address receiver) public virtual override payable nonReentrant returns (uint256) {
         require(msg.value == assets, "Incorrect ETH amount");
         uint256 shares = previewDeposit(assets);
         _deposit(msg.sender, receiver, assets, shares);
         return shares;
     }
 
-    function withdraw(uint256 assets, address receiver, address owner) public virtual override returns (uint256) {
+    function withdraw(uint256 assets, address receiver, address owner) public virtual override nonReentrant returns (uint256) {
         uint256 shares = previewWithdraw(assets);
         _withdraw(msg.sender, receiver, owner, assets, shares);
         _distributeRewards(receiver, shares);
