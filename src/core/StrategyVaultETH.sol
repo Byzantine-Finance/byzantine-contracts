@@ -125,27 +125,6 @@ contract StrategyVault is Initializable, StrategyVaultStorage, AccessControlUpgr
     }
 
     /**
-     * @notice Deposit ERC20 tokens into the StrategyVault.
-     * @param strategy The EigenLayer StrategyBaseTVLLimits contract for the depositing token.
-     * @param token The address of the ERC20 token to deposit.
-     * @param amount The amount of tokens to deposit.
-     * @dev The caller receives Byzantine StrategyVault shares in return for the ERC20 tokens staked.
-     */
-    function stakeERC20(IStrategy strategy, IERC20 token, uint256 amount) external {
-        // If whitelistedDeposit is true, then only users with the whitelisted role can call this function.
-        if (whitelistedDeposit && !hasRole(whitelisted, msg.sender)) revert OnlyWhitelistedDeposit();
-
-        // Check the correct token is being deposited
-        if (token != depositToken) revert IncorrectToken();
-
-        // Stake the ERC20 tokens into StrategyVault
-        ERC4626MultiRewardVault.deposit(amount, msg.sender);
-
-        // Deposit the ERC20 tokens into the EigenLayer StrategyManager
-        strategyManager.depositIntoStrategy(strategy, token, amount);
-    }
-
-    /**
      * @notice Call the EigenPodManager contract
      * @param data to call contract 
      */

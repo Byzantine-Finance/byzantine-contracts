@@ -67,18 +67,6 @@ interface IStrategyVault {
   ) 
     external payable; 
 
-  /**
-    * @notice Deposit ERC20 tokens into the StrategyVault.
-    * @param strategy The EigenLayer StrategyBaseTVLLimits contract for the depositing token.
-    * @param token The address of the ERC20 token to deposit.
-    * @param amount The amount of tokens to deposit.
-    * @dev The caller receives Byzantine StrategyVault shares in return for the ERC20 tokens staked.
-    */
-  function stakeERC20(
-    IStrategy strategy,
-    IERC20 token,
-    uint256 amount
-  ) external;
 
   /**
    * @notice This function verifies that the withdrawal credentials of the Distributed Validator(s) owned by

@@ -7,14 +7,15 @@ import "@openzeppelin-upgrades/contracts/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
 
 import "eigenlayer-contracts/interfaces/IEigenPodManager.sol";
-import "eigenlayer-contracts/interfaces/IStrategyManager.sol";
+//import "eigenlayer-contracts/interfaces/IStrategyManager.sol";
 import "eigenlayer-contracts/interfaces/IDelegationManager.sol";
 
 import "./StrategyVaultManagerStorage.sol";
 
 import "../interfaces/IByzNft.sol";
 import "../interfaces/IAuction.sol";
-import "../interfaces/IStrategyVault.sol";
+import "../interfaces/IStrategyVaultERC20.sol";
+import "../interfaces/IStrategyVaultETH.sol";
 
 // TODO: Emit events to notify what happened
 
@@ -104,8 +105,8 @@ contract StrategyVaultManager is
         require(msg.value == 32 ether, "StrategyVaultManager.createStratVaultAndStakeNativeETH: must initially stake for any validator with 32 ether");
         /// TODO Verify the pubkey in arguments to be sure it is using the right pubkey of a pre-created cluster. Use a monolithic blockchain
 
-        // Create a StrategyVault
-        IStrategyVault newStratVault = _deployStratVault(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE, whitelistedDeposit, upgradeable);
+        // Create a Native ETH StrategyVault
+        IStrategyVaultETH newStratVault = _deployStratVault(whitelistedDeposit, upgradeable);
 
         // Stake 32 ETH in the Beacon Chain
         newStratVault.stakeNativeETH{value: msg.value}(pubkey, signature, depositDataRoot);
@@ -152,8 +153,8 @@ contract StrategyVaultManager is
         bool upgradeable
     ) external {
 
-        // Create a StrategyVault
-        IStrategyVault newStratVault = _deployStratVault(address(token), whitelistedDeposit, upgradeable);
+        // Create a ERC20 StrategyVault
+        IStrategyVaultERC20 newStratVault = _deployStratVault(address(token), whitelistedDeposit, upgradeable);
 
         // Stake ERC20
         newStratVault.stakeERC20(strategy, token, amount);
