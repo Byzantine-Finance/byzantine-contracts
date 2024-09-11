@@ -13,12 +13,15 @@ contract ERC4626MultiRewardVault is Initializable, ERC4626Upgradeable, OwnableUp
     IERC20Upgradeable[] public rewardTokens;
     mapping(IERC20Upgradeable => uint8) public rewardTokenDecimals;
 
-
     function initialize() public initializer {
         __ERC4626_init(IERC20MetadataUpgradeable(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE));
         __ERC20_init("ETH Byzantine StrategyVault Token", "byzETH");
         __Ownable_init();
         __ReentrancyGuard_init();
+    }
+
+    receive() external payable {
+        // TODO: emit an event to notify
     }
 
     function addRewardToken(IERC20Upgradeable _rewardToken) external onlyOwner {
