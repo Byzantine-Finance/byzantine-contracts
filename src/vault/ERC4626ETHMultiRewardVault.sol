@@ -25,9 +25,18 @@ contract ERC4626MultiRewardVault is Initializable, ERC4626Upgradeable, OwnableUp
         rewardTokens.push(_rewardToken);
     }
 
+    function deposit(uint256 assets, address receiver) public virtual override payable returns (uint256) {
+        require(msg.value == assets, "Incorrect ETH amount");
+        uint256 shares = previewDeposit(assets);
+        _deposit(msg.sender, receiver, assets, shares);
+        return shares;
+    }
+
     function withdraw(uint256 assets, address receiver, address owner) public virtual override returns (uint256) {
-        uint256 shares = super.withdraw(assets, receiver, owner);
+        uint256 shares = previewWithdraw(assets);
+        _withdraw(msg.sender, receiver, owner, assets, shares);
         _distributeRewards(receiver, shares);
+        payable(receiver).transfer(assets);
         return shares;
     }
 
