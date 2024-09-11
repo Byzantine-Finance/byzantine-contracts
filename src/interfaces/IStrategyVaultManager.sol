@@ -32,6 +32,21 @@ interface IStrategyVaultManager {
     function preCreateDVs(uint8 _numDVsToPreCreate) external;
 
     /**
+     * @notice A staker creates a StrategyVault for Native ETH.
+     * @param whitelistedDeposit If false, anyone can deposit into the Strategy Vault. If true, only whitelisted addresses can deposit into the Strategy Vault.
+     * @param upgradeable If true, the Strategy Vault is upgradeable. If false, the Strategy Vault is not upgradeable.
+     * @dev This action triggers a new auction to pre-create a new Distributed Validator for the next staker (if enough operators in Auction).
+     * @dev It also fill the ClusterDetails struct of the newly created StrategyVault.
+     */
+    function createStratVaultETH(
+        bytes calldata pubkey,
+        bytes calldata signature,
+        bytes32 depositDataRoot,
+        bool whitelistedDeposit,
+        bool upgradeable
+    ) external;
+
+    /**
      * @notice A 32ETH staker create a Strategy Vault, use a pre-created DV as a validator and activate it by depositing 32ETH.
      * @param pubkey The 48 bytes public key of the beacon chain DV.
      * @param signature The DV's signature of the deposit data.
@@ -46,6 +61,20 @@ interface IStrategyVaultManager {
         bytes32 depositDataRoot
     ) 
         external payable;
+
+    /**
+     * @notice Staker creates a StrategyVault with an ERC20 deposit token.
+     * @param token The ERC20 deposit token for the StrategyVault.
+     * @param whitelistedDeposit If false, anyone can deposit into the Strategy Vault. If true, only whitelisted addresses can deposit into the Strategy Vault.
+     * @param upgradeable If true, the Strategy Vault is upgradeable. If false, the Strategy Vault is not upgradeable.
+     * @dev The caller receives Byzantine StrategyVault shares in return for the ERC20 tokens staked.
+     */
+    function createStratVaultERC20(
+        IStrategy strategy,
+        IERC20 token,
+        bool whitelistedDeposit,
+        bool upgradeable
+    ) external;
 
     /**
      * @notice Staker creates a Strategy Vault and stakes ERC20.
