@@ -229,14 +229,6 @@ contract StrategyVault is Initializable, StrategyVaultStorage, AccessControlUpgr
     }
 
     /**
-     * @notice Allow the Strategy Vault's owner to withdraw the smart contract's balance.
-     * @dev Revert if the caller is not the owner of the Strategy Vault's ByzNft.
-     */
-    function withdrawContractBalance() external onlyNftOwner {
-        payable(msg.sender).transfer(address(this).balance);
-    }
-
-    /**
      * @notice Change the whitelistedDeposit flag.
      * @dev Callable only by the owner of the Strategy Vault's ByzNft.
      */

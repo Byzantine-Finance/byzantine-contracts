@@ -394,22 +394,6 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
 
     }
 
-    function testStakerWithdrawStratVaultBalance() public preCreateClusters(2) {
-
-        // Alice creates a StrategyVault
-        address stratVaultAddr = _createStratVaultAndStakeNativeETH(alice, 32 ether);
-
-        // Alice's Strategy Vault get 64ETH
-        vm.deal(stratVaultAddr, 64 ether);
-        assertEq(stratVaultAddr.balance, 64 ether);
-
-        // Alice withdraw the Strategy Vault balance
-        vm.prank(alice);
-        IStrategyVault(stratVaultAddr).withdrawContractBalance();
-        assertEq(alice.balance, STARTING_BALANCE - 32 ether + 64 ether);
-        assertEq(stratVaultAddr.balance, 0 ether);
-    }
-
     // That test reverts because the `withdrawal_credential_proof` file generated with the Byzantine API
     // doesn't point to the correct EigenPod (alice's EigenPod which is locally deployed)
     function test_RevertWhen_WrongWithdrawalCredentials() public preCreateClusters(2) {

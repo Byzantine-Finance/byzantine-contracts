@@ -134,12 +134,6 @@ interface IStrategyVault {
     external;
 
   /**
-   * @notice Allow the Strategy Vault's owner to withdraw the smart contract's balance.
-   * @dev Revert if the caller is not the owner of the Strategy Vault's ByzNft.
-   */
-  function withdrawContractBalance() external;
-
-  /**
    * @notice Call the EigenPodManager contract
    * @param data to call contract 
    */

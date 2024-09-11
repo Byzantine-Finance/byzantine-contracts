@@ -54,11 +54,6 @@ interface IStrategyVault {
    */
   function delegateTo(address operator) external;
 
-  /**
-   * @notice Allow the Strategy Vault's owner to withdraw the smart contract's balance.
-   * @dev Revert if the caller is not the owner of the Strategy Vault's ByzNft.
-   */
-  function withdrawContractBalance() external;
 
   /// @dev Error when unauthorized call to a function callable only by the Strategy Vault Owner (aka the ByzNft holder).
   error OnlyNftOwner();

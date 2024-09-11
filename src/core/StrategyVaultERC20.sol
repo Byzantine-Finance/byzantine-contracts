@@ -21,11 +21,6 @@ contract StrategyVault is Initializable, StrategyVaultStorage, AccessControlUpgr
         _;
     }
 
-    modifier onlyIfNativeRestaking() {
-        if (clusterDetails.dvStatus == DVStatus.NATIVE_RESTAKING_NOT_ACTIVATED) revert NativeRestakingNotActivated();
-        _;
-    }
-
     /* ============== CONSTRUCTOR & INITIALIZER ============== */
 
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -125,14 +120,6 @@ contract StrategyVault is Initializable, StrategyVaultStorage, AccessControlUpgr
         ISignatureUtils.SignatureWithExpiry memory emptySignatureAndExpiry;
 
         delegationManager.delegateTo(operator, emptySignatureAndExpiry, bytes32(0));
-    }
-
-    /**
-     * @notice Allow the Strategy Vault's owner to withdraw the smart contract's balance.
-     * @dev Revert if the caller is not the owner of the Strategy Vault's ByzNft.
-     */
-    function withdrawContractBalance() external onlyNftOwner {
-        payable(msg.sender).transfer(address(this).balance);
     }
 
     /**

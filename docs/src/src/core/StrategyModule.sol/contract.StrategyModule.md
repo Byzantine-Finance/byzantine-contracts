@@ -301,17 +301,6 @@ function setClusterDetails(Node[4] calldata nodes, DVStatus dvStatus) external o
 |`dvStatus`|`DVStatus`|The status of the DV, refer to the DVStatus enum for details.|
 
 
-### withdrawContractBalance
-
-Allow the Strategy Vault's owner to withdraw the smart contract's balance.
-
-*Revert if the caller is not the owner of the Strategy Vault's ByzNft.*
-
-
-```solidity
-function withdrawContractBalance() external onlyNftOwner;
-```
-
 ### stratVaultOwner
 
 Returns the address of the owner of the Strategy Vault's ByzNft.
