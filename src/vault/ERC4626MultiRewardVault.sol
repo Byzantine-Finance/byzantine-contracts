@@ -11,6 +11,7 @@ contract ERC4626MultiRewardVault is Initializable, ERC4626Upgradeable, OwnableUp
     using SafeERC20Upgradeable for IERC20Upgradeable;
 
     IERC20Upgradeable[] public rewardTokens;
+    mapping(IERC20Upgradeable => uint8) public rewardTokenDecimals;
 
     function initialize(IERC20Upgradeable _asset) public initializer {
         string memory assetSymbol = IERC20MetadataUpgradeable(address(_asset)).symbol();
@@ -25,6 +26,8 @@ contract ERC4626MultiRewardVault is Initializable, ERC4626Upgradeable, OwnableUp
 
     function addRewardToken(IERC20Upgradeable _rewardToken) external onlyOwner {
         rewardTokens.push(_rewardToken);
+        uint8 decimals = IERC20MetadataUpgradeable(address(_rewardToken)).decimals();
+        rewardTokenDecimals[_rewardToken] = decimals;
     }
 
     function withdraw(uint256 assets, address receiver, address owner) public virtual override nonReentrant returns (uint256) {
