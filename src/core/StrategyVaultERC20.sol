@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 import "@openzeppelin-upgrades/contracts/proxy/utils/Initializable.sol";
 import "@openzeppelin-upgrades/contracts/access/AccessControlUpgradeable.sol";
 
-import "./StrategyVaultStorage.sol";
+import "./StrategyVaultERC20Storage.sol";
 import "../vault/ERC4626MultiRewardVault.sol";
 
 contract StrategyVault is Initializable, StrategyVaultStorage, AccessControlUpgradeable, ERC4626MultiRewardVault {

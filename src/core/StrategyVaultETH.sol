@@ -8,7 +8,7 @@ import "eigenlayer-contracts/interfaces/ISignatureUtils.sol";
 import "eigenlayer-contracts/libraries/BeaconChainProofs.sol";
 import { PushSplit } from "splits-v2/splitters/push/PushSplit.sol";
 
-import "./StrategyVaultStorage.sol";
+import "./StrategyVaultETHStorage.sol";
 import "../vault/ERC4626MultiRewardVault.sol";
 
 contract StrategyVault is Initializable, StrategyVaultStorage, AccessControlUpgradeable, ERC4626MultiRewardVault {

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "../interfaces/IStrategyVault.sol";
+import "../interfaces/IStrategyVaultERC20.sol";
 import "../interfaces/IByzNft.sol";
 import "../interfaces/IStrategyVaultManager.sol";
 import "eigenlayer-contracts/interfaces/IStrategyManager.sol";
