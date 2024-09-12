@@ -114,7 +114,7 @@ contract StrategyVaultManager is
             splitAddr,
             IStrategyVault.DVStatus.DEPOSITED_NOT_VERIFIED
         );
-
+    }
 
     /**
      * @notice A 32ETH staker create a Strategy Vault, use a pre-created DV as a validator and activate it by depositing 32ETH.
