@@ -7,6 +7,8 @@ import "@openzeppelin-upgrades/contracts/access/OwnableUpgradeable.sol";
 import "@openzeppelin-upgrades/contracts/token/ERC20/extensions/IERC20MetadataUpgradeable.sol";
 import "@openzeppelin-upgrades/contracts/security/ReentrancyGuardUpgradeable.sol";
 
+// TODO: Override _convertToShares and _convertToAssets
+
 contract ERC4626MultiRewardVault is Initializable, ERC4626Upgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
     using SafeERC20Upgradeable for IERC20Upgradeable;
 
@@ -56,8 +58,23 @@ contract ERC4626MultiRewardVault is Initializable, ERC4626Upgradeable, OwnableUp
      */
     function withdraw(uint256 assets, address receiver, address owner) public virtual override nonReentrant returns (uint256) {
         uint256 shares = super.withdraw(assets, receiver, owner);
+        _withdraw(msg.sender, receiver, owner, assets, shares);
         _distributeRewards(receiver, shares);
         return shares;
+    }
+
+    /**
+     * @notice Withdraws assets from the vault. Amount is determined by number of shares burning.
+     * @param shares The amount of shares to burn to exchange for assets.
+     * @param receiver The address to receive the assets.
+     * @param owner The address that is withdrawing assets.
+     * return The amount of assets withdrawn.
+     */
+    function redeem(uint256 shares, address receiver, address owner) public virtual override nonReentrant returns (uint256) {
+        require(shares <= maxRedeem(owner), "ERC4626: redeem more than max");
+        uint256 assets = previewRedeem(shares);
+        _withdraw(_msgSender(), receiver, owner, assets, shares);
+        return assets;
     }
 
     /* ================ VIEW FUNCTIONS ================ */

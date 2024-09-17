@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+import "eigenlayer-contracts/interfaces/IStrategy.sol";
+
 interface IStrategyVault {
 
     /**
@@ -32,13 +34,11 @@ interface IStrategyVault {
 
   /**
     * @notice Deposit ERC20 tokens into the StrategyVault.
-    * @param strategy The EigenLayer StrategyBaseTVLLimits contract for the depositing token.
     * @param token The address of the ERC20 token to deposit.
     * @param amount The amount of tokens to deposit.
     * @dev The caller receives Byzantine StrategyVault shares in return for the ERC20 tokens staked.
     */
   function stakeERC20(
-    IStrategy strategy,
     IERC20 token,
     uint256 amount
   ) external;
@@ -69,8 +69,5 @@ interface IStrategyVault {
 
   /// @dev Returned when trying to deposit an incorrect token
   error IncorrectToken();
-
-  /// @dev Returned when trying to deposit ETH into a token StrategyVault
-  error CannotDepositETHIntoTokenVault();
 
 }

@@ -23,17 +23,6 @@ interface IStrategyVault {
     address eth1Addr;
   }
 
-  /// @notice Struct to store the details of a Distributed Validator created on Byzantine
-  /// @dev Byzantine is the owner of the Split contract and can thus update it if the DV changes
-  struct ClusterDetails {
-    // The Split contract address
-    address splitAddr;
-    // The status of the Distributed Validator
-    DVStatus dvStatus;
-    // A record of the 4 nodes being part of the cluster
-    Node[4] nodes;
-  }
-
   /**
    * @notice Used to initialize the nftId of that StrategyVault and its owner.
    * @dev Called on construction by the StrategyVaultManager.
@@ -107,20 +96,6 @@ interface IStrategyVault {
   function delegateTo(address operator) external;
 
   /**
-   * @notice Set the `clusterDetails` struct of the StrategyVault.
-   * @param nodes An array of Node making up the DV
-   * @param splitAddr The address of the Split contract.
-   * @param dvStatus The status of the DV, refer to the DVStatus enum for details.
-   * @dev Callable only by the StrategyVaultManager and bound a pre-created DV to this StrategyVault.
-   */
-  function setClusterDetails(
-    Node[4] calldata nodes,
-    address splitAddr,
-    DVStatus dvStatus
-  ) 
-    external;
-
-  /**
    * @notice Distributes the tokens issued from the PoS rewards evenly between the node operators.
    * @param _split The current split struct of the StrategyVault. Can be reconstructed offchain since the only variable is the `recipients` field.
    * @param _token The address of the token to distribute. NATIVE_TOKEN_ADDR = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE
@@ -173,12 +148,6 @@ interface IStrategyVault {
 
   /// @dev Returned when trying to access DV data but no ETH has been deposited
   error NativeRestakingNotActivated();
-
-  /// @dev Returned when trying to deposit an incorrect token
-  error IncorrectToken();
-
-  /// @dev Returned when trying to deposit ETH into a token StrategyVault
-  error CannotDepositETHIntoTokenVault();
 
   /// @dev Returned when trying to deposit an incorrect amount of ETH. Can only deposit a multiple of 32 ETH. (32, 64, 96, 128, etc.)
   error CanOnlyDepositMultipleOf32ETH();

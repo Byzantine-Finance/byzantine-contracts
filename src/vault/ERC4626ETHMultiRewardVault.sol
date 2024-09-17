@@ -7,6 +7,9 @@ import "@openzeppelin-upgrades/contracts/access/OwnableUpgradeable.sol";
 import "@openzeppelin-upgrades/contracts/token/ERC20/extensions/IERC20MetadataUpgradeable.sol";
 import "@openzeppelin-upgrades/contracts/security/ReentrancyGuardUpgradeable.sol";
 
+// TODO: Fix deposit()
+// TODO: Override _convertToShares and _convertToAssets
+
 contract ERC4626MultiRewardVault is Initializable, ERC4626Upgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
     using SafeERC20Upgradeable for IERC20Upgradeable;
 
@@ -17,6 +20,11 @@ contract ERC4626MultiRewardVault is Initializable, ERC4626Upgradeable, OwnableUp
 
     /// @notice Mapping of reward token to its decimals
     mapping(IERC20Upgradeable => uint8) public rewardTokenDecimals;
+
+    /* ============== CUSTOM ERRORS ============== */
+
+    /// @notice Error emitted when ETH transfer fails
+    error ETHTransferFailedOnWithdrawal();
 
     /* ============== CONSTRUCTOR & INITIALIZER ============== */
 
@@ -52,9 +60,9 @@ contract ERC4626MultiRewardVault is Initializable, ERC4626Upgradeable, OwnableUp
     }
 
     /**
-     * @notice Deposits ETH into the vault.
+     * @notice Deposits ETH into the vault. Amount is determined by ETH depositing.
      * @param assets The amount of ETH being deposit.
-     * @param receiver The address to receive the deposited assets.
+     * @param receiver The address to receive the Byzantine vault shares.
      * @return The amount of shares minted.
      */
     function deposit(uint256 assets, address receiver) public virtual override payable nonReentrant returns (uint256) {
@@ -65,18 +73,45 @@ contract ERC4626MultiRewardVault is Initializable, ERC4626Upgradeable, OwnableUp
     }
 
     /**
-     * @notice Withdraws ETH from the vault.
+     * @notice Deposits ETH into the vault. Amount is determined by number of shares minting.
+     * @param shares The amount of vault shares to mint.
+     * @param receiver The address to receive the Byzantine vault shares.
+     * @return The amount of ETH deposited.
+     */
+    function mint(uint256 shares, address receiver) public virtual override payable nonReentrant returns (uint256) {
+    require(shares <= maxMint(receiver), "ERC4626: mint more than max");
+    uint256 assets = previewMint(shares);
+    _deposit(_msgSender(), receiver, assets, shares);
+    return assets;
+}
+
+    /**
+     * @notice Withdraws ETH from the vault. Amount is determined by ETH withdrawing. 
      * @param assets The amount of ETH to withdraw.
-     * @param receiver The address to receive the withdrawn assets.
-     * @param owner The address that is withdrawing the assets.
+     * @param receiver The address to receive the ETH.
+     * @param owner The address that is withdrawing ETH.
      * @return The amount of shares burned.
      */
     function withdraw(uint256 assets, address receiver, address owner) public virtual override nonReentrant returns (uint256) {
+        require(assets <= maxWithdraw(owner), "ERC4626: withdraw more than max");
         uint256 shares = previewWithdraw(assets);
         _withdraw(msg.sender, receiver, owner, assets, shares);
         _distributeRewards(receiver, shares);
-        payable(receiver).transfer(assets);
         return shares;
+    }
+
+    /**
+     * @notice Withdraws ETH from the vault. Amount is determined by number of shares burning.
+     * @param shares The amount of shares to burn to exchange for ETH.
+     * @param receiver The address to receive the ETH.
+     * @param owner The address that is withdrawing ETH.
+     * return The amount of ETH withdrawn.
+     */
+    function redeem(uint256 shares, address receiver, address owner) public virtual override nonReentrant returns (uint256) {
+        require(shares <= maxRedeem(owner), "ERC4626: redeem more than max");
+        uint256 assets = previewRedeem(shares);
+        _withdraw(_msgSender(), receiver, owner, assets, shares);
+        return assets;
     }
 
     /* ================ VIEW FUNCTIONS ================ */
@@ -120,7 +155,7 @@ contract ERC4626MultiRewardVault is Initializable, ERC4626Upgradeable, OwnableUp
     /* ============== INTERNAL FUNCTIONS ============== */
 
     /**
-     * @notice Distributes rewards to the receiver for all rewardTokens.
+     * @dev Distributes rewards to the receiver for all rewardTokens.
      * @param receiver The address to receive the rewards.
      * @param sharesBurned The amount of shares burned.
      */
@@ -136,4 +171,24 @@ contract ERC4626MultiRewardVault is Initializable, ERC4626Upgradeable, OwnableUp
         }
     }
 
+    /**
+     * @dev Override's ERC4626's _withdraw function to transfer ETH instead of tokens.
+     */
+    function _withdraw(
+        address caller,
+        address receiver,
+        address owner,
+        uint256 assets,
+        uint256 shares
+    ) internal virtual override {
+        if (caller != owner) {
+            _spendAllowance(owner, caller, shares);
+        }
+        _burn(owner, shares);
+        (bool success, ) = receiver.call{value: assets}("");
+        if (!success) {
+            revert ETHTransferFailedOnWithdrawal();
+        }
+        emit Withdraw(caller, receiver, owner, assets, shares);
+    }
 }

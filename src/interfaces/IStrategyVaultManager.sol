@@ -3,7 +3,7 @@ pragma solidity ^0.8.20;
 
 import "eigenlayer-contracts/interfaces/IEigenPod.sol";
 import { SplitV2Lib } from "splits-v2/libraries/SplitV2.sol";
-import "../interfaces/IStrategyVault.sol";
+import "../interfaces/IStrategyVaultETH.sol";
 
 interface IStrategyVaultManager {
 
@@ -12,7 +12,7 @@ interface IStrategyVaultManager {
         // The parameters of the Split contract
         SplitV2Lib.Split splitParams;
         // A record of the 4 nodes being part of the cluster
-        IStrategyVault.Node[4] nodes;
+        IStrategyVaultETH.Node[4] nodes;
     }
 
     /// @notice Get total number of pre-created clusters.
@@ -35,15 +35,14 @@ interface IStrategyVaultManager {
      * @notice A staker creates a StrategyVault for Native ETH.
      * @param whitelistedDeposit If false, anyone can deposit into the Strategy Vault. If true, only whitelisted addresses can deposit into the Strategy Vault.
      * @param upgradeable If true, the Strategy Vault is upgradeable. If false, the Strategy Vault is not upgradeable.
+     * @param operator The address for the operator that this StrategyVault will delegate to.
      * @dev This action triggers a new auction to pre-create a new Distributed Validator for the next staker (if enough operators in Auction).
      * @dev It also fill the ClusterDetails struct of the newly created StrategyVault.
      */
     function createStratVaultETH(
-        bytes calldata pubkey,
-        bytes calldata signature,
-        bytes32 depositDataRoot,
         bool whitelistedDeposit,
-        bool upgradeable
+        bool upgradeable,
+        address operator
     ) external;
 
     /**
@@ -51,14 +50,20 @@ interface IStrategyVaultManager {
      * @param pubkey The 48 bytes public key of the beacon chain DV.
      * @param signature The DV's signature of the deposit data.
      * @param depositDataRoot The root/hash of the deposit data for the DV's deposit.
+     * @param whitelistedDeposit If false, anyone can deposit into the Strategy Vault. If true, only whitelisted addresses can deposit into the Strategy Vault.
+     * @param upgradeable If true, the Strategy Vault is upgradeable. If false, the Strategy Vault is not upgradeable.
+     * @param operator The address for the operator that this StrategyVault will delegate to.
      * @dev This action triggers a new auction to pre-create a new Distributed Validator for the next staker (if enough operators in Auction).
      * @dev It also fill the ClusterDetails struct of the newly created StrategyVault.
-     * @dev Function will revert if not exactly 32 ETH are sent with the transaction.
+     * @dev Function will revert unless a multiple of 32 ETH are sent with the transaction.
      */
     function createStratVaultAndStakeNativeETH(
         bytes calldata pubkey,
         bytes calldata signature,
-        bytes32 depositDataRoot
+        bytes32 depositDataRoot,
+        bool whitelistedDeposit,
+        bool upgradeable,
+        address operator
     ) 
         external payable;
 
@@ -67,13 +72,15 @@ interface IStrategyVaultManager {
      * @param token The ERC20 deposit token for the StrategyVault.
      * @param whitelistedDeposit If false, anyone can deposit into the Strategy Vault. If true, only whitelisted addresses can deposit into the Strategy Vault.
      * @param upgradeable If true, the Strategy Vault is upgradeable. If false, the Strategy Vault is not upgradeable.
+     * @param operator The address for the operator that this StrategyVault will delegate to.
      * @dev The caller receives Byzantine StrategyVault shares in return for the ERC20 tokens staked.
      */
     function createStratVaultERC20(
         IStrategy strategy,
         IERC20 token,
         bool whitelistedDeposit,
-        bool upgradeable
+        bool upgradeable,
+        address operator
     ) external;
 
     /**
@@ -83,6 +90,7 @@ interface IStrategyVaultManager {
      * @param amount The amount of token to stake.
      * @param whitelistedDeposit If false, anyone can deposit into the Strategy Vault. If true, only whitelisted addresses can deposit into the Strategy Vault.
      * @param upgradeable If true, the Strategy Vault is upgradeable. If false, the Strategy Vault is not upgradeable.
+     * @param operator The address for the operator that this StrategyVault will delegate to.
      * @dev The caller receives Byzantine StrategyVault shares in return for the ERC20 tokens staked.
      */
     function createStratVaultAndStakeERC20(
@@ -90,7 +98,8 @@ interface IStrategyVaultManager {
         IERC20 token,
         uint256 amount,
         bool whitelistedDeposit,
-        bool upgradeable
+        bool upgradeable,
+        address operator
     ) external;
 
     /**
@@ -121,7 +130,7 @@ interface IStrategyVaultManager {
      * @param clusterIndex The index of the pending cluster you want to know the node details.
      * @dev If the index does not exist, it returns the default value of the Node struct.
      */
-    function getPendingClusterNodeDetails(uint64 clusterIndex) external view returns (IStrategyVault.Node[4] memory);
+    function getPendingClusterNodeDetails(uint64 clusterIndex) external view returns (IStrategyVaultETH.Node[4] memory);
 
     /**
      * @notice Returns the number of StrategyVaults owned by an address.

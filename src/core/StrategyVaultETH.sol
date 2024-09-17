@@ -11,6 +11,8 @@ import { PushSplit } from "splits-v2/splitters/push/PushSplit.sol";
 import "./StrategyVaultETHStorage.sol";
 import "../vault/ERC4626MultiRewardVault.sol";
 
+// TODO: Finish withdrawal logic
+
 contract StrategyVault is Initializable, StrategyVaultStorage, AccessControlUpgradeable, ERC4626MultiRewardVault {
     using BeaconChainProofs for *;
 
@@ -143,6 +145,7 @@ contract StrategyVault is Initializable, StrategyVaultStorage, AccessControlUpgr
      * @param validatorFieldsProofs proofs against the `beaconStateRoot` for each validator in `validatorFields`
      * @param validatorFields are the fields of the "Validator Container", refer to consensus specs for details: 
      * https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/beacon-chain.md#validator
+     * @param strategy The EigenLayer StrategyBaseTVLLimits contract for the depositing token. TODO: Check address for Native ETH.
      * @dev That function must be called for a validator which is "INACTIVE".
      * @dev The timestamp used to generate the Beacon Block Root is `block.timestamp - FINALITY_TIME` to be sure
      * that the Beacon Block is finalized.
@@ -155,7 +158,8 @@ contract StrategyVault is Initializable, StrategyVaultStorage, AccessControlUpgr
         BeaconChainProofs.StateRootProof calldata stateRootProof,
         uint40[] calldata validatorIndices,
         bytes[] calldata validatorFieldsProofs,
-        bytes32[][] calldata validatorFields
+        bytes32[][] calldata validatorFields,
+        IStrategy strategy
     ) external onlyNftOwner onlyIfNativeRestaking {
 
         IEigenPod myPod = eigenPodManager.ownerToPod(address(this));
@@ -171,6 +175,8 @@ contract StrategyVault is Initializable, StrategyVaultStorage, AccessControlUpgr
         // Update DV Status to ACTIVE_AND_VERIFIED
         clusterDetails.dvStatus = DVStatus.ACTIVE_AND_VERIFIED;
 
+        // Update the amount of tokens that the StrategyVault is delegating.
+        delegationManager.increaseDelegatedShares(address(this), strategy, amount);
     }
 
     /**
@@ -188,29 +194,6 @@ contract StrategyVault is Initializable, StrategyVaultStorage, AccessControlUpgr
         ISignatureUtils.SignatureWithExpiry memory emptySignatureAndExpiry;
 
         delegationManager.delegateTo(operator, emptySignatureAndExpiry, bytes32(0));
-    }
-
-    /**
-     * @notice Set the `clusterDetails` struct of the StrategyVault.
-     * @param nodes An array of Node making up the DV
-     * @param splitAddr The address of the Split contract.
-     * @param dvStatus The status of the DV, refer to the DVStatus enum for details.
-     * @dev Callable only by the StrategyVaultManager and bound a pre-created DV to this StrategyVault.
-     */
-    function setClusterDetails(
-        Node[4] calldata nodes,
-        address splitAddr,
-        DVStatus dvStatus
-    ) external onlyStratVaultManager {
-
-        for (uint8 i = 0; i < CLUSTER_SIZE;) {
-            clusterDetails.nodes[i] = nodes[i];
-            unchecked {
-                ++i;
-            }
-        }
-        clusterDetails.splitAddr = splitAddr;
-        clusterDetails.dvStatus = dvStatus;
     }
 
     /**

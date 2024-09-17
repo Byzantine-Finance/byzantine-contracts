@@ -10,6 +10,8 @@ import "eigenlayer-contracts/interfaces/IEigenPodManager.sol";
 //import "eigenlayer-contracts/interfaces/IStrategyManager.sol";
 import "eigenlayer-contracts/interfaces/IDelegationManager.sol";
 
+import { PushSplitFactory } from "splits-v2/splitters/push/PushSplitFactory.sol";
+
 import "./StrategyVaultManagerStorage.sol";
 
 import "../interfaces/IByzNft.sol";
@@ -86,24 +88,23 @@ contract StrategyVaultManager is
      * @notice A staker creates a StrategyVault for Native ETH.
      * @param whitelistedDeposit If false, anyone can deposit into the Strategy Vault. If true, only whitelisted addresses can deposit into the Strategy Vault.
      * @param upgradeable If true, the Strategy Vault is upgradeable. If false, the Strategy Vault is not upgradeable.
+     * @param operator The address for the operator that this StrategyVault will delegate to.
      * @dev This action triggers a new auction to pre-create a new Distributed Validator for the next staker (if enough operators in Auction).
      * @dev It also fill the ClusterDetails struct of the newly created StrategyVault.
      */
     function createStratVaultETH(
-        bytes calldata pubkey,
-        bytes calldata signature,
-        bytes32 depositDataRoot,
         bool whitelistedDeposit,
-        bool upgradeable
+        bool upgradeable,
+        address operator
     ) external {
         require (getNumPendingClusters() > 0, "StrategyVaultManager.createStratVaultAndStakeNativeETH: no pending DVs");
-        require(msg.value == 32 ether, "StrategyVaultManager.createStratVaultAndStakeNativeETH: must initially stake for any validator with 32 ether");
-        /// TODO Verify the pubkey in arguments to be sure it is using the right pubkey of a pre-created cluster. Use a monolithic blockchain
-
+        
         // Create a Native ETH StrategyVault
         IStrategyVaultETH newStratVault = _deployStratVault(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE, whitelistedDeposit, upgradeable);
 
-        uint256 clusterSize = pendingClusters[numStratVaults].nodes.length;
+        // Delegate the StrategyVault towards the operator
+        // TODO: Ensure StrategyVault delegating, not caller.
+        newStratVault.delegateTo(operator);
 
         // deploy the Split contract
         address splitAddr = pushSplitFactory.createSplitDeterministic(pendingClusters[numStratVaults].splitParams, owner(), owner(), bytes32(uint256(keccak256(abi.encode(numStratVaults)))));
@@ -123,9 +124,10 @@ contract StrategyVaultManager is
      * @param depositDataRoot The root/hash of the deposit data for the DV's deposit.
      * @param whitelistedDeposit If false, anyone can deposit into the Strategy Vault. If true, only whitelisted addresses can deposit into the Strategy Vault.
      * @param upgradeable If true, the Strategy Vault is upgradeable. If false, the Strategy Vault is not upgradeable.
+     * @param operator The address for the operator that this StrategyVault will delegate to.
      * @dev This action triggers a new auction to pre-create a new Distributed Validator for the next staker (if enough operators in Auction).
      * @dev It also fill the ClusterDetails struct of the newly created StrategyVault.
-     * @dev Function will revert if not exactly 32 ETH are sent with the transaction.
+     * @dev Function will revert unless a multiple of 32 ETH are sent with the transaction.
      * @dev The caller receives Byzantine StrategyVault shares in return for the ETH staked.
      */
     function createStratVaultAndStakeNativeETH(
@@ -133,19 +135,22 @@ contract StrategyVaultManager is
         bytes calldata signature,
         bytes32 depositDataRoot,
         bool whitelistedDeposit,
-        bool upgradeable
+        bool upgradeable,
+        address operator
     ) external payable {
         require (getNumPendingClusters() > 0, "StrategyVaultManager.createStratVaultAndStakeNativeETH: no pending DVs");
-        require(msg.value == 32 ether, "StrategyVaultManager.createStratVaultAndStakeNativeETH: must initially stake for any validator with 32 ether");
         /// TODO Verify the pubkey in arguments to be sure it is using the right pubkey of a pre-created cluster. Use a monolithic blockchain
 
         // Create a Native ETH StrategyVault
         IStrategyVaultETH newStratVault = _deployStratVault(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE, whitelistedDeposit, upgradeable);
 
+        // Delegate the StrategyVault towards the operator
+        newStratVault.delegateTo(operator);
+
         // Stake 32 ETH in the Beacon Chain
         newStratVault.stakeNativeETH{value: msg.value}(pubkey, signature, depositDataRoot);
 
-        uint256 clusterSize = pendingClusters[numStratVaults].nodes.length;
+        // uint256 clusterSize = pendingClusters[numStratVaults].nodes.length;
 
         // deploy the Split contract
         address splitAddr = pushSplitFactory.createSplitDeterministic(pendingClusters[numStratVaults].splitParams, owner(), owner(), bytes32(uint256(keccak256(abi.encode(numStratVaults)))));
@@ -161,13 +166,13 @@ contract StrategyVaultManager is
         delete pendingClusters[numStratVaults];
         ++numStratVaults;
 
-        // If enough node ops in Auction, trigger a new auction for the next staker's DV
-        if (auction.numNodeOpsInAuction() >= clusterSize) {
-            // Create the Split parameters
-            (address[] memory recipients, uint256[] memory allocations) = _createSplitParams();
-            _getNewPendingCluster(recipients, allocations);
-            ++numPreCreatedClusters;
-        }
+        // // If enough node ops in Auction, trigger a new auction for the next staker's DV
+        // if (auction.numNodeOpsInAuction() >= clusterSize) {
+        //     // Create the Split parameters
+        //     (address[] memory recipients, uint256[] memory allocations) = _createSplitParams();
+        //     _getNewPendingCluster(recipients, allocations);
+        //     ++numPreCreatedClusters;
+        // }
     }
 
     /**
@@ -175,37 +180,44 @@ contract StrategyVaultManager is
      * @param token The ERC20 deposit token for the StrategyVault.
      * @param whitelistedDeposit If false, anyone can deposit into the Strategy Vault. If true, only whitelisted addresses can deposit into the Strategy Vault.
      * @param upgradeable If true, the Strategy Vault is upgradeable. If false, the Strategy Vault is not upgradeable.
+     * @param operator The address for the operator that this StrategyVault will delegate to.
      * @dev The caller receives Byzantine StrategyVault shares in return for the ERC20 tokens staked.
      */
     function createStratVaultERC20(
-        IStrategy strategy,
         IERC20 token,
         bool whitelistedDeposit,
-        bool upgradeable
+        bool upgradeable,
+        address operator
     ) external {
         // Create a ERC20 StrategyVault
         IStrategyVaultERC20 newStratVault = _deployStratVault(address(token), whitelistedDeposit, upgradeable);
+
+        // Delegate the StrategyVault towards the operator
+        newStratVault.delegateTo(operator);
     }
 
     /**
      * @notice Staker creates a Strategy Vault and stakes ERC20.
-     * @param strategy The EigenLayer StrategyBaseTVLLimits contract for the depositing token.
      * @param token The ERC20 token to stake.
      * @param amount The amount of token to stake.
      * @param whitelistedDeposit If false, anyone can deposit into the Strategy Vault. If true, only whitelisted addresses can deposit into the Strategy Vault.
      * @param upgradeable If true, the Strategy Vault is upgradeable. If false, the Strategy Vault is not upgradeable.
+     * @param operator The address for the operator that this StrategyVault will delegate to.
      * @dev The caller receives Byzantine StrategyVault shares in return for the ERC20 tokens staked.
      */
     function createStratVaultAndStakeERC20(
-        IStrategy strategy,
         IERC20 token,
         uint256 amount,
         bool whitelistedDeposit,
-        bool upgradeable
+        bool upgradeable,
+        address operator
     ) external {
 
         // Create a ERC20 StrategyVault
         IStrategyVaultERC20 newStratVault = _deployStratVault(address(token), whitelistedDeposit, upgradeable);
+
+        // Delegate the StrategyVault towards the operator
+        newStratVault.delegateTo(operator);
 
         // Stake ERC20
         newStratVault.stakeERC20(strategy, token, amount);

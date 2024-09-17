@@ -103,6 +103,57 @@ contract StrategyVault is Initializable, StrategyVaultStorage, AccessControlUpgr
 
         // Deposit the ERC20 tokens into the EigenLayer StrategyManager
         strategyManager.depositIntoStrategy(strategy, token, amount);
+
+        // Update the amount of tokens that the StrategyVault is delegating
+        delegationManager.increaseDelegatedShares(address(this), strategy, amount);
+    }
+
+    /**
+     * @notice Begins the withdrawal process to pull ERC20 tokens out of the StrategyVault
+     * @param queuedWithdrawalParams TODO: Fill in
+     * @param strategies An array of strategy contracts for all tokens being withdrawn from EigenLayer.
+     * @dev Withdrawal is not instant - a withdrawal delay exists for removing the assets from EigenLayer
+     */
+    function startWithdrawERC20(
+        QueuedWithdrawalParams[] calldata queuedWithdrawalParams,
+        IStrategy[] strategies
+        ) external {
+        // Begins withdrawal procedure with EigenLayer.
+        delegationManager.queueWithdrawals(queuedWithdrawalParams);
+
+        // Calculate the withdrawal delay
+        uint256 withdrawalDelay = delegationManager.getWithdrawalDelay(strategies);
+
+        // Setup scheduled function call for finishWithdrawERC20 after withdrawal delay is finished.
+        // TODO
+    }
+
+    /**
+     * @notice Finalizes the withdrawal of ERC20 tokens from the StrategyVault
+     * @param withdrawal TODO: Fill in
+     * @param tokens TODO: Fill in
+     * @param middlewareTimesIndex TODO: Fill in
+     * @param receiveAsTokens TODO: Fill in
+     * @dev Can only be called after the withdrawal delay is finished
+     */
+    function finishWithdrawERC20(
+        withdrawal,
+        tokens[],
+        middlewareTimesIndex,
+        receiveAsTokens
+    ) external {
+        // Have StrategyVault unstake from the EigenLayer Strategy contract
+        delegationManager.completeQueuedWithdrawal(
+            /*
+            Withdrawal calldata withdrawal,
+            IERC20[] calldata tokens,
+            uint256 middlewareTimesIndex,
+            bool receiveAsTokens
+            */
+        );
+        
+        // Burn caller's shares and exchange for deposit token + reward tokens
+        super.withdraw(assetAmount, receiver, msg.sender);
     }
 
     /**

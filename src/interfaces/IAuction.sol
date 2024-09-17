@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "./IStrategyVault.sol";
+import "./IStrategyVaultETH.sol";
 
 interface IAuction {
 
@@ -71,7 +71,7 @@ interface IAuction {
      * It finds the `clusterSize` node operators with the highest auction scores and put them in a DV.
      * @dev Reverts if not enough node operators are available.
      */
-    function getAuctionWinners() external returns(IStrategyVault.Node[] memory);
+    function getAuctionWinners() external returns(IStrategyVaultETH.Node[] memory);
 
     /**
      * @notice Fonction to determine the auction price for a validator according to its bids parameters
