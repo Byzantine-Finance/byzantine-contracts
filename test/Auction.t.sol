@@ -117,7 +117,7 @@ contract AuctionTest is ByzantineDeployer {
         assertEq(bid0Details.auctionScore, auctionScore_10e2_100);
         assertEq(bid0Details.bidPrice, bidPrice_10e2_100);
         assertEq(bid0Details.nodeOp, nodeOps[0]);
-        assertEq(bid0Details.vcNumbers, 100);
+        assertEq(bid0Details.vcNumber, 100);
         assertEq(bid0Details.discountRate, 10e2);
         assertEq(uint256(bid0Details.auctionType), uint256(IAuction.AuctionType.JOIN_CLUSTER_4));
 
@@ -128,7 +128,7 @@ contract AuctionTest is ByzantineDeployer {
         assertEq(bid1Details.auctionScore, auctionScore_1375_129);
         assertEq(bid1Details.bidPrice, bidPrice_1375_129);
         assertEq(bid1Details.nodeOp, nodeOps[1]);
-        assertEq(bid1Details.vcNumbers, 129);
+        assertEq(bid1Details.vcNumber, 129);
         assertEq(bid1Details.discountRate, 1375);
         assertEq(uint256(bid1Details.auctionType), uint256(IAuction.AuctionType.JOIN_CLUSTER_4));
     }
@@ -183,16 +183,17 @@ contract AuctionTest is ByzantineDeployer {
         assertEq(highestAvgAuctionScore, winningInfo.averageAuctionScore);
         assertEq(winningClusterId, winningInfo.clusterId);
 
-        // Verify the `ClsuterDetails` struct
+        // Verify the `ClusterDetails` struct
         IAuction.ClusterDetails memory winningClusterDetails = auction.getClusterDetails(winningClusterId);
         assertEq(winningClusterDetails.averageAuctionScore, highestAvgAuctionScore);
-        assertEq(winningClusterDetails.nodes[0].pendingBidId, bidId1);
-        assertEq(winningClusterDetails.nodes[1].pendingBidId, bidId3);
-        assertEq(winningClusterDetails.nodes[2].pendingBidId, bidId5);
-        assertEq(winningClusterDetails.nodes[3].pendingBidId, bidId9);
-
-        // Verify latestWonBidId is null
-        assertEq(winningClusterDetails.nodes[3].latestWonBidId, bytes32(0));
+        assertEq(winningClusterDetails.nodes[0].bidId, bidId1);
+        assertEq(winningClusterDetails.nodes[0].currentVCNumber, 200);
+        assertEq(winningClusterDetails.nodes[1].bidId, bidId3);
+        assertEq(winningClusterDetails.nodes[1].currentVCNumber, 200);
+        assertEq(winningClusterDetails.nodes[2].bidId, bidId5);
+        assertEq(winningClusterDetails.nodes[2].currentVCNumber, 150);
+        assertEq(winningClusterDetails.nodes[3].bidId, bidId9);
+        assertEq(winningClusterDetails.nodes[3].currentVCNumber, 50);
 
         /* ============= nodeOps[4] update the main auction tree ============= */
 

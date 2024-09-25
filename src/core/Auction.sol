@@ -145,7 +145,7 @@ contract Auction is
             auctionScore: auctionScore,
             bidPrice: bidPrice,
             nodeOp: msg.sender,
-            vcNumbers: _timeInDays, /// TODO: Split the VC among the different validators (or do it in another contract)
+            vcNumber: _timeInDays, /// TODO: Split the VC among the different validators (or do it in another contract)
             discountRate: _discountRate,
             auctionType: AuctionType.JOIN_CLUSTER_4
         });
@@ -488,7 +488,8 @@ contract Auction is
                 // Save winner's details
                 if (!winnerExists) {
                     winnersAddr[winnerCount] = _bidDetails[bidId].nodeOp;
-                    dv4Winners[winnerCount].pendingBidId = bidId;
+                    dv4Winners[winnerCount].bidId = bidId;
+                    dv4Winners[winnerCount].currentVCNumber = _bidDetails[bidId].vcNumber;
                     if (i > 0) bestAuctionScores[winnerCount] = bestAuctionScores[winnerCount - 1];
                     ++winnerCount;
                 }

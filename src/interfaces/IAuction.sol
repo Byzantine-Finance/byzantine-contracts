@@ -25,7 +25,7 @@ interface IAuction {
         // Address of the node operator who placed the bid
         address nodeOp;
         // Number of VCs the node operator wishes to buy
-        uint32 vcNumbers;
+        uint32 vcNumber;
         // Discount rate of the bid
         uint16 discountRate;
         // Auction type to know if we must update a sub-auction tree
@@ -66,9 +66,9 @@ interface IAuction {
     /// @dev When rebuying VCs, take the discount rate of the latest won bid
     struct NodeDetails {
         // Bid Id which allows the node op to join that DV
-        bytes32 latestWonBidId;
-        // Bid id of the node to add additional validators in its DV 
-        bytes32 pendingBidId;
+        bytes32 bidId;
+        // Current number of VCs of a node operator (if active, 1 VC is deducted per day)
+        uint32 currentVCNumber;
     }
 
     /* ===================== EVENTS ===================== */
