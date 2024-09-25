@@ -20,16 +20,14 @@ interface IAuction {
     struct BidDetails {
         // Necessary to remove the bids from the BSTs
         uint256 auctionScore;
-        // Price paid per validator (excluding the bond)
-        uint256 bidPriceValidator;
+        // Price paid (excluding the bond)
+        uint256 bidPrice;
         // Address of the node operator who placed the bid
         address nodeOp;
-        // Number of VCs the node operator wish to buy per validator
-        uint32 vcNumbersValidator;
+        // Number of VCs the node operator wishes to buy
+        uint32 vcNumbers;
         // Discount rate of the bid
         uint16 discountRate;
-        // The number of validators to bid for
-        uint8 numValidators;
         // Auction type to know if we must update a sub-auction tree
         AuctionType auctionType;
     }
@@ -250,20 +248,6 @@ interface IAuction {
      * @param _newMaxDiscountRate: the new maximum discount rate (i.e the max profit margin of node op) (from 0 to 10000 -> 100%)
      */
     function updateMaxDiscountRate(uint16 _newMaxDiscountRate) external;
-
-    /**
-     * @notice Update the number of default validators in a cluster of size 4
-     * @dev This function is callable only by the Auction contract's owner
-     * @param _newNumValidatorsCluster4 The new number of default validators in a cluster of size 4
-     */
-    function updateNumValidatorsCluster4(uint8 _newNumValidatorsCluster4) external;
-
-    /**
-     * @notice Update the number of default validators in a cluster of size 7
-     * @dev This function is callable only by the Auction contract's owner
-     * @param _newNumValidatorsCluster7 The new number of default validators in a cluster of size 7
-     */
-    function updateNumValidatorsCluster7(uint8 _newNumValidatorsCluster7) external;
 
     /// @dev Error when unauthorized call to a function callable only by the StrategyModuleManager.
     error OnlyStrategyModuleManager();

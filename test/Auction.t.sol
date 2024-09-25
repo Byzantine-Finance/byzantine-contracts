@@ -16,9 +16,9 @@ contract AuctionTest is ByzantineDeployer {
 
     // Some references score and bid price for specific bid parameters 
     uint256 internal auctionScore_10e2_100 = 737197890360389;
-    uint256 internal bidPriceValidator_10e2_100 = 72986301369863000;
+    uint256 internal bidPrice_10e2_100 = 72986301369863000;
     uint256 internal auctionScore_1375_129 = 708532978296286;
-    uint256 internal bidPriceValidator_1375_129 = 90229315068493080;
+    uint256 internal bidPrice_1375_129 = 90229315068493080;
 
     function setUp() public override {
         // deploy locally EigenLayer and Byzantine contracts
@@ -69,11 +69,11 @@ contract AuctionTest is ByzantineDeployer {
 
         // Test price to pay for a whitelisted nodeOp
         uint256 priceToPayWhitelisted = auction.getPriceToPayCluster4(nodeOps[0], 10e2, 100);
-        assertEq(priceToPayWhitelisted, bidPriceValidator_10e2_100 * NUM_VALIDATORS_CLUSTER_4);
+        assertEq(priceToPayWhitelisted, bidPrice_10e2_100);
 
         // Test price to pay for a non-whitelisted nodeOp
         uint256 priceToPayNotWhitelisted = auction.getPriceToPayCluster4(alice, 10e2, 100);
-        assertEq(priceToPayNotWhitelisted, (bidPriceValidator_10e2_100 + BOND) * NUM_VALIDATORS_CLUSTER_4);
+        assertEq(priceToPayNotWhitelisted, bidPrice_10e2_100 + BOND);
     }
 
     function testBid_RevertCorrectly() external {
@@ -115,11 +115,10 @@ contract AuctionTest is ByzantineDeployer {
         IAuction.BidDetails memory bid0Details = auction.getBidDetails(bid0Id);
 
         assertEq(bid0Details.auctionScore, auctionScore_10e2_100);
-        assertEq(bid0Details.bidPriceValidator, bidPriceValidator_10e2_100);
+        assertEq(bid0Details.bidPrice, bidPrice_10e2_100);
         assertEq(bid0Details.nodeOp, nodeOps[0]);
-        assertEq(bid0Details.vcNumbersValidator, 100);
+        assertEq(bid0Details.vcNumbers, 100);
         assertEq(bid0Details.discountRate, 10e2);
-        assertEq(bid0Details.numValidators, NUM_VALIDATORS_CLUSTER_4);
         assertEq(uint256(bid0Details.auctionType), uint256(IAuction.AuctionType.JOIN_CLUSTER_4));
 
         // Second bid parameter: 13.75%, 129 days
@@ -127,11 +126,10 @@ contract AuctionTest is ByzantineDeployer {
         IAuction.BidDetails memory bid1Details = auction.getBidDetails(bid1Id);
 
         assertEq(bid1Details.auctionScore, auctionScore_1375_129);
-        assertEq(bid1Details.bidPriceValidator, bidPriceValidator_1375_129);
+        assertEq(bid1Details.bidPrice, bidPrice_1375_129);
         assertEq(bid1Details.nodeOp, nodeOps[1]);
-        assertEq(bid1Details.vcNumbersValidator, 129);
+        assertEq(bid1Details.vcNumbers, 129);
         assertEq(bid1Details.discountRate, 1375);
-        assertEq(bid1Details.numValidators, NUM_VALIDATORS_CLUSTER_4);
         assertEq(uint256(bid1Details.auctionType), uint256(IAuction.AuctionType.JOIN_CLUSTER_4));
     }
 
@@ -414,21 +412,15 @@ contract AuctionTest is ByzantineDeployer {
         uint256 newExpectedDailyReturnWei = (uint256(32 ether) * 32) / (1000 * 365); // 3.2% APY
         uint16 newMaxDiscountRate = 10e2;
         uint32 newMinDuration = 60;
-        uint8 newNumValidatorsCluster4 = 6;
-        uint8 newNumValidatorsCluster7 = 9;
 
         auction.updateExpectedDailyReturnWei(newExpectedDailyReturnWei);
         auction.updateMinDuration(newMinDuration);
         auction.updateMaxDiscountRate(newMaxDiscountRate);
-        auction.updateNumValidatorsCluster4(newNumValidatorsCluster4);
-        auction.updateNumValidatorsCluster7(newNumValidatorsCluster7);
 
         // Check if the auction configuration is updated correctly
         assertEq(auction.expectedDailyReturnWei(), newExpectedDailyReturnWei);
         assertEq(auction.maxDiscountRate(), newMaxDiscountRate);
         assertEq(auction.minDuration(), newMinDuration);
-        assertEq(auction.NUM_VALIDATORS_CLUSTER_4(), newNumValidatorsCluster4);
-        assertEq(auction.NUM_VALIDATORS_CLUSTER_7(), newNumValidatorsCluster7);
     }
 
     // function test_updateClusterSize() external {

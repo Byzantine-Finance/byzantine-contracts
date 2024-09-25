@@ -31,7 +31,7 @@ library ByzantineAuctionMath {
      * @param _dailyVcPrice: daily Validation Credit price (in WEI)
      * @dev bid_price = time_in_days * vc_price
      */
-    function calculateBidPriceValidator(
+    function calculateBidPrice(
         uint32 _timeInDays,
         uint256 _dailyVcPrice
     ) internal pure returns (uint256) {

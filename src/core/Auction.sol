@@ -38,17 +38,13 @@ contract Auction is
         address _initialOwner,
         uint256 _expectedDailyReturnWei,
         uint16 _maxDiscountRate,
-        uint32 _minDuration,
-        uint8 _numValidatorCluster4,
-        uint8 _numValidatorCluster7
+        uint32 _minDuration
     ) external initializer {
         _transferOwnership(_initialOwner);
         __ReentrancyGuard_init();
         expectedDailyReturnWei = _expectedDailyReturnWei;
         maxDiscountRate = _maxDiscountRate;
         minDuration = _minDuration;
-        NUM_VALIDATORS_CLUSTER_4 = _numValidatorCluster4;
-        NUM_VALIDATORS_CLUSTER_7 = _numValidatorCluster7;
     }
 
     /* ===================== EXTERNAL FUNCTIONS ===================== */
@@ -91,14 +87,13 @@ contract Auction is
 
         // Calculate operator's bid price
         uint256 dailyVcPrice = ByzantineAuctionMath.calculateVCPrice(expectedDailyReturnWei, _discountRate, _CLUSTER_SIZE_4);
-        uint256 bidPriceValidator = ByzantineAuctionMath.calculateBidPriceValidator(_timeInDays, dailyVcPrice);
-        uint256 bidPriceCluster = bidPriceValidator * NUM_VALIDATORS_CLUSTER_4;
+        uint256 bidPrice = ByzantineAuctionMath.calculateBidPrice(_timeInDays, dailyVcPrice);
 
         // Calculate the total price to pay
         if (isWhitelisted(_nodeOpAddr)) {
-            return bidPriceCluster;
+            return bidPrice;
         }
-        return bidPriceCluster + (_BOND * NUM_VALIDATORS_CLUSTER_4);
+        return bidPrice + _BOND;
     }
 
     /**
@@ -136,8 +131,7 @@ contract Auction is
 
         // Calculate operator's bid price and score
         uint256 dailyVcPrice = ByzantineAuctionMath.calculateVCPrice(expectedDailyReturnWei, _discountRate, _CLUSTER_SIZE_4);
-        uint256 bidPriceValidator = ByzantineAuctionMath.calculateBidPriceValidator(_timeInDays, dailyVcPrice);
-        uint256 bidPriceCluster = bidPriceValidator * NUM_VALIDATORS_CLUSTER_4;
+        uint256 bidPrice = ByzantineAuctionMath.calculateBidPrice(_timeInDays, dailyVcPrice);
         uint256 auctionScore = ByzantineAuctionMath.calculateAuctionScore(dailyVcPrice, _timeInDays, reputationScore);
 
         // Calculate the bid ID (hash(msg.sender, timestamp, bidType))
@@ -149,11 +143,10 @@ contract Auction is
         // Add bid to the bids mapping
         _bidDetails[bidId] = BidDetails({
             auctionScore: auctionScore,
-            bidPriceValidator: bidPriceValidator,
+            bidPrice: bidPrice,
             nodeOp: msg.sender,
-            vcNumbersValidator: _timeInDays, /// TODO: Split the VC among the different validators (or do it in another contract)
+            vcNumbers: _timeInDays, /// TODO: Split the VC among the different validators (or do it in another contract)
             discountRate: _discountRate,
-            numValidators: NUM_VALIDATORS_CLUSTER_4,
             auctionType: AuctionType.JOIN_CLUSTER_4
         });
         // Increment the bid number of the node op
@@ -170,10 +163,10 @@ contract Auction is
         // Calculate the total price to pay, verify it and send it to the escrow contract
         uint256 priceToPay;
         if (isWhitelisted(msg.sender)) {
-            priceToPay = bidPriceCluster;
+            priceToPay = bidPrice;
         } else {
-            priceToPay = bidPriceCluster + (_BOND * NUM_VALIDATORS_CLUSTER_4);
-            _nodeOpsDetails[msg.sender].numBonds += NUM_VALIDATORS_CLUSTER_4;
+            priceToPay = bidPrice + _BOND;
+            _nodeOpsDetails[msg.sender].numBonds += 1;
         }
         _verifyEthSent(msg.value, priceToPay);
         _transferToEscrow(priceToPay);
@@ -445,24 +438,6 @@ contract Auction is
      */
     function updateMaxDiscountRate(uint16 _newMaxDiscountRate) external onlyOwner {
         maxDiscountRate = _newMaxDiscountRate;
-    }
-
-    /**
-     * @notice Update the number of default validators in a cluster of size 4
-     * @dev This function is callable only by the Auction contract's owner
-     * @param _newNumValidatorsCluster4 The new number of default validators in a cluster of size 4
-     */
-    function updateNumValidatorsCluster4(uint8 _newNumValidatorsCluster4) external onlyOwner {
-       NUM_VALIDATORS_CLUSTER_4 = _newNumValidatorsCluster4;
-    }
-
-    /**
-     * @notice Update the number of default validators in a cluster of size 7
-     * @dev This function is callable only by the Auction contract's owner
-     * @param _newNumValidatorsCluster7 The new number of default validators in a cluster of size 7
-     */
-    function updateNumValidatorsCluster7(uint8 _newNumValidatorsCluster7) external onlyOwner {
-        NUM_VALIDATORS_CLUSTER_7 = _newNumValidatorsCluster7;
     }
 
     /* ======================= PRIVATE FUNCTIONS ======================= */

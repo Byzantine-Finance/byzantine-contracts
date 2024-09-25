@@ -33,8 +33,6 @@ contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
     uint256 public currentPoSDailyReturnWei = (uint256(32 ether) * 37) / (1000 * 365); // 3.7% APY --> 3243835616438356 WEI
     uint16 public maxDiscountRate = 15e2; // 15%
     uint160 public minValidationDuration = 30; // 30 days
-    uint8 public NUM_VALIDATORS_CLUSTER_4 = 4;
-    uint8 public NUM_VALIDATORS_CLUSTER_7 = 10;
 
     /* =============== TEST VARIABLES AND STRUCT =============== */
    
@@ -156,9 +154,7 @@ contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
                 byzantineAdmin,
                 currentPoSDailyReturnWei,
                 maxDiscountRate,
-                minValidationDuration,
-                NUM_VALIDATORS_CLUSTER_4,
-                NUM_VALIDATORS_CLUSTER_7
+                minValidationDuration
             )
         );
         // Upgrade Escrow
@@ -180,8 +176,6 @@ contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
         assertEq(auction.expectedDailyReturnWei(), currentPoSDailyReturnWei);
         assertEq(auction.maxDiscountRate(), maxDiscountRate);
         assertEq(auction.minDuration(), minValidationDuration);
-        assertEq(auction.NUM_VALIDATORS_CLUSTER_4(), NUM_VALIDATORS_CLUSTER_4);
-        assertEq(auction.NUM_VALIDATORS_CLUSTER_7(), NUM_VALIDATORS_CLUSTER_7);
     }
 
 } 
