@@ -7,6 +7,7 @@ import {OwnableUpgradeable} from "@openzeppelin-upgrades/contracts/access/Ownabl
 import {BeaconProxy} from "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
 
 import {IStrategyVaultERC20} from "../interfaces/IStrategyVaultERC20.sol";
+import {IStrategyVault} from "../interfaces/IStrategyVault.sol";
 
 import "./StrategyVaultManagerStorage.sol";
 
@@ -21,13 +22,14 @@ contract StrategyVaultManager is
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor(
-        IBeacon _stratVaultBeacon,
+        IBeacon _stratVaultETHBeacon,
+        IBeacon _stratVaultERC20Beacon,
         IAuction _auction,
         IByzNft _byzNft,
         IEigenPodManager _eigenPodManager,
         IDelegationManager _delegationManager,
         PushSplitFactory _pushSplitFactory
-    ) StrategyVaultManagerStorage(_stratVaultBeacon, _auction, _byzNft, _eigenPodManager, _delegationManager, _pushSplitFactory) {
+    ) StrategyVaultManagerStorage(_stratVaultETHBeacon, _stratVaultERC20Beacon, _auction, _byzNft, _eigenPodManager, _delegationManager, _pushSplitFactory) {
         // Disable initializer in the context of the implementation contract
         _disableInitializers();
     }
@@ -91,7 +93,7 @@ contract StrategyVaultManager is
         require (getNumPendingClusters() > 0, "StrategyVaultManager.createStratVaultAndStakeNativeETH: no pending DVs");
         
         // Create a Native ETH StrategyVault
-        IStrategyVaultETH newStratVault = _deployStratVault(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE, whitelistedDeposit, upgradeable);
+        IStrategyVaultETH newStratVault = _deployStratVaultETH(whitelistedDeposit, upgradeable);
 
         // Delegate the StrategyVault towards the operator
         // TODO: Ensure StrategyVault delegating, not caller.
@@ -133,7 +135,7 @@ contract StrategyVaultManager is
         /// TODO Verify the pubkey in arguments to be sure it is using the right pubkey of a pre-created cluster. Use a monolithic blockchain
 
         // Create a Native ETH StrategyVault
-        IStrategyVaultETH newStratVault = _deployStratVault(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE, whitelistedDeposit, upgradeable);
+        IStrategyVaultETH newStratVault = _deployStratVaultETH(whitelistedDeposit, upgradeable);
 
         // Delegate the StrategyVault towards the operator
         newStratVault.delegateTo(operator);
@@ -181,7 +183,7 @@ contract StrategyVaultManager is
         address operator
     ) external {
         // Create a ERC20 StrategyVault
-        IStrategyVaultERC20 newStratVault = _deployStratVault(address(token), whitelistedDeposit, upgradeable);
+        IStrategyVaultERC20 newStratVault = _deployStratVaultERC20(address(token), whitelistedDeposit, upgradeable);
 
         // Delegate the StrategyVault towards the operator
         newStratVault.delegateTo(operator);
@@ -205,13 +207,13 @@ contract StrategyVaultManager is
     ) external {
 
         // Create a ERC20 StrategyVault
-        IStrategyVaultERC20 newStratVault = _deployStratVault(address(token), whitelistedDeposit, upgradeable);
+        IStrategyVaultERC20 newStratVault = _deployStratVaultERC20(address(token), whitelistedDeposit, upgradeable);
 
         // Delegate the StrategyVault towards the operator
         newStratVault.delegateTo(operator);
 
         // Stake ERC20
-        newStratVault.stakeERC20(strategy, token, amount);
+        newStratVault.stakeERC20(token, amount);
     }
 
     /**
@@ -266,7 +268,7 @@ contract StrategyVaultManager is
         address stratVaultAddr = address(
             Create2.computeAddress(
                 bytes32(preNftId), //salt
-                keccak256(abi.encodePacked(type(BeaconProxy).creationCode, abi.encode(stratVaultBeacon, ""))) //bytecode
+                keccak256(abi.encodePacked(type(BeaconProxy).creationCode, abi.encode(stratVaultETHBeacon, ""))) //bytecode
             )
         );
 
@@ -398,13 +400,13 @@ contract StrategyVaultManager is
     /* ============== INTERNAL FUNCTIONS ============== */
 
     /**
-     * @notice Deploy a new Strategy Vault.
-     * @param token The address of the token to be staked. Address(0) if staking ETH.
+     * @notice Deploy a new ERC20 Strategy Vault.
+     * @param token The address of the token to be staked.
      * @param whitelistedDeposit If false, anyone can deposit into the Strategy Vault. If true, only whitelisted addresses can deposit into the Strategy Vault.
      * @param upgradeable If true, the Strategy Vault is upgradeable. If false, the Strategy Vault is not upgradeable.
      * @return The address of the newly deployed Strategy Vault.
      */
-    function _deployStratVault(address token, bool whitelistedDeposit, bool upgradeable) internal returns (IStrategyVault) {
+    function _deployStratVaultERC20(address token, bool whitelistedDeposit, bool upgradeable) internal returns (IStrategyVaultERC20) {
         // mint a byzNft for the Strategy Vault's creator
         uint256 nftId = byzNft.mint(msg.sender, numStratVaults);
 
@@ -412,7 +414,7 @@ contract StrategyVaultManager is
         address stratVault = Create2.deploy(
             0,
             bytes32(nftId),
-            abi.encodePacked(type(BeaconProxy).creationCode, abi.encode(stratVaultBeacon, ""))
+            abi.encodePacked(type(BeaconProxy).creationCode, abi.encode(stratVaultERC20Beacon, ""))
         );
         IStrategyVault(stratVault).initialize(nftId, msg.sender, token, whitelistedDeposit, upgradeable);
 
@@ -422,7 +424,34 @@ contract StrategyVaultManager is
         // store the stratVault in the staker mapping
         stakerToStratVaults[msg.sender].push(stratVault);
 
-        return IStrategyVault(stratVault);
+        return IStrategyVaultERC20(stratVault);
+    }
+
+    /**
+     * @notice Deploy a new ETH Strategy Vault.
+     * @param whitelistedDeposit If false, anyone can deposit into the Strategy Vault. If true, only whitelisted addresses can deposit into the Strategy Vault.
+     * @param upgradeable If true, the Strategy Vault is upgradeable. If false, the Strategy Vault is not upgradeable.
+     * @return The address of the newly deployed Strategy Vault.
+     */
+    function _deployStratVaultETH(bool whitelistedDeposit, bool upgradeable) internal returns (IStrategyVaultETH) {
+        // mint a byzNft for the Strategy Vault's creator
+        uint256 nftId = byzNft.mint(msg.sender, numStratVaults);
+
+        // create the stratVault
+        address stratVault = Create2.deploy(
+            0,
+            bytes32(nftId),
+            abi.encodePacked(type(BeaconProxy).creationCode, abi.encode(stratVaultETHBeacon, ""))
+        );
+        IStrategyVaultETH(stratVault).initialize(nftId, msg.sender, NATIVE_ETH_STRATEGY, whitelistedDeposit, upgradeable);
+
+        // store the stratVault in the nftId mapping
+        nftIdToStratVault[nftId] = stratVault;
+
+        // store the stratVault in the staker mapping
+        stakerToStratVaults[msg.sender].push(stratVault);
+
+        return IStrategyVaultETH(stratVault);
     }
 
     function _createSplitParams() internal pure returns (
@@ -442,7 +471,7 @@ contract StrategyVaultManager is
     }
 
     function _getNewPendingCluster(address[] memory recipients, uint256[] memory allocations) internal {
-        IStrategyVault.Node[] memory nodes = auction.getAuctionWinners();
+        IStrategyVaultETH.Node[] memory nodes = auction.getAuctionWinners();
         require(nodes.length == 4, "Incompatible cluster size");
 
         for (uint8 j = 0; j < nodes.length;) {

@@ -238,7 +238,7 @@ contract StrategyVaultETH is Initializable, StrategyVaultETHStorage, AccessContr
      * @notice Returns the DV nodes details of the Strategy Vault
      * It returns the eth1Addr, the number of Validation Credit and the reputation score of each nodes.
      */
-    function getDVNodesDetails() public view onlyIfNativeRestaking returns (IStrategyVault.Node[4] memory) {
+    function getDVNodesDetails() public view onlyIfNativeRestaking returns (IStrategyVaultETH.Node[4] memory) {
         return clusterDetails.nodes;
     }
 

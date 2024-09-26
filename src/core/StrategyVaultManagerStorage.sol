@@ -18,14 +18,20 @@ abstract contract StrategyVaultManagerStorage is IStrategyVaultManager {
     /// @notice The split operators allocation
     uint256 public constant NODE_OP_SPLIT_ALLOCATION = 250_000; // 25%
 
+    /// @notice Address of the ETH token strategy
+    address public constant NATIVE_ETH_STRATEGY = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
+
     /// @notice The split distribution incentive
     uint16 public constant SPLIT_DISTRIBUTION_INCENTIVE = 20_000; // 2% for the distributor
 
     /// @notice The split total allocation
     uint256 public constant SPLIT_TOTAL_ALLOCATION = 1_000_000; // 100% is 1_000_000
 
-    /// @notice Beacon proxy to which the StrategyVaults point
-    IBeacon public immutable stratVaultBeacon;
+    /// @notice Beacon proxy to which all the StrategyVaultETHs point
+    IBeacon public immutable stratVaultETHBeacon;
+
+    /// @notice Beacon proxy to which all the StrategyVaultERC20s point
+    IBeacon public immutable stratVaultERC20Beacon;
 
     /// @notice ByzNft contract
     IByzNft public immutable byzNft;
@@ -62,14 +68,16 @@ abstract contract StrategyVaultManagerStorage is IStrategyVaultManager {
     /* ================= CONSTRUCTOR ================= */ 
 
     constructor(
-        IBeacon _stratVaultBeacon,
+        IBeacon _stratVaultETHBeacon,
+        IBeacon _stratVaultERC20Beacon,
         IAuction _auction,
         IByzNft _byzNft,
         IEigenPodManager _eigenPodManager,
         IDelegationManager _delegationManager,
         PushSplitFactory _pushSplitFactory
     ) {
-        stratVaultBeacon = _stratVaultBeacon;
+        stratVaultETHBeacon = _stratVaultETHBeacon;
+        stratVaultERC20Beacon = _stratVaultERC20Beacon;
         auction = _auction;
         byzNft = _byzNft;
         eigenPodManager = _eigenPodManager;
