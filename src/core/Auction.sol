@@ -50,23 +50,32 @@ contract Auction is
     /* ===================== EXTERNAL FUNCTIONS ===================== */
 
     /**
-     * @notice Function triggered by the StrategyModuleManager every time a staker deposit 32ETH and ask for a DV.
-     * It allows the pre-creation of a new DV for the next staker.
-     * It finds the `clusterSize` node operators with the highest auction scores and put them in a DV.
-     * @dev Reverts if not enough node operators are available.
+     * @notice Function triggered by the StrategyVaultManager or a StrategyVaultETH every time a staker deposits ETH
+     * @dev It triggers the DV Auction, returns the winning cluster ID and triggers a new sub-auction
+     * @dev Reverts if not enough node operators in the protocol
+     * @dev Reverts if the caller is not a StrategyVaultETH contract or the StrategyVaultManager
+     * @return The id of the winning cluster
      */
-    /*function getAuctionWinners()
-        external
-        onlyStategyModuleManager
-        nonReentrant
-        returns(IStrategyModule.Node[] memory)
-    {
-        // Check if enough node ops in the auction to create a DV
-        require(numNodeOpsInAuction >= clusterSize, "Not enough node ops in auction");
-        
-        // Returns the auction winners
-        return _getAuctionWinners();
-    }*/
+    function triggerAuction() external onlyStratVaultManagerOrStratVaultETH nonReentrant returns (bytes32) {
+
+        // Check if at least one DV is ready in the main auction 
+        if (_mainAuctionTree.count() < 1) revert MainAuctionEmpty();
+
+        // Get the winning cluster details
+        (bytes32 winningClusterId, uint256 winningAvgAuctionScore) = getWinningCluster();
+        _clusterDetails[winningClusterId].status = ClusterStatus.IN_CREATION;
+        ClusterDetails memory winningClusterDetails = getClusterDetails(winningClusterId);
+
+        // Remove the winning cluster from the main auction tree
+        _mainAuctionTree.remove(winningClusterId, winningAvgAuctionScore);
+
+        // If winning cluster is a newly created DV4, update dv4 sub-auction tree
+        if (_bidDetails[winningClusterDetails.nodes[0].bidId].auctionType == AuctionType.JOIN_CLUSTER_4) {
+            _mainUdateDv4SubAuction(winningClusterDetails.nodes);
+        }
+
+        return winningClusterId;
+    }
 
     /**
      * @notice Function to determine the bid price a node operator will have to pay
@@ -515,6 +524,29 @@ contract Auction is
         _dv4LatestWinningInfo.latestWinningClusterId = clusterId;
     }
 
+    /// @notice Called if a winning DV comes from the dv4 sub-auction
+    function _mainUdateDv4SubAuction(NodeDetails[] memory _nodesToRemove) private {
+
+        // Reset the latest winning info
+        _dv4LatestWinningInfo.lastestWinningScore = 0;
+        _dv4LatestWinningInfo.latestWinningClusterId = bytes32(0);
+
+        for (uint256 i = 0; i < _nodesToRemove.length;) {
+            // Remove the winning node operator bid from the dv4 sub-auction tree
+            _dv4AuctionTree.remove(_nodesToRemove[i].bidId, _bidDetails[_nodesToRemove[i].bidId].auctionScore);
+            // Update the bids number of the node op in dv4 sub-auction
+            _nodeOpsDetails[_bidDetails[_nodesToRemove[i].bidId].nodeOp].numBidsCluster4 -= 1;
+            // Update the number of node ops in dv4 sub-auction if necessary
+            if (_nodeOpsDetails[_bidDetails[_nodesToRemove[i].bidId].nodeOp].numBidsCluster4 == 0) dv4AuctionNumNodeOps -= 1;
+            unchecked {
+                ++i;
+            }
+        }
+        
+        // If enough operators in dv4 sub-auction, update main tree
+        if (dv4AuctionNumNodeOps >= _CLUSTER_SIZE_4) _dv4UpdateMainAuction();
+    }
+
     /// @notice Update the main auction tree by adding a new virtual cluster and removing the old one
     function _updateMainAuctionTree(bytes32 _newClusterId, uint256 _newAvgAuctionScore) private {
         if (_dv4LatestWinningInfo.latestWinningClusterId != bytes32(0)) {
@@ -556,8 +588,11 @@ contract Auction is
 
     /* ===================== MODIFIERS ===================== */
 
-    modifier onlyStategyModuleManager() {
-        if (msg.sender != address(strategyModuleManager)) revert OnlyStrategyModuleManager();
+    modifier onlyStratVaultManagerOrStratVaultETH() {
+        if (msg.sender != address(strategyModuleManager)) {
+            /// TODO Verify if msg.sender is a StratVaultETH through a StrategyModuleManager function
+            revert OnlyStratVaultManagerOrStratVaultETH();
+        }
         _;
     }
 

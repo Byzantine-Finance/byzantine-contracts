@@ -186,6 +186,7 @@ contract AuctionTest is ByzantineDeployer {
         // Verify the `ClusterDetails` struct
         IAuction.ClusterDetails memory winningClusterDetails = auction.getClusterDetails(winningClusterId);
         assertEq(winningClusterDetails.averageAuctionScore, highestAvgAuctionScore);
+        assertEq(uint256(winningClusterDetails.status), uint256(IAuction.ClusterStatus.INACTIVE));
         assertEq(winningClusterDetails.nodes[0].bidId, bidId1);
         assertEq(winningClusterDetails.nodes[0].currentVCNumber, 200);
         assertEq(winningClusterDetails.nodes[1].bidId, bidId3);
@@ -424,264 +425,98 @@ contract AuctionTest is ByzantineDeployer {
         assertEq(auction.minDuration(), newMinDuration);
     }
 
-    // function test_updateClusterSize() external {
-    //     // Update cluster size to 7
-    //     auction.updateClusterSize(7);
-    //     assertEq(auction.clusterSize(), 7);
-    // }
+    function test_TriggerMainAuctions() external {
 
-    // function test_getAuctionWinners_FourDiffBids() external {
-    //     // 4 node ops bid
-    //     uint256[][] memory nodeOpsAuctionScore = _4NodeOpsBidDiff();
+        // 6 nodeOps bid, 11 bids in total
+        bytes32[] memory bidIds = _createMultipleBids();
 
-    //     // Verify the number of node ops in the auction
-    //     assertEq(auction.numNodeOpsInAuction(), 4);
-        
-    //     // Get the total bids price
-    //     uint256 totalBidsPrice;
-    //     uint256 totalBonds = 3 * BOND; // Only 1 node op is whitelisted
-    //     for (uint i = 0; i < nodeOpsAuctionScore.length - 1; i++) {
-    //        totalBidsPrice += auction.getNodeOpAuctionScoreBidPrices(nodeOps[i], nodeOpsAuctionScore[i][0])[0];
-    //     }
-    //     totalBidsPrice += auction.getNodeOpAuctionScoreBidPrices(nodeOps[9], nodeOpsAuctionScore[3][0])[0];
+        // Verify the number of node ops and DV
+        assertEq(auction.dv4AuctionNumNodeOps(), 6);
+        assertEq(auction.getNumDVInAuction(), 1);
 
-    //     // Verify escrow received bids price + bonds
-    //     assertEq(address(escrow).balance, totalBidsPrice + totalBonds);
+        /* ===================== FIRST DV CREATION ===================== */
 
-    //     // Revert if not SrategyModuleManager calls createDV
-    //     vm.expectRevert(IAuction.OnlyStrategyModuleManager.selector);
-    //     auction.getAuctionWinners();
+        // Revert if the caller is not the StrategyModuleManager
+        vm.expectRevert(IAuction.OnlyStratVaultManagerOrStratVaultETH.selector);
+        auction.triggerAuction();
 
-    //     // DV: nodeOps[0], nodeOps[1], nodeOps[2], nodeOps[9]
-    //     vm.prank(address(strategyModuleManager));
-    //     IStrategyModule.Node[] memory winnersDV = auction.getAuctionWinners();
+        // A main auction is triggered
+        vm.prank(address(strategyModuleManager));
+        bytes32 firstClusterId = auction.triggerAuction();
 
-    //     // Verify Escrow contract has been drained
-    //     assertEq(address(escrow).balance, totalBonds);
-        
-    //     // Verify the DV composition
-    //     for (uint i = 0; i < winnersDV.length - 1; i++) {
-    //        assertEq(winnersDV[i].eth1Addr, nodeOps[i]);
-    //     }
-    //     assertEq(winnersDV[3].eth1Addr, nodeOps[9]);
+        // Get the winning cluster details
+        IAuction.ClusterDetails memory winningClusterDetails = auction.getClusterDetails(firstClusterId);
 
-    //     // Verify the node ops details has been updated correctly
-    //     for (uint256 i = 0; i < winnersDV.length - 1; i++) {
-    //         assertEq(auction.getNodeOpBidNumber(nodeOps[i]), 0);
-    //         uint256[] memory nodeOpBid = auction.getNodeOpAuctionScoreBidPrices(nodeOps[i], nodeOpsAuctionScore[i][0]);
-    //         uint32[] memory nodeOpVc = auction.getNodeOpAuctionScoreVcs(nodeOps[i], nodeOpsAuctionScore[i][0]);
-    //         assertEq(nodeOpBid.length, 0);
-    //         assertEq(nodeOpVc.length, 0);
-    //     }
-    //     assertEq(auction.getNodeOpBidNumber(nodeOps[9]), 0);
-    //     uint256[] memory nodeOp9Bid = auction.getNodeOpAuctionScoreBidPrices(nodeOps[9], nodeOpsAuctionScore[3][0]);
-    //     uint32[] memory nodeOp9Vc = auction.getNodeOpAuctionScoreVcs(nodeOps[9], nodeOpsAuctionScore[3][0]);
-    //     assertEq(nodeOp9Bid.length, 0);
-    //     assertEq(nodeOp9Vc.length, 0);
+        // Get the winning bid ids
+        bytes32[] memory winningBidIds = new bytes32[](4);
+        winningBidIds[0] = winningClusterDetails.nodes[0].bidId;
+        winningBidIds[1] = winningClusterDetails.nodes[1].bidId;
+        winningBidIds[2] = winningClusterDetails.nodes[2].bidId;
+        winningBidIds[3] = winningClusterDetails.nodes[3].bidId;
 
-    //     // Revert when not enough nodeOps in Auction
-    //     assertEq(auction.numNodeOpsInAuction(), 0);
-    //     vm.prank(address(strategyModuleManager));
-    //     vm.expectRevert(bytes("Not enough node ops in auction"));
-    //     auction.getAuctionWinners();
+        // Verify the winning bids
+        assertEq(winningBidIds[0], bidIds[8]);
+        assertEq(winningBidIds[1], bidIds[0]);
+        assertEq(winningBidIds[2], bidIds[2]);
+        assertEq(winningBidIds[3], bidIds[9]);
+        // Verify the winning node op addresses
+        assertEq(_getBidIdNodeAddr(bidIds[8]), nodeOps[3]);
+        assertEq(_getBidIdNodeAddr(bidIds[0]), nodeOps[0]);
+        assertEq(_getBidIdNodeAddr(bidIds[2]), nodeOps[1]);
+        assertEq(_getBidIdNodeAddr(bidIds[9]), nodeOps[4]);
+        // Verify the number of VCs of each node op
+        assertEq(winningClusterDetails.nodes[0].currentVCNumber, 210);
+        assertEq(winningClusterDetails.nodes[1].currentVCNumber, 200);
+        assertEq(winningClusterDetails.nodes[2].currentVCNumber, 200);
+        assertEq(winningClusterDetails.nodes[3].currentVCNumber, 175);
+        // Verify the cluster status
+        assertEq(uint256(winningClusterDetails.status), uint256(IAuction.ClusterStatus.IN_CREATION));
 
-    // }
+        // Verify the number of node ops and DV
+        assertEq(auction.dv4AuctionNumNodeOps(), 4);
+        assertEq(auction.getNumDVInAuction(), 1);
 
-    // function test_getAuctionWinners_EightSameBids() external {
-    //     // 4 node ops bids 2 times (all of them have the same bids)
-    //     uint256[][] memory nodeOpsAuctionScore = _4NodeOpsBidSame();
+        /* ===================== SECOND DV CREATION ===================== */
 
-    //     // Calculate the price paid by node ops
-    //     uint256 totalBonds = 8 * BOND; // Every node op has 2 bonds
-    //     uint256 totalFirstBidPrice;
-    //     for (uint i = 0; i < nodeOpsAuctionScore.length; i++) {
-    //         totalFirstBidPrice += auction.getNodeOpAuctionScoreBidPrices(nodeOps[i], nodeOpsAuctionScore[i][0])[0];
-    //     }
-    //     uint256 totalSecondBidPrice;
-    //     for (uint i = 0; i < nodeOpsAuctionScore.length; i++) {
-    //         totalSecondBidPrice += auction.getNodeOpAuctionScoreBidPrices(nodeOps[i], nodeOpsAuctionScore[i][1])[0];
-    //     }
-    //     // Verify escrow received bids price + bonds
-    //     assertEq(address(escrow).balance, totalFirstBidPrice + totalSecondBidPrice + totalBonds);
+        // A main auction is triggered
+        vm.prank(address(strategyModuleManager));
+        bytes32 secondClusterId = auction.triggerAuction();
 
-    //     // Verify the number of node ops in the auction
-    //     assertEq(auction.numNodeOpsInAuction(), 4);
+        // Get the second winning cluster details
+        winningClusterDetails = auction.getClusterDetails(secondClusterId);
 
-    //     /* ============= 1st DV ============= */
+        // Get the second DV winning bid ids
+        winningBidIds[0] = winningClusterDetails.nodes[0].bidId;
+        winningBidIds[1] = winningClusterDetails.nodes[1].bidId;
+        winningBidIds[2] = winningClusterDetails.nodes[2].bidId;
+        winningBidIds[3] = winningClusterDetails.nodes[3].bidId;
 
-    //     // DV1: nodeOps[0], nodeOps[1], nodeOps[2], nodeOps[3]
-    //     vm.prank(address(strategyModuleManager));
-    //     IStrategyModule.Node[] memory winnersDV1 = auction.getAuctionWinners();
+        // Verify the winning bids
+        assertEq(winningBidIds[0], bidIds[3]); // How the RedBlackTreeLib is implemented --> last element overwrites the first one
+        assertEq(winningBidIds[1], bidIds[1]);
+        assertEq(winningBidIds[2], bidIds[4]);
+        assertEq(winningBidIds[3], bidIds[10]);
+        // Verify the winning node op addresses
+        assertEq(_getBidIdNodeAddr(bidIds[3]), nodeOps[1]);
+        assertEq(_getBidIdNodeAddr(bidIds[1]), nodeOps[0]);
+        assertEq(_getBidIdNodeAddr(bidIds[4]), nodeOps[2]);
+        assertEq(_getBidIdNodeAddr(bidIds[10]), nodeOps[5]);
+        // Verify the cluster status
+        assertEq(uint256(winningClusterDetails.status), uint256(IAuction.ClusterStatus.IN_CREATION));
 
-    //     // Verify the DV composition
-    //     assertEq(winnersDV1[0].eth1Addr, nodeOps[0]);
-    //     assertEq(winnersDV1[1].eth1Addr, nodeOps[1]);
-    //     assertEq(winnersDV1[2].eth1Addr, nodeOps[2]);
-    //     assertEq(winnersDV1[3].eth1Addr, nodeOps[3]);
+        // Verify the number of node ops and DV
+        assertEq(auction.dv4AuctionNumNodeOps(), 1);
+        assertEq(auction.getNumDVInAuction(), 0);
 
-    //     // Verify escrow received bids price + bonds
-    //     assertEq(address(escrow).balance, totalSecondBidPrice + totalBonds);
+        /* ===================== THIRD DV CREATION FAILED ===================== */
 
-    //     // Verify the number of node ops in the auction
-    //     assertEq(auction.numNodeOpsInAuction(), 4);
+        // Cannot trigger a new auction if not enough node operators to create a new DV
+        vm.expectRevert(IAuction.MainAuctionEmpty.selector);
+        vm.prank(address(strategyModuleManager));
+        auction.triggerAuction();
+    }
 
-    //     /* ============= 2nd DV ============= */
-
-    //     // DV2: nodeOps[0], nodeOps[1], nodeOps[2], nodeOps[3]
-    //     vm.prank(address(strategyModuleManager));
-    //     IStrategyModule.Node[] memory winnersDV2 = auction.getAuctionWinners();
-
-    //     // Verify the DV composition
-    //     assertEq(winnersDV2[0].eth1Addr, nodeOps[0]);
-    //     assertEq(winnersDV2[1].eth1Addr, nodeOps[3]);
-    //     assertEq(winnersDV2[2].eth1Addr, nodeOps[2]);
-    //     assertEq(winnersDV2[3].eth1Addr, nodeOps[1]);
-
-    //     // Verify the number of node ops in the auction
-    //     assertEq(auction.numNodeOpsInAuction(), 0);
-
-    //     // Verify escrow has been drained
-    //     assertEq(address(escrow).balance, totalBonds);
-
-    // }
-
-    // function test_getAuctionWinners_ThreeSameBids_WinnerAlreadyExists() external {
-    //     // 4 node ops bid (three bids are similar)
-    //     uint256[][] memory nodeOpsAuctionScore = _4NodeOpsBid_ThreeSame_WinnerAlreadyExists();
-
-    //     // Verify the number of node ops in the auction
-    //     assertEq(auction.numNodeOpsInAuction(), 4);
-
-    //     // DV: nodeOps[0], nodeOps[1], nodeOps[2], nodeOps[3]
-    //     vm.prank(address(strategyModuleManager));
-    //     IStrategyModule.Node[] memory winnersDV = auction.getAuctionWinners();
-        
-    //     // Verify the DV composition
-    //     assertEq(winnersDV[0].eth1Addr, nodeOps[0]);
-    //     assertEq(winnersDV[1].eth1Addr, nodeOps[2]);
-    //     assertEq(winnersDV[2].eth1Addr, nodeOps[1]);
-    //     assertEq(winnersDV[3].eth1Addr, nodeOps[3]);
-
-    //     // Verify the node ops details has been updated correctly
-    //     for (uint256 i = 0; i < winnersDV.length; i++) {
-    //         if (i != 2) {
-    //             assertEq(auction.getNodeOpBidNumber(nodeOps[i]), 0);
-    //             uint256[] memory nodeOpBid = auction.getNodeOpAuctionScoreBidPrices(nodeOps[i], nodeOpsAuctionScore[i][0]);
-    //             uint32[] memory nodeOpVc = auction.getNodeOpAuctionScoreVcs(nodeOps[i], nodeOpsAuctionScore[i][0]);
-    //             assertEq(nodeOpBid.length, 0);
-    //             assertEq(nodeOpVc.length, 0);
-    //         } else {
-    //             assertEq(auction.getNodeOpBidNumber(nodeOps[i]), 1);
-    //             uint256[] memory nodeOp2Bid1 = auction.getNodeOpAuctionScoreBidPrices(nodeOps[i], nodeOpsAuctionScore[i][0]);
-    //             uint32[] memory nodeOp2Vc1 = auction.getNodeOpAuctionScoreVcs(nodeOps[i], nodeOpsAuctionScore[i][0]);
-    //             assertEq(nodeOp2Bid1.length, 0);
-    //             assertEq(nodeOp2Vc1.length, 0);
-    //             uint256[] memory nodeOp2Bid2 = auction.getNodeOpAuctionScoreBidPrices(nodeOps[i], nodeOpsAuctionScore[i][1]);
-    //             uint32[] memory nodeOp2Vc2 = auction.getNodeOpAuctionScoreVcs(nodeOps[i], nodeOpsAuctionScore[i][1]);
-    //             assertEq(nodeOp2Bid2.length, 1);
-    //             assertEq(nodeOp2Vc2.length, 1);
-    //             assertEq(nodeOp2Bid2[0], bidPrice_one_Bid[0]);
-    //             assertEq(nodeOp2Vc2[0], 100);
-    //         }
-    //     }
-
-    //     // Verify the number of node ops in the auction
-    //     assertEq(auction.numNodeOpsInAuction(), 1);
-    // }
-
-    // function test_CreateMultipleDVs() external {
-    //     // 10 node ops bid (real life example)
-    //     uint256[][] memory nodeOpsAuctionScore = _10NodeOpsBid();
-
-    //     // Verify the number of node ops in the auction
-    //     assertEq(auction.numNodeOpsInAuction(), 10);
-
-    //     /* ===================== FIRST DV ===================== */
-
-    //     // DV1: nodeOps[0], nodeOps[6], nodeOps[2], nodeOps[4]
-    //     vm.prank(address(strategyModuleManager));
-    //     IStrategyModule.Node[] memory winnersDV1 = auction.getAuctionWinners();
-        
-    //     // Verify the DV1 composition
-    //     assertEq(winnersDV1[0].eth1Addr, nodeOps[0]);
-    //     assertEq(winnersDV1[1].eth1Addr, nodeOps[6]);
-    //     assertEq(winnersDV1[2].eth1Addr, nodeOps[2]);
-    //     assertEq(winnersDV1[3].eth1Addr, nodeOps[4]);
-
-    //     // Verify the number of node ops in the auction
-    //     assertEq(auction.numNodeOpsInAuction(), 9);
-
-    //     /* ===================== SECOND DV ===================== */
-
-    //     // DV2: nodeOps[0], nodeOps[6], nodeOps[2], nodeOps[5]
-    //     vm.prank(address(strategyModuleManager));
-    //     IStrategyModule.Node[] memory winnersDV2 = auction.getAuctionWinners();
-        
-    //     // Verify the DV2 composition
-    //     assertEq(winnersDV2[0].eth1Addr, nodeOps[0]);
-    //     assertEq(winnersDV2[1].eth1Addr, nodeOps[6]);
-    //     assertEq(winnersDV2[2].eth1Addr, nodeOps[2]);
-    //     assertEq(winnersDV2[3].eth1Addr, nodeOps[5]);
-
-    //     // Verify the number of node ops in the auction
-    //     assertEq(auction.numNodeOpsInAuction(), 8);
-
-    //     /* ===================== THIRD DV ===================== */
-
-    //     // DV2: nodeOps[0], nodeOps[6], nodeOps[2], nodeOps[1]
-    //     vm.prank(address(strategyModuleManager));
-    //     IStrategyModule.Node[] memory winnersDV3 = auction.getAuctionWinners();
-        
-    //     // Verify the DV3 composition
-    //     assertEq(winnersDV3[0].eth1Addr, nodeOps[0]);
-    //     assertEq(winnersDV3[1].eth1Addr, nodeOps[6]);
-    //     assertEq(winnersDV3[2].eth1Addr, nodeOps[2]);
-    //     assertEq(winnersDV3[3].eth1Addr, nodeOps[1]);
-
-    //     // Verify the number of node ops in the auction
-    //     assertEq(auction.numNodeOpsInAuction(), 5);
-
-    //     /* ===================== FOURTH DV ===================== */
-
-    //     // DV2: nodeOps[1], nodeOps[3], nodeOps[7], nodeOps[9]
-    //     vm.prank(address(strategyModuleManager));
-    //     IStrategyModule.Node[] memory winnersDV4 = auction.getAuctionWinners();
-        
-    //     // Verify the DV4 composition
-    //     assertEq(winnersDV4[0].eth1Addr, nodeOps[1]);
-    //     assertEq(winnersDV4[1].eth1Addr, nodeOps[3]);
-    //     assertEq(winnersDV4[2].eth1Addr, nodeOps[7]);
-    //     assertEq(winnersDV4[3].eth1Addr, nodeOps[9]);
-
-    //     // Verify the number of node ops in the auction
-    //     assertEq(auction.numNodeOpsInAuction(), 3);
-
-    //     /* ===================== NOT ENOUGH NODE OPS IN AUCTION ===================== */
-    //     vm.prank(address(strategyModuleManager));
-    //     vm.expectRevert(bytes("Not enough node ops in auction"));
-    //     auction.getAuctionWinners();
-
-    //     // Verify remaining bids of nodeOps[3]
-    //     uint256[] memory nodeOp3Bid1 = auction.getNodeOpAuctionScoreBidPrices(nodeOps[3], nodeOpsAuctionScore[3][1]);
-    //     uint32[] memory nodeOp3Vc1 = auction.getNodeOpAuctionScoreVcs(nodeOps[3], nodeOpsAuctionScore[3][1]);
-    //     assertEq(nodeOp3Bid1.length, 2);
-    //     assertEq(nodeOp3Vc1.length, 2);
-    //     assertEq(nodeOp3Bid1[0], bidPrices_five_SameDiffBids[0]);
-    //     assertEq(nodeOp3Bid1[1], bidPrices_five_SameDiffBids[1]);
-    //     assertEq(nodeOp3Vc1[0], 30);
-    //     assertEq(nodeOp3Vc1[1], 30);
-    //     uint256[] memory nodeOp3Bid2 = auction.getNodeOpAuctionScoreBidPrices(nodeOps[3], nodeOpsAuctionScore[3][4]);
-    //     uint32[] memory nodeOp3Vc2 = auction.getNodeOpAuctionScoreVcs(nodeOps[3], nodeOpsAuctionScore[3][4]);
-    //     assertEq(nodeOp3Bid2.length, 2);
-    //     assertEq(nodeOp3Vc2.length, 2);
-    //     assertEq(nodeOp3Bid2[0], bidPrices_five_SameDiffBids[4]);
-    //     assertEq(nodeOp3Bid2[1], bidPrices_five_SameDiffBids[4]);
-    //     assertEq(nodeOp3Vc2[0], 30);
-    //     assertEq(nodeOp3Vc2[1], 30);
-
-    // }
-
-    // /* ===================== HELPER FUNCTIONS ===================== */
+    /* ===================== HELPER FUNCTIONS ===================== */
 
     function _bidCluster4(
         address _nodeOp,
@@ -698,6 +533,11 @@ contract AuctionTest is ByzantineDeployer {
     function _getBidIdAuctionScore(bytes32 _bidId) internal view returns (uint256) {
         IAuction.BidDetails memory bidDetails = auction.getBidDetails(_bidId);
         return bidDetails.auctionScore;
+    }
+
+    function _getBidIdNodeAddr(bytes32 _bidId) internal view returns (address) {
+        IAuction.BidDetails memory bidDetails = auction.getBidDetails(_bidId);
+        return bidDetails.nodeOp;
     }
 
     function _calculateAvgAuctionScore(uint256[] memory _auctionScores) internal pure returns (uint256) {
@@ -736,63 +576,33 @@ contract AuctionTest is ByzantineDeployer {
     //     auction.withdrawBid();
     // }
 
-    // function _4NodeOpsBidDiff() internal returns (uint256[][] memory) {
-    //     (uint16[] memory first_DR, uint32[] memory first_time) = _createOneBidParamArray(11e2, 400);
-    //     (uint16[] memory second_DR, uint32[] memory second_time) = _createOneBidParamArray(11e2, 300);
-    //     (uint16[] memory third_DR, uint32[] memory third_time) = _createOneBidParamArray(11e2, 200);
-    //     (uint16[] memory fourth_DR, uint32[] memory fourth_time) = _createOneBidParamArray(11e2, 100);
+    function _createMultipleBids() internal returns (bytes32[] memory) {
+        bytes32[] memory bidIds = new bytes32[](11);
 
-    //     NodeOpBid[] memory nodeOpsBid = new NodeOpBid[](4);
-    //     nodeOpsBid[0] = NodeOpBid(nodeOps[0], first_DR, first_time); // 1st
-    //     nodeOpsBid[1] = NodeOpBid(nodeOps[1], second_DR, second_time); // 2nd
-    //     nodeOpsBid[2] = NodeOpBid(nodeOps[2], third_DR, third_time); // 3rd
-    //     nodeOpsBid[3] = NodeOpBid(nodeOps[9], fourth_DR, fourth_time); // 4th
-        
-    //     return _nodeOpsBid(nodeOpsBid);
-    // }
+        // nodeOps[0] bids 2 times with the same parameters
+        bidIds[0] = _bidCluster4(nodeOps[0], 5e2, 200); // 2nd
+        bidIds[1] = _bidCluster4(nodeOps[0], 5e2, 200); // 2nd
 
-    // function _4NodeOpsBidSame() internal returns (uint256[][] memory) {
-    //     (uint16[] memory discounts, uint32[] memory times) = _createTwoBidsParamArray(11e2, 100, 11e2, 100);
+        // nodeOps[1] bids 2 times with the same parameters
+        bidIds[2] = _bidCluster4(nodeOps[1], 5e2, 200); // 3rd
+        bidIds[3] = _bidCluster4(nodeOps[1], 5e2, 200); // 3rd
 
-    //     NodeOpBid[] memory nodeOpsBid = new NodeOpBid[](4);
-    //     nodeOpsBid[0] = NodeOpBid(nodeOps[0], discounts, times); // 1st // 2nd
-    //     nodeOpsBid[1] = NodeOpBid(nodeOps[1], discounts, times); // 1st // 2nd
-    //     nodeOpsBid[2] = NodeOpBid(nodeOps[2], discounts, times); // 1st // 2nd
-    //     nodeOpsBid[3] = NodeOpBid(nodeOps[3], discounts, times); // 1st // 2nd
+        // nodeOps[2] bids 4 times with different parameters
+        bidIds[4] = _bidCluster4(nodeOps[2], 5e2, 150); // 5th
+        bidIds[5] = _bidCluster4(nodeOps[2], 5e2, 149); // 5th
+        bidIds[6] = _bidCluster4(nodeOps[2], 5e2, 148); // 5th
+        bidIds[7] = _bidCluster4(nodeOps[2], 5e2, 147); // 5th
 
-    //     return _nodeOpsBid(nodeOpsBid);
-    // }
+        // nodeOps[3] bids and takes the first position
+        bidIds[8] = _bidCluster4(nodeOps[3], 5e2, 210); // 1st
 
-    // function _4NodeOpsBid_ThreeSame_WinnerAlreadyExists() internal returns (uint256[][] memory) {
-    //     (uint16[] memory first_DR, uint32[] memory first_time) = _createOneBidParamArray(11e2, 400);
-    //     (uint16[] memory second_DR, uint32[] memory second_time) = _createTwoBidsParamArray(11e2, 400, 10e2, 100);
-    //     (uint16[] memory third_DR, uint32[] memory third_time) = _createOneBidParamArray(11e2, 100);
+        // nodeOps[4] bids and takes the fourth position
+        bidIds[9] = _bidCluster4(nodeOps[4], 5e2, 175); // 4th
 
-    //     NodeOpBid[] memory nodeOpsBid = new NodeOpBid[](4);
-    //     nodeOpsBid[0] = NodeOpBid(nodeOps[0], first_DR, first_time); // 1st
-    //     nodeOpsBid[1] = NodeOpBid(nodeOps[1], first_DR, first_time); // 1st
-    //     nodeOpsBid[2] = NodeOpBid(nodeOps[2], second_DR, second_time); // 1st // 2nd -> not taken cause node op already exists
-    //     nodeOpsBid[3] = NodeOpBid(nodeOps[3], third_DR, third_time); // 4th
-        
-    //     return _nodeOpsBid(nodeOpsBid);
-    // }
+        // nodeOps[5] bids
+        bidIds[10] = _bidCluster4(nodeOps[5], 14e2, 50); // 6th
 
-    // function _10NodeOpsBid() internal returns (uint256[][] memory) {
-    //     (uint16[] memory small_DR, uint32[] memory small_time) = _createOneBidParamArray(15e2, 30);
-
-    //     NodeOpBid[] memory nodeOpBids = new NodeOpBid[](10);
-    //     nodeOpBids[0] = NodeOpBid(nodeOps[0], three_DiffDiscountRates, three_DiffTimesInDays); // 1st // 5th // 9th --
-    //     nodeOpBids[1] = NodeOpBid(nodeOps[1], five_SameDiffDiscountRates, five_SameDiffTimesInDays); // 12th // 13th
-    //     nodeOpBids[2] = NodeOpBid(nodeOps[2], three_DiffDiscountRates, three_DiffTimesInDays); // 3rd // 7th // 11th --
-    //     nodeOpBids[3] = NodeOpBid(nodeOps[3], five_SameDiffDiscountRates, five_SameDiffTimesInDays); // 14th 
-    //     nodeOpBids[4] = NodeOpBid(nodeOps[4], one_DiscountRates, one_TimesInDays);  // 4th --
-    //     nodeOpBids[5] = NodeOpBid(nodeOps[5], one_DiscountRates, one_TimesInDays);  // 8th --
-    //     nodeOpBids[6] = NodeOpBid(nodeOps[6], three_DiffDiscountRates, three_DiffTimesInDays);  // 2nd // 6th // 10th --
-    //     nodeOpBids[7] = NodeOpBid(nodeOps[7], small_DR, small_time);  // 15th --
-    //     nodeOpBids[8] = NodeOpBid(nodeOps[8], small_DR, small_time);  
-    //     nodeOpBids[9] = NodeOpBid(nodeOps[9], small_DR, small_time);  // 16th --
-        
-    //     return _nodeOpsBid(nodeOpBids);
-    // }
+        return bidIds;
+    }
 
 }

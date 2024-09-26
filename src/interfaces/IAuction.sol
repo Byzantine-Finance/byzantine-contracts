@@ -10,8 +10,15 @@ interface IAuction {
     /// @notice Defines the types of auctions available
     enum AuctionType {
         JOIN_CLUSTER_4,
-        JOIN_CLUSTER_7,
-        ALREADY_EXISTING_CLUSTER
+        JOIN_CLUSTER_7
+    }
+
+    /// @notice Defines the status of a cluster
+    enum ClusterStatus {
+        INACTIVE,
+        IN_CREATION,
+        DEPOSITED_NOT_VERIFIED,
+        DEPOSITED_VERIFIED
     }
 
     /* ===================== STRUCTS ===================== */
@@ -59,6 +66,7 @@ interface IAuction {
     struct ClusterDetails {
         uint256 averageAuctionScore;
         NodeDetails[] nodes;
+        ClusterStatus status;
     }
 
     /// @notice Stores a node operator DV details
@@ -139,12 +147,13 @@ interface IAuction {
     /* ===================== EXTERNAL FUNCTIONS ===================== */
 
     /**
-     * @notice Function triggered by the StrategyModuleManager every time a staker deposit 32ETH and ask for a DV.
-     * It allows the pre-creation of a new DV for the next staker.
-     * It finds the `clusterSize` node operators with the highest auction scores and put them in a DV.
-     * @dev Reverts if not enough node operators are available.
+     * @notice Function triggered by the StrategyVaultManager or a StrategyVaultETH every time a staker deposits ETH
+     * @dev It triggers the DV Auction, returns the winning cluster ID and triggers a new sub-auction
+     * @dev Reverts if not enough node operators in the protocol
+     * @dev Reverts if the caller is not a StrategyVaultETH contract or the StrategyVaultManager
+     * @return The id of the winning cluster
      */
-    // function getAuctionWinners() external returns(IStrategyModule.Node[] memory);
+    function triggerAuction() external returns (bytes32);
 
     /**
      * @notice Function to determine the bid price a node operator will have to pay
@@ -249,8 +258,8 @@ interface IAuction {
      */
     function updateMaxDiscountRate(uint16 _newMaxDiscountRate) external;
 
-    /// @dev Error when unauthorized call to a function callable only by the StrategyModuleManager.
-    error OnlyStrategyModuleManager();
+    /// @dev Error when unauthorized call to a function callable only by the StrategyVaultManager or a StratVaultETH.
+    error OnlyStratVaultManagerOrStratVaultETH();
 
     /// @dev Error when address already whitelisted
     error AlreadyWhitelisted();
@@ -272,4 +281,7 @@ interface IAuction {
 
     /// @dev Returned when a bid refund failed
     error RefundFailed();
+
+    /// @dev Returned when the main auction tree is empty, and therefore when it's not possible to create a new DV
+    error MainAuctionEmpty();
 }
