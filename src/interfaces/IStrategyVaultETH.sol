@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "eigenlayer-contracts/libraries/BeaconChainProofs.sol";
-import { SplitV2Lib } from "splits-v2/libraries/SplitV2.sol";
+import {BeaconChainProofs} from "eigenlayer-contracts/libraries/BeaconChainProofs.sol";
+import {SplitV2Lib} from "splits-v2/libraries/SplitV2.sol";
 
-interface IStrategyVault {
+interface IStrategyVaultETH {
 
   enum DVStatus {
     NATIVE_RESTAKING_NOT_ACTIVATED, // Native restaking is not activated and 0 ETH has been deposited
@@ -123,7 +123,7 @@ interface IStrategyVault {
    * @notice Returns the DV nodes details of the Strategy Vault
    * It returns the eth1Addr, the number of Validation Credit and the reputation score of each nodes.
    */
-  function getDVNodesDetails() external view returns (IStrategyVault.Node[4] memory);
+  function getDVNodesDetails() external view returns (IStrategyVaultETH.Node[4] memory);
 
   /**
    * @notice Returns the address of the Split contract.

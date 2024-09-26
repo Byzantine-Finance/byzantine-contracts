@@ -1,22 +1,22 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
-import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-import "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
+import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 
-import "../../src/core/StrategyVaultManager.sol";
-import "../../src/core/StrategyVault.sol";
-import "../../src/tokens/ByzNft.sol";
-import "../../src/core/Auction.sol";
-import "../../src/vault/Escrow.sol";
+import {StrategyVaultManager} from "../../src/core/StrategyVaultManager.sol";
+import {StrategyVaultERC20} from "../../src/core/StrategyVaultERC20.sol";
+import {ByzNft} from "../../src/tokens/ByzNft.sol";
+import {Auction} from "../../src/core/Auction.sol";
+import {Escrow} from "../../src/vault/Escrow.sol";
 
-import "eigenlayer-contracts/pods/EigenPodManager.sol";
-import "eigenlayer-contracts/core/DelegationManager.sol";
+import {EigenPodManager} from "eigenlayer-contracts/pods/EigenPodManager.sol";
+import {DelegationManager} from "eigenlayer-contracts/core/DelegationManager.sol";
 
-import "splits-v2/splitters/push/PushSplitFactory.sol";
+import {PushSplitFactory} from "splits-v2/splitters/push/PushSplitFactory.sol";
 
-import "../../test/mocks/EmptyContract.sol";
+import {EmptyContract} from "../../test/mocks/EmptyContract.sol";
 
 import "forge-std/Script.sol";
 import "forge-std/Test.sol";

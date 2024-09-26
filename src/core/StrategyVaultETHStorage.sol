@@ -1,15 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "../interfaces/IStrategyVaultETH.sol";
-import "../interfaces/IByzNft.sol";
-import "../interfaces/IStrategyVaultManager.sol";
-import "../interfaces/IAuction.sol";
-import "eigenlayer-contracts/interfaces/IEigenPodManager.sol";
-import "eigenlayer-contracts/interfaces/IEigenPod.sol";
-import "eigenlayer-contracts/interfaces/IDelegationManager.sol";
+import {IByzNft} from "../interfaces/IByzNft.sol";
+import {IStrategyVaultManager} from "../interfaces/IStrategyVaultManager.sol";
+import {IAuction} from "../interfaces/IAuction.sol";
+import {IEigenPodManager} from "eigenlayer-contracts/interfaces/IEigenPodManager.sol";
+import {IEigenPod} from "eigenlayer-contracts/interfaces/IEigenPod.sol";
+import {IDelegationManager} from "eigenlayer-contracts/interfaces/IDelegationManager.sol";
 
-abstract contract StrategyVaultStorage is IStrategyVault {
+import "../interfaces/IStrategyVaultETH.sol";
+
+abstract contract StrategyVaultETHStorage is IStrategyVaultETH {
 
     /* ============== CONSTANTS + IMMUTABLES ============== */
 

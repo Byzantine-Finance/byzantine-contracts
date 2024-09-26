@@ -1,23 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "@openzeppelin/contracts/utils/Create2.sol";
-import "@openzeppelin-upgrades/contracts/proxy/utils/Initializable.sol";
-import "@openzeppelin-upgrades/contracts/access/OwnableUpgradeable.sol";
-import "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
+import {Create2} from "@openzeppelin/contracts/utils/Create2.sol";
+import {Initializable} from "@openzeppelin-upgrades/contracts/proxy/utils/Initializable.sol";
+import {OwnableUpgradeable} from "@openzeppelin-upgrades/contracts/access/OwnableUpgradeable.sol";
+import {BeaconProxy} from "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
 
-import "eigenlayer-contracts/interfaces/IEigenPodManager.sol";
-//import "eigenlayer-contracts/interfaces/IStrategyManager.sol";
-import "eigenlayer-contracts/interfaces/IDelegationManager.sol";
-
-import { PushSplitFactory } from "splits-v2/splitters/push/PushSplitFactory.sol";
+import {IStrategyVaultERC20} from "../interfaces/IStrategyVaultERC20.sol";
 
 import "./StrategyVaultManagerStorage.sol";
-
-import "../interfaces/IByzNft.sol";
-import "../interfaces/IAuction.sol";
-import "../interfaces/IStrategyVaultERC20.sol";
-import "../interfaces/IStrategyVaultETH.sol";
 
 // TODO: Emit events to notify what happened
 
@@ -300,7 +291,7 @@ contract StrategyVaultManager is
      * @param clusterIndex The index of the pending cluster you want to know the node details.
      * @dev If the index does not exist, it returns the default value of the Node struct.
      */
-    function getPendingClusterNodeDetails(uint64 clusterIndex) public view returns (IStrategyVault.Node[4] memory) {
+    function getPendingClusterNodeDetails(uint64 clusterIndex) public view returns (IStrategyVaultETH.Node[4] memory) {
         return pendingClusters[clusterIndex].nodes;
     }
 

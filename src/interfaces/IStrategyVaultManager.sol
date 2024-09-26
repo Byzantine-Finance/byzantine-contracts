@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "eigenlayer-contracts/interfaces/IEigenPod.sol";
-import { SplitV2Lib } from "splits-v2/libraries/SplitV2.sol";
-import "../interfaces/IStrategyVaultETH.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IEigenPod} from "eigenlayer-contracts/interfaces/IEigenPod.sol";
+import {IStrategy} from "eigenlayer-contracts/interfaces/IStrategy.sol";
+import {SplitV2Lib} from "splits-v2/libraries/SplitV2.sol";
+import {IStrategyVaultETH} from "./IStrategyVaultETH.sol";
 
 interface IStrategyVaultManager {
 

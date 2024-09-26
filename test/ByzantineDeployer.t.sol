@@ -10,7 +10,7 @@ import "./eigenlayer-helper/EigenLayerDeployer.t.sol";
 import "./splits-helper/SplitsV2Deployer.t.sol";
 
 import "../src/core/StrategyVaultManager.sol";
-import "../src/core/StrategyVault.sol";
+import "../src/core/StrategyVaultETH.sol";
 import "../src/tokens/ByzNft.sol";
 import "../src/core/Auction.sol";
 import "../src/vault/Escrow.sol";
@@ -94,15 +94,15 @@ contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
             payable(address(new TransparentUpgradeableProxy(address(emptyContract), address(byzantineProxyAdmin), "")))
         );
 
-        // StrategyVault implementation contract
-        IStrategyVault strategyVaultImplementation = new StrategyVault(
+        // StrategyVaultETH implementation contract
+        IStrategyVault strategyVaultImplementation = new StrategyVaultETH(
             strategyVaultManager,
             auction,
             byzNft,
             eigenPodManager,
             delegation
         );
-        // StrategyVault beacon contract. The Beacon Proxy contract is deployed in the StrategyVaultManager
+        // StrategyVaultETH beacon contract. The Beacon Proxy contract is deployed in the StrategyVaultManager
         // This contract points to the implementation contract.
         strategyVaultBeacon = new UpgradeableBeacon(address(strategyVaultImplementation));
 

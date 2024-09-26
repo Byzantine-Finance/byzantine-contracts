@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "eigenlayer-contracts/interfaces/IStrategy.sol";
+import {IStrategy} from "eigenlayer-contracts/interfaces/IStrategy.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-interface IStrategyVault {
+interface IStrategyVaultERC20 {
 
     /**
      * @notice Used to initialize the StrategyVault given it's setup parameters.

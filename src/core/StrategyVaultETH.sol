@@ -1,19 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "@openzeppelin-upgrades/contracts/proxy/utils/Initializable.sol";
-import "@openzeppelin-upgrades/contracts/access/AccessControlUpgradeable.sol";
+import {Initializable} from "@openzeppelin-upgrades/contracts/proxy/utils/Initializable.sol";
+import {AccessControlUpgradeable} from "@openzeppelin-upgrades/contracts/access/AccessControlUpgradeable.sol";
 
-import "eigenlayer-contracts/interfaces/ISignatureUtils.sol";
-import "eigenlayer-contracts/libraries/BeaconChainProofs.sol";
-import { PushSplit } from "splits-v2/splitters/push/PushSplit.sol";
+import {ISignatureUtils} from "eigenlayer-contracts/interfaces/ISignatureUtils.sol";
+import {PushSplit} from "splits-v2/splitters/push/PushSplit.sol";
 
+import {ERC4626MultiRewardVault} from "../vault/ERC4626MultiRewardVault.sol";
 import "./StrategyVaultETHStorage.sol";
-import "../vault/ERC4626MultiRewardVault.sol";
 
 // TODO: Finish withdrawal logic
 
-contract StrategyVault is Initializable, StrategyVaultStorage, AccessControlUpgradeable, ERC4626MultiRewardVault {
+contract StrategyVaultETH is Initializable, StrategyVaultETHStorage, AccessControlUpgradeable, ERC4626MultiRewardVault {
     using BeaconChainProofs for *;
 
     /* ============== MODIFIERS ============== */

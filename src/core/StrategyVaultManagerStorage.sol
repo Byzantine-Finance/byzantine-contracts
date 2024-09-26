@@ -1,15 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "@openzeppelin/contracts/proxy/beacon/IBeacon.sol";
+import {IBeacon} from "@openzeppelin/contracts/proxy/beacon/IBeacon.sol";
+
+import {IByzNft} from "../interfaces/IByzNft.sol";
+import {IAuction} from "../interfaces/IAuction.sol";
+import {IEigenPodManager} from "eigenlayer-contracts/interfaces/IEigenPodManager.sol";
+import {IStrategyManager} from "eigenlayer-contracts/interfaces/IStrategyManager.sol";
+import {IDelegationManager} from "eigenlayer-contracts/interfaces/IDelegationManager.sol";
+import {PushSplitFactory} from "splits-v2/splitters/push/PushSplitFactory.sol";
 
 import "../interfaces/IStrategyVaultManager.sol";
-import "../interfaces/IByzNft.sol";
-import "../interfaces/IAuction.sol";
-import "eigenlayer-contracts/interfaces/IEigenPodManager.sol";
-import "eigenlayer-contracts/interfaces/IStrategyManager.sol";
-import "eigenlayer-contracts/interfaces/IDelegationManager.sol";
-import "splits-v2/splitters/push/PushSplitFactory.sol";
 
 abstract contract StrategyVaultManagerStorage is IStrategyVaultManager {
     /* ============== CONSTANTS + IMMUTABLES ============== */
