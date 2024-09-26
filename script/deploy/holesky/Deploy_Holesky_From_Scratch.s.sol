@@ -60,21 +60,34 @@ contract Deploy_Holesky_From_Scratch is ExistingDeploymentParser {
             payable(address(new TransparentUpgradeableProxy(address(emptyContract), address(byzantineProxyAdmin), "")))
         );
 
-        // StrategyVault implementation contract
-        strategyVaultImplementation = new StrategyVault(
+        // StrategyVaultETH implementation contract
+        strategyVaultETHImplementation = new StrategyVaultETH(
             strategyVaultManager,
             auction,
             byzNft,
             eigenPodManager,
             delegation
         );
-        // StrategyVault beacon contract. The Beacon Proxy contract is deployed in the StrategyVaultManager
+        // StrategyVaultETH beacon contract. The Beacon Proxy contract is deployed in the StrategyVaultManager
         // This contract points to the implementation contract.
-        strategyVaultBeacon = new UpgradeableBeacon(address(strategyVaultImplementation));
+        strategyVaultETHBeacon = new UpgradeableBeacon(address(strategyVaultETHImplementation));
+
+        // StrategyVaultERC20 implementation contract
+        strategyVaultERC20Implementation = new StrategyVaultERC20(
+            strategyVaultManager,
+            auction,
+            byzNft,
+            eigenPodManager,
+            delegation
+        );
+        // StrategyVaultERC20 beacon contract. The Beacon Proxy contract is deployed in the StrategyVaultManager
+        // This contract points to the implementation contract.
+        strategyVaultERC20Beacon = new UpgradeableBeacon(address(strategyVaultERC20Implementation));
 
         // Second, deploy the *implementation* contracts, using the *proxy contracts* as inputs
         strategyVaultManagerImplementation = new StrategyVaultManager(
-            strategyVaultBeacon,
+            strategyVaultETHBeacon,
+            strategyVaultERC20Beacon,
             auction,
             byzNft,
             eigenPodManager,

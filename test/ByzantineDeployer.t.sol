@@ -11,6 +11,7 @@ import "./splits-helper/SplitsV2Deployer.t.sol";
 
 import "../src/core/StrategyVaultManager.sol";
 import "../src/core/StrategyVaultETH.sol";
+import "../src/core/StrategyVaultERC20.sol";
 import "../src/tokens/ByzNft.sol";
 import "../src/core/Auction.sol";
 import "../src/vault/Escrow.sol";
@@ -20,7 +21,8 @@ contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
     // Byzantine contracts
     ProxyAdmin public byzantineProxyAdmin;
     StrategyVaultManager public strategyVaultManager;
-    UpgradeableBeacon public strategyVaultBeacon;
+    UpgradeableBeacon public strategyVaultETHBeacon;
+    UpgradeableBeacon public strategyVaultERC20Beacon;
     ByzNft public byzNft;
     Auction public auction;
     Escrow public escrow;
@@ -95,7 +97,7 @@ contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
         );
 
         // StrategyVaultETH implementation contract
-        IStrategyVault strategyVaultImplementation = new StrategyVaultETH(
+        IStrategyVault strategyVaultETHImplementation = new StrategyVaultETH(
             strategyVaultManager,
             auction,
             byzNft,
@@ -104,11 +106,24 @@ contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
         );
         // StrategyVaultETH beacon contract. The Beacon Proxy contract is deployed in the StrategyVaultManager
         // This contract points to the implementation contract.
-        strategyVaultBeacon = new UpgradeableBeacon(address(strategyVaultImplementation));
+        strategyVaultETHBeacon = new UpgradeableBeacon(address(strategyVaultETHImplementation));
+
+        // StrategyVaultERC20 implementation contract
+        IStrategyVault strategyVaultERC20Implementation = new StrategyVaultERC20(
+            strategyVaultManager,
+            auction,
+            byzNft,
+            eigenPodManager,
+            delegation
+        );
+        // StrategyVaultERC20 beacon contract. The Beacon Proxy contract is deployed in the StrategyVaultManager
+        // This contract points to the implementation contract.
+        strategyVaultERC20Beacon = new UpgradeableBeacon(address(strategyVaultERC20Implementation));
 
         // Second, deploy the *implementation* contracts, using the *proxy contracts* as inputs
         StrategyVaultManager strategyVaultManagerImplementation = new StrategyVaultManager(
-            strategyVaultBeacon,
+            strategyVaultETHBeacon,
+            strategyVaultERC20Beacon,
             auction,
             byzNft,
             eigenPodManager,
