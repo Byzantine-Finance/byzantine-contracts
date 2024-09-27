@@ -9,37 +9,14 @@ import {IStrategyVaultETH} from "./IStrategyVaultETH.sol";
 
 interface IStrategyVaultManager {
 
-    /// @notice Struct to hold the details of a pending cluster
-    struct PendingClusterDetails {
-        // The parameters of the Split contract
-        SplitV2Lib.Split splitParams;
-        // A record of the 4 nodes being part of the cluster
-        IStrategyVaultETH.Node[4] nodes;
-    }
-
-    /// @notice Get total number of pre-created clusters.
-    function numPreCreatedClusters() external view returns (uint64);
-
     /// @notice Get the total number of Strategy Vaults that have been deployed.
     function numStratVaults() external view returns (uint64);
 
     /**
-     * @notice Function to pre-create Distributed Validators. Must be called at least one time to allow stakers to enter in the protocol.
-     * @param _numDVsToPreCreate Number of Distributed Validators to pre-create.
-     * @dev This function is only callable by Byzantine Finance. Once the first DVs are pre-created, the stakers
-     * pre-create a new DV every time they create a new StrategyVault (if enough operators in Auction).
-     * @dev Make sure there are enough bids and node operators before calling this function.
-     * @dev Pre-create clusters of size 4.
-     */
-    function preCreateDVs(uint8 _numDVsToPreCreate) external;
-
-    /**
-     * @notice A staker creates a StrategyVault for Native ETH.
+     * @notice A strategy designer creates a StrategyVault for Native ETH.
      * @param whitelistedDeposit If false, anyone can deposit into the Strategy Vault. If true, only whitelisted addresses can deposit into the Strategy Vault.
      * @param upgradeable If true, the Strategy Vault is upgradeable. If false, the Strategy Vault is not upgradeable.
      * @param operator The address for the operator that this StrategyVault will delegate to.
-     * @dev This action triggers a new auction to pre-create a new Distributed Validator for the next staker (if enough operators in Auction).
-     * @dev It also fill the ClusterDetails struct of the newly created StrategyVault.
      */
     function createStratVaultETH(
         bool whitelistedDeposit,
@@ -48,21 +25,15 @@ interface IStrategyVaultManager {
     ) external;
 
     /**
-     * @notice A 32ETH staker create a Strategy Vault, use a pre-created DV as a validator and activate it by depositing 32ETH.
-     * @param pubkey The 48 bytes public key of the beacon chain DV.
-     * @param signature The DV's signature of the deposit data.
-     * @param depositDataRoot The root/hash of the deposit data for the DV's deposit.
+     * @notice A staker (which can also be referred as to a strategy designer) creates a Strategy Vault, triggers an Auction and stake native ETH on it (only multiple of 32ETH).
      * @param whitelistedDeposit If false, anyone can deposit into the Strategy Vault. If true, only whitelisted addresses can deposit into the Strategy Vault.
      * @param upgradeable If true, the Strategy Vault is upgradeable. If false, the Strategy Vault is not upgradeable.
      * @param operator The address for the operator that this StrategyVault will delegate to.
-     * @dev This action triggers a new auction to pre-create a new Distributed Validator for the next staker (if enough operators in Auction).
-     * @dev It also fill the ClusterDetails struct of the newly created StrategyVault.
+     * @dev This action triggers a new auction to get a new Distributed Validator for the next staker (if enough operators in Auction).
      * @dev Function will revert unless a multiple of 32 ETH are sent with the transaction.
+     * @dev The caller receives Byzantine StrategyVault shares in return for the ETH staked.
      */
     function createStratVaultAndStakeNativeETH(
-        bytes calldata pubkey,
-        bytes calldata signature,
-        bytes32 depositDataRoot,
         bool whitelistedDeposit,
         bool upgradeable,
         address operator
@@ -103,24 +74,6 @@ interface IStrategyVaultManager {
         bool upgradeable,
         address operator
     ) external;
-
-    /**
-     * @notice Returns the address of the EigenPod and the Split contract of the next StrategyVault to be created.
-     * @param _nounce The index of the StrategyVault you want to know the EigenPod and Split contract address.
-     * @dev Ownership of the Split contract belongs to ByzantineAdmin to be able to update it.
-     * @dev Function essential to pre-create DVs as their withdrawal address has to be the EigenPod and fee recipient address the Split.
-     */
-    function preCalculatePodAndSplitAddr(uint64 _nounce) external view returns (address, address);
-    
-    /// @notice Returns the number of current pending clusters waiting for a Strategy Vault.
-    function getNumPendingClusters() external view returns (uint64);
-
-    /**
-     * @notice Returns the node details of a pending cluster.
-     * @param clusterIndex The index of the pending cluster you want to know the node details.
-     * @dev If the index does not exist, it returns the default value of the Node struct.
-     */
-    function getPendingClusterNodeDetails(uint64 clusterIndex) external view returns (IStrategyVaultETH.Node[4] memory);
 
     /**
      * @notice Returns the number of StrategyVaults owned by an address.

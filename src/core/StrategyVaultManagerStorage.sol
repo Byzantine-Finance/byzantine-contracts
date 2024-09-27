@@ -56,12 +56,6 @@ abstract contract StrategyVaultManagerStorage is IStrategyVaultManager {
     /// @notice ByzNft tokenId to its tied StrategyVault
     mapping(uint256 => address) public nftIdToStratVault;
 
-    /// @notice Mapping to store the pre-created clusters waiting for work
-    mapping(uint64 => PendingClusterDetails) public pendingClusters;
-
-    /// @notice The number of pre-created clusters. Used as the mapping index.
-    uint64 public numPreCreatedClusters;
-
     /// @notice The number of StratVaults that have been deployed
     uint64 public numStratVaults; // This is also the number of ByzNft minted
 

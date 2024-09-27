@@ -30,13 +30,13 @@ contract ByzNft is
     }
 
     /**
-     * @notice Gets called when a full staker creates a Strategy Vault
-     * @param _to The address of the staker who created the Strategy Vault
-     * @param _nounce to calculate the tokenId. This is to prevent minting the same tokenId twice.
-     * @return The tokenId of the newly minted NFT (calculated from the number of Strategy Vaults already deployed)
+     * @notice Gets called when a Strategy Vault is created
+     * @param _to The address of the Strategy Vault creator
+     * @param _nounce To prevent minting the same tokenId twice
+     * @return The tokenId of the newly minted ByzNft
      */
     function mint(address _to, uint64 _nounce) external onlyOwner returns (uint256) {
-        uint256 tokenId = uint256(keccak256(abi.encode(_nounce)));
+        uint256 tokenId = uint256(keccak256(abi.encodePacked(block.timestamp, _nounce, _to)));
         _safeMint(_to, tokenId);
         return tokenId;
     }
