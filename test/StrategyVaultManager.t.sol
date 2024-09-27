@@ -15,7 +15,7 @@ import "./ByzantineDeployer.t.sol";
 import "../src/tokens/ByzNft.sol";
 import "../src/core/Auction.sol";
 
-import "../src/interfaces/IStrategyVault.sol";
+import "../src/interfaces/IStrategyVaultETH.sol";
 import "../src/interfaces/IStrategyVaultManager.sol";
 
 contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
@@ -81,8 +81,8 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
         assertEq(strategyVaultManager.getNumPendingClusters(), 2);
 
         // Verify the nodes details of the pre-created DVs
-        IStrategyVault.Node[4] memory nodesDV1 = strategyVaultManager.getPendingClusterNodeDetails(0);
-        IStrategyVault.Node[4] memory nodesDV2 = strategyVaultManager.getPendingClusterNodeDetails(1);
+        IStrategyVaultETH.Node[4] memory nodesDV1 = strategyVaultManager.getPendingClusterNodeDetails(0);
+        IStrategyVaultETH.Node[4] memory nodesDV2 = strategyVaultManager.getPendingClusterNodeDetails(1);
         // Verify the nodes details of the pre-created DV1
         for (uint i = 0; i < clusterSize; i++) {
             assertEq(nodesDV1[i].eth1Addr, nodeOps[i]);
@@ -131,16 +131,16 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
 
         // Alice creates a StrategyVault
         address aliceStratVaultAddr1 = _createStratVaultAndStakeNativeETH(alice, 32 ether);
-        uint256 nft1 = IStrategyVault(aliceStratVaultAddr1).stratVaultNftId();
+        uint256 nft1 = IStrategyVaultETH(aliceStratVaultAddr1).stratVaultNftId();
         assertTrue(strategyVaultManager.hasStratVaults(alice));
         assertEq(strategyVaultManager.numStratVaults(), 1);
         assertEq(strategyVaultManager.getStratVaultNumber(alice), 1);
-        assertEq(IStrategyVault(aliceStratVaultAddr1).stratVaultOwner(), alice);
+        assertEq(IStrategyVaultETH(aliceStratVaultAddr1).stratVaultOwner(), alice);
         assertEq(strategyVaultManager.getStratVaultByNftId(nft1), aliceStratVaultAddr1);
 
         // Verify alice strat vault 1 DV details
-        IStrategyVault.Node[4] memory nodesDV1Alice = IStrategyVault(aliceStratVaultAddr1).getDVNodesDetails();
-        IStrategyVault.DVStatus dvStatusDV1Alice = IStrategyVault(aliceStratVaultAddr1).getDVStatus();
+        IStrategyVaultETH.Node[4] memory nodesDV1Alice = IStrategyVaultETH(aliceStratVaultAddr1).getDVNodesDetails();
+        IStrategyVaultETH.DVStatus dvStatusDV1Alice = IStrategyVaultETH(aliceStratVaultAddr1).getDVStatus();
         // Verify the nodes details
         for (uint i = 0; i < clusterSize; i++) {
             assertEq(nodesDV1Alice[i].eth1Addr, nodeOps[i]);
@@ -150,7 +150,7 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
         assertEq(nodesDV1Alice[2].vcNumber, 800);
         assertEq(nodesDV1Alice[3].vcNumber, 700);
         // Verify the DV status
-        assertEq(uint(dvStatusDV1Alice), uint(IStrategyVault.DVStatus.DEPOSITED_NOT_VERIFIED));
+        assertEq(uint(dvStatusDV1Alice), uint(IStrategyVaultETH.DVStatus.DEPOSITED_NOT_VERIFIED));
 
         // Verify number of pending DVs
         assertEq(strategyVaultManager.numPreCreatedClusters(), 3);
@@ -158,16 +158,16 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
 
         // Bob creates a StrategyVault
         address bobStratVaultAddr1 = _createStratVaultAndStakeNativeETH(bob, 32 ether);
-        uint256 nft2 = IStrategyVault(bobStratVaultAddr1).stratVaultNftId();
+        uint256 nft2 = IStrategyVaultETH(bobStratVaultAddr1).stratVaultNftId();
         assertTrue(strategyVaultManager.hasStratVaults(bob));
         assertEq(strategyVaultManager.numStratVaults(), 2);
         assertEq(strategyVaultManager.getStratVaultNumber(bob), 1);
-        assertEq(IStrategyVault(bobStratVaultAddr1).stratVaultOwner(), bob);
+        assertEq(IStrategyVaultETH(bobStratVaultAddr1).stratVaultOwner(), bob);
         assertEq(strategyVaultManager.getStratVaultByNftId(nft2), bobStratVaultAddr1);
 
         // Verify bob strat vault 1 DV details
-        IStrategyVault.Node[4] memory nodesDV1Bob = IStrategyVault(bobStratVaultAddr1).getDVNodesDetails();
-        IStrategyVault.DVStatus dvStatusDV1Bob = IStrategyVault(bobStratVaultAddr1).getDVStatus();
+        IStrategyVaultETH.Node[4] memory nodesDV1Bob = IStrategyVaultETH(bobStratVaultAddr1).getDVNodesDetails();
+        IStrategyVaultETH.DVStatus dvStatusDV1Bob = IStrategyVaultETH(bobStratVaultAddr1).getDVStatus();
         // Verify the nodes details
         for (uint i = 0; i < clusterSize; i++) {
            assertEq(nodesDV1Bob[i].eth1Addr, nodeOps[i + 4]);
@@ -177,7 +177,7 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
         assertEq(nodesDV1Bob[2].vcNumber, 400);
         assertEq(nodesDV1Bob[3].vcNumber, 300);
         // Verify the DV status
-        assertEq(uint(dvStatusDV1Bob), uint(IStrategyVault.DVStatus.DEPOSITED_NOT_VERIFIED));
+        assertEq(uint(dvStatusDV1Bob), uint(IStrategyVaultETH.DVStatus.DEPOSITED_NOT_VERIFIED));
 
         // Verify number of pending DVs
         assertEq(strategyVaultManager.numPreCreatedClusters(), 4);
@@ -185,15 +185,15 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
 
         // Alice creates a second StrategyVault
         address aliceStratVaultAddr2 = _createStratVaultAndStakeNativeETH(alice, 32 ether);
-        uint256 nft3 = IStrategyVault(aliceStratVaultAddr2).stratVaultNftId();
+        uint256 nft3 = IStrategyVaultETH(aliceStratVaultAddr2).stratVaultNftId();
         assertEq(strategyVaultManager.numStratVaults(), 3);
         assertEq(strategyVaultManager.getStratVaultNumber(alice), 2);
-        assertEq(IStrategyVault(aliceStratVaultAddr2).stratVaultOwner(), alice);
+        assertEq(IStrategyVaultETH(aliceStratVaultAddr2).stratVaultOwner(), alice);
         assertEq(strategyVaultManager.getStratVaultByNftId(nft3), aliceStratVaultAddr2);
 
         // Verify alice strat vault 2 DV details
-        IStrategyVault.Node[4] memory nodesDV2Alice = IStrategyVault(aliceStratVaultAddr2).getDVNodesDetails();
-        IStrategyVault.DVStatus dvStatusDV2Alice = IStrategyVault(aliceStratVaultAddr2).getDVStatus();
+        IStrategyVaultETH.Node[4] memory nodesDV2Alice = IStrategyVaultETH(aliceStratVaultAddr2).getDVNodesDetails();
+        IStrategyVaultETH.DVStatus dvStatusDV2Alice = IStrategyVaultETH(aliceStratVaultAddr2).getDVStatus();
         // Verify the nodes details
         for (uint i = 0; i < clusterSize; i++) {
             assertEq(nodesDV2Alice[i].eth1Addr, nodeOps[i]);
@@ -203,7 +203,7 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
         assertEq(nodesDV2Alice[2].vcNumber, 800);
         assertEq(nodesDV2Alice[3].vcNumber, 700);
         // Verify the DV status
-        assertEq(uint(dvStatusDV2Alice), uint(IStrategyVault.DVStatus.DEPOSITED_NOT_VERIFIED));
+        assertEq(uint(dvStatusDV2Alice), uint(IStrategyVaultETH.DVStatus.DEPOSITED_NOT_VERIFIED));
 
         // Verify number of pending DVs
         assertEq(strategyVaultManager.numPreCreatedClusters(), 4);
@@ -243,9 +243,9 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
         assertEq(strategyVaultManager.getPodByStratVaultAddr(bobStratVaultAddr1), podAddressDV3);
 
         // Verify split addresses of DV1, DV2 and DV3
-        assertEq(IStrategyVault(aliceStratVaultAddr1).getSplitAddress(), splitAddressDV1);
-        assertEq(IStrategyVault(aliceStratVaultAddr2).getSplitAddress(), splitAddressDV2);
-        assertEq(IStrategyVault(bobStratVaultAddr1).getSplitAddress(), splitAddressDV3);
+        assertEq(IStrategyVaultETH(aliceStratVaultAddr1).getSplitAddress(), splitAddressDV1);
+        assertEq(IStrategyVaultETH(aliceStratVaultAddr2).getSplitAddress(), splitAddressDV2);
+        assertEq(IStrategyVaultETH(bobStratVaultAddr1).getSplitAddress(), splitAddressDV3);
     }
 
     // Within foundry, resulting address of a contract deployed with CREATE2 differs according to the msg.sender.
@@ -261,17 +261,17 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
         );
         // Bob wants to initialize the StrategyVault but can't because he doesn't own the nft
         vm.expectRevert(bytes("Cannot initialize StrategyVault: ERC721: invalid token ID"));
-        IStrategyVault(stratVaultAddr).initialize(firstNftId, bob);
+        IStrategyVaultETH(stratVaultAddr).initialize(firstNftId, bob);
         vm.stopPrank();
     }
 
     function testSplitDistribution() public preCreateClusters(2) {
         // Alice creates a StrategyVault
-        IStrategyVault stratVaultAlice = IStrategyVault(_createStratVaultAndStakeNativeETH(alice, 32 ether));
+        IStrategyVaultETH stratVaultAlice = IStrategyVaultETH(_createStratVaultAndStakeNativeETH(alice, 32 ether));
         address stratVaultAliceSplit = stratVaultAlice.getSplitAddress();
 
         // Create the recipients array
-        IStrategyVault.Node[4] memory nodesDVAlice = stratVaultAlice.getDVNodesDetails();
+        IStrategyVaultETH.Node[4] memory nodesDVAlice = stratVaultAlice.getDVNodesDetails();
         address[] memory recipients = new address[](nodesDVAlice.length);
         for (uint i = 0; i < nodesDVAlice.length; i++) {
             recipients[i] = nodesDVAlice[i].eth1Addr;
@@ -309,7 +309,7 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
     function testStratVaultTransfer() public preCreateClusters(2) {
         // Alice creates a StrategyVault
         address stratVaultAddrAlice = _createStratVaultAndStakeNativeETH(alice, 32 ether);
-        uint256 nftId = IStrategyVault(stratVaultAddrAlice).stratVaultNftId();
+        uint256 nftId = IStrategyVaultETH(stratVaultAddrAlice).stratVaultNftId();
 
         // Verify Alice owns the nft
         ByzNft byzNftContract = _getByzNftContract();
@@ -323,7 +323,7 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
         vm.stopPrank();
 
         // Alice approves the StrategyVaultManager to transfer to Bob
-        _approveNftTransferByStratVaultManager(alice, IStrategyVault(stratVaultAddrAlice).stratVaultNftId());
+        _approveNftTransferByStratVaultManager(alice, IStrategyVaultETH(stratVaultAddrAlice).stratVaultNftId());
 
         // Alice transfers the StrategyVault to Bob
         vm.prank(alice);
@@ -331,7 +331,7 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
         assertEq(strategyVaultManager.getStratVaultNumber(alice), 0);
 
         // Verify if Bob is the new owner
-        assertEq(bob, IStrategyVault(stratVaultAddrAlice).stratVaultOwner());
+        assertEq(bob, IStrategyVaultETH(stratVaultAddrAlice).stratVaultOwner());
         assertEq(strategyVaultManager.getStratVaultNumber(bob), 1);
 
         // Verify if the mappings has been correctly updated
@@ -348,7 +348,7 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
         address stratVaultAddrAlice = _createStratVaultAndStakeNativeETH(alice, 32 ether);
 
         // Alice approves the StrategyVaultManager to transfer to Bob
-        _approveNftTransferByStratVaultManager(alice, IStrategyVault(stratVaultAddrAlice).stratVaultNftId());
+        _approveNftTransferByStratVaultManager(alice, IStrategyVaultETH(stratVaultAddrAlice).stratVaultNftId());
 
         // This smart contract transfers the StrategyVault to Bob
         vm.expectRevert(IStrategyVaultManager.NotStratVaultOwner.selector);
@@ -360,7 +360,7 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
         address stratVaultAddrAlice = _createStratVaultAndStakeNativeETH(alice, 32 ether);
 
         // Alice approves the StrategyVault to transfer to herself
-        _approveNftTransferByStratVaultManager(alice, IStrategyVault(stratVaultAddrAlice).stratVaultNftId());     
+        _approveNftTransferByStratVaultManager(alice, IStrategyVaultETH(stratVaultAddrAlice).stratVaultNftId());     
 
         vm.expectRevert(bytes("StrategyVaultManager.transferStratVaultOwnership: cannot transfer ownership to the same address"));
         vm.prank(alice);
@@ -380,7 +380,7 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
         // Alice wants to call EigenPodManager directly
         bytes memory functionToCall = abi.encodeWithSignature("ownerToPod(address)", stratVaultAddr);
         vm.prank(alice);
-        bytes memory ret = IStrategyVault(stratVaultAddr).callEigenPodManager(functionToCall);
+        bytes memory ret = IStrategyVaultETH(stratVaultAddr).callEigenPodManager(functionToCall);
         IEigenPod pod = abi.decode(ret, (IEigenPod));
 
         assertEq(address(pod), strategyVaultManager.getPodByStratVaultAddr(stratVaultAddr));
@@ -424,7 +424,7 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
             bytes("EigenPod.verifyCorrectWithdrawalCredentials: Proof is not for this EigenPod")
         );
         /// TODO: Update API to to have the exact timestamp where the proof was generated
-        IStrategyVault(stratVaultAddr).verifyWithdrawalCredentials(timestamp, stateRootProofStruct, validatorIndices, proofsArray, validatorFieldsArray);
+        IStrategyVaultETH(stratVaultAddr).verifyWithdrawalCredentials(timestamp, stateRootProofStruct, validatorIndices, proofsArray, validatorFieldsArray);
 
     }
 
@@ -455,7 +455,7 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
         address stratVaultAddr = _createStratVaultAndStakeNativeETH(alice, 32 ether);
         // Alice delegate its staked ETH to the ELOperator1
         vm.prank(alice);
-        IStrategyVault(stratVaultAddr).delegateTo(ELOperator1);
+        IStrategyVaultETH(stratVaultAddr).delegateTo(ELOperator1);
 
         // Verify if alice's strategy vault is registered as a delegator
         bool[] memory stratVaultsDelegated = strategyVaultManager.isDelegated(alice);

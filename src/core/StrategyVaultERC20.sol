@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "@openzeppelin-upgrades/contracts/proxy/utils/Initializable.sol";
-import "@openzeppelin-upgrades/contracts/access/AccessControlUpgradeable.sol";
+import {Initializable} from "@openzeppelin-upgrades/contracts/proxy/utils/Initializable.sol";
+import {AccessControlUpgradeable} from "@openzeppelin-upgrades/contracts/access/AccessControlUpgradeable.sol";
 
+import {ERC4626MultiRewardVault} from "../vault/ERC4626MultiRewardVault.sol";
 import "./StrategyVaultERC20Storage.sol";
-import "../vault/ERC4626MultiRewardVault.sol";
 
-contract StrategyVault is Initializable, StrategyVaultStorage, AccessControlUpgradeable, ERC4626MultiRewardVault {
+contract StrategyVaultERC20 is Initializable, StrategyVaultERC20Storage, AccessControlUpgradeable, ERC4626MultiRewardVault {
 
     /* ============== MODIFIERS ============== */
 
@@ -136,25 +136,25 @@ contract StrategyVault is Initializable, StrategyVaultStorage, AccessControlUpgr
      * @param receiveAsTokens TODO: Fill in
      * @dev Can only be called after the withdrawal delay is finished
      */
-    function finishWithdrawERC20(
-        withdrawal,
-        tokens[],
-        middlewareTimesIndex,
-        receiveAsTokens
-    ) external {
-        // Have StrategyVault unstake from the EigenLayer Strategy contract
-        delegationManager.completeQueuedWithdrawal(
-            /*
-            Withdrawal calldata withdrawal,
-            IERC20[] calldata tokens,
-            uint256 middlewareTimesIndex,
-            bool receiveAsTokens
-            */
-        );
+    // function finishWithdrawERC20(
+    //     withdrawal,
+    //     tokens[],
+    //     middlewareTimesIndex,
+    //     receiveAsTokens
+    // ) external {
+    //     // Have StrategyVault unstake from the EigenLayer Strategy contract
+    //     delegationManager.completeQueuedWithdrawal(
+    //         /*
+    //         Withdrawal calldata withdrawal,
+    //         IERC20[] calldata tokens,
+    //         uint256 middlewareTimesIndex,
+    //         bool receiveAsTokens
+    //         */
+    //     );
         
-        // Burn caller's shares and exchange for deposit token + reward tokens
-        super.withdraw(assetAmount, receiver, msg.sender);
-    }
+    //     // Burn caller's shares and exchange for deposit token + reward tokens
+    //     super.withdraw(assetAmount, receiver, msg.sender);
+    // }
 
     /**
      * @notice The caller delegate its Strategy Vault's stake to an Eigen Layer operator.

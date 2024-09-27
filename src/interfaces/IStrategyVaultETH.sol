@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "eigenlayer-contracts/libraries/BeaconChainProofs.sol";
-import { SplitV2Lib } from "splits-v2/libraries/SplitV2.sol";
+import {BeaconChainProofs} from "eigenlayer-contracts/libraries/BeaconChainProofs.sol";
+import {SplitV2Lib} from "splits-v2/libraries/SplitV2.sol";
 
-interface IStrategyVault {
+import "./IStrategyVault.sol";
+
+interface IStrategyVaultETH is IStrategyVault {
 
   enum DVStatus {
     NATIVE_RESTAKING_NOT_ACTIVATED, // Native restaking is not activated and 0 ETH has been deposited
@@ -23,21 +25,16 @@ interface IStrategyVault {
     address eth1Addr;
   }
 
-  /**
-   * @notice Used to initialize the nftId of that StrategyVault and its owner.
-   * @dev Called on construction by the StrategyVaultManager.
-  */
-  function initialize(uint256 _nftId,address _initialOwner) external;
-
-  /**
-   * @notice Returns the owner of this StrategyVault
-   */
-  function stratVaultNftId() external view returns (uint256);
-
-  /**
-   * @notice Returns the address of the owner of the Strategy Vault's ByzNft.
-   */
-  function stratVaultOwner() external view returns (address);
+  /// @notice Struct to store the details of a Distributed Validator created on Byzantine
+  /// @dev Byzantine is the owner of the Split contract and can thus update it if the DV changes
+  struct ClusterDetails {
+    // The Split contract address
+    address splitAddr;
+    // The status of the Distributed Validator
+    DVStatus dvStatus;
+    // A record of the 4 nodes being part of the cluster
+    Node[4] nodes;
+  }
 
   /**
    * @notice Deposit 32ETH in the beacon chain to activate a Distributed Validator and start validating on the consensus layer.
@@ -85,17 +82,6 @@ interface IStrategyVault {
     external;
 
   /**
-   * @notice The caller delegate its Strategy Vault's stake to an Eigen Layer operator.
-   * @notice /!\ Delegation is all-or-nothing: when a Staker delegates to an Operator, they delegate ALL their stake.
-   * @param operator The account teh Strategy Vault is delegating its assets to for use in serving applications built on EigenLayer.
-   * @dev The operator must not have set a delegation approver, everyone can delegate to it without permission.
-   * @dev Ensures that:
-   *          1) the `staker` is not already delegated to an operator
-   *          2) the `operator` has indeed registered as an operator in EigenLayer
-   */
-  function delegateTo(address operator) external;
-
-  /**
    * @notice Distributes the tokens issued from the PoS rewards evenly between the node operators.
    * @param _split The current split struct of the StrategyVault. Can be reconstructed offchain since the only variable is the `recipients` field.
    * @param _token The address of the token to distribute. NATIVE_TOKEN_ADDR = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE
@@ -123,7 +109,7 @@ interface IStrategyVault {
    * @notice Returns the DV nodes details of the Strategy Vault
    * It returns the eth1Addr, the number of Validation Credit and the reputation score of each nodes.
    */
-  function getDVNodesDetails() external view returns (IStrategyVault.Node[4] memory);
+  function getDVNodesDetails() external view returns (IStrategyVaultETH.Node[4] memory);
 
   /**
    * @notice Returns the address of the Split contract.
@@ -131,25 +117,13 @@ interface IStrategyVault {
    */
   function getSplitAddress() external view returns (address);
 
-  /// @dev Error when unauthorized call to a function callable only by the Strategy Vault Owner (aka the ByzNft holder).
-  error OnlyNftOwner();
-
-  /// @dev Error when unauthorized call to the deposit function when whitelistedDeposit is true and caller is not whitelisted.
-  error OnlyWhitelistedDeposit();
-
-  /// @dev Error when unauthorized call to a function callable only by the StrategyVaultManager.
-  error OnlyStrategyVaultManager();
-
   /// @dev Returned when not privided the right number of nodes 
   error InvalidClusterSize();
 
-  /// @dev Returned on failed Eigen Layer contracts call
-  error CallFailed(bytes data);
+  /// @dev Returned when trying to deposit an incorrect amount of ETH. Can only deposit a multiple of 32 ETH. (32, 64, 96, 128, etc.)
+  error CanOnlyDepositMultipleOf32ETH();
 
   /// @dev Returned when trying to access DV data but no ETH has been deposited
   error NativeRestakingNotActivated();
-
-  /// @dev Returned when trying to deposit an incorrect amount of ETH. Can only deposit a multiple of 32 ETH. (32, 64, 96, 128, etc.)
-  error CanOnlyDepositMultipleOf32ETH();
 
 }
