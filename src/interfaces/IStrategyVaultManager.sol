@@ -105,18 +105,6 @@ interface IStrategyVaultManager {
     ) external;
 
     /**
-     * @notice Strategy Vault owner can transfer its Strategy Vault to another address.
-     * Under the hood, he transfers the ByzNft associated to the StrategyVault.
-     * That action makes him give the ownership of the StrategyVault and all the token it owns.
-     * @param stratVaultAddr The address of the StrategyVault the owner will transfer.
-     * @param newOwner The address of the new owner of the StrategyVault.
-     * @dev The ByzNft owner must first call the `approve` function to allow the StrategyVaultManager to transfer the ByzNft.
-     * @dev Function will revert if not called by the ByzNft holder.
-     * @dev Function will revert if the new owner is the same as the old owner.
-     */
-    function transferStratVaultOwnership(address stratVaultAddr, address newOwner) external;
-
-    /**
      * @notice Returns the address of the EigenPod and the Split contract of the next StrategyVault to be created.
      * @param _nounce The index of the StrategyVault you want to know the EigenPod and Split contract address.
      * @dev Ownership of the Split contract belongs to ByzantineAdmin to be able to update it.

@@ -216,40 +216,6 @@ contract StrategyVaultManager is
         newStratVault.stakeERC20(token, amount);
     }
 
-    /**
-     * @notice Strategy Vault owner can transfer its Strategy Vault to another address.
-     * Under the hood, he transfers the ByzNft associated to the StrategyVault.
-     * That action makes him give the ownership of the StrategyVault and all the token it owns.
-     * @param stratVaultAddr The address of the StrategyVault the owner will transfer.
-     * @param newOwner The address of the new owner of the StrategyVault.
-     * @dev The ByzNft owner must first call the `approve` function to allow the StrategyVaultManager to transfer the ByzNft.
-     * @dev Function will revert if not called by the ByzNft holder.
-     * @dev Function will revert if the new owner is the same as the old owner.
-     */
-    function transferStratVaultOwnership(address stratVaultAddr, address newOwner) external onlyStratVaultOwner(msg.sender, stratVaultAddr) {
-        
-        require(newOwner != msg.sender, "StrategyVaultManager.transferStratVaultOwnership: cannot transfer ownership to the same address");
-        
-        // Transfer the ByzNft
-        byzNft.safeTransferFrom(msg.sender, newOwner, IStrategyVault(stratVaultAddr).stratVaultNftId());
-
-        // Delete stratVault from owner's portfolio
-        address[] storage stratVaults = stakerToStratVaults[msg.sender];
-        for (uint256 i = 0; i < stratVaults.length;) {
-            if (stratVaults[i] == stratVaultAddr) {
-                stratVaults[i] = stratVaults[stratVaults.length - 1];
-                stratVaults.pop();
-                break;
-            }
-            unchecked {
-                ++i;
-            }
-        }
-
-        // Add stratVault to newOwner's portfolio
-        stakerToStratVaults[newOwner].push(stratVaultAddr);
-    }
-
     /* ============== VIEW FUNCTIONS ============== */
 
     /**
