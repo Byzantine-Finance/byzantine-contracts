@@ -10,6 +10,8 @@ import {IStrategyManager} from "eigenlayer-contracts/interfaces/IStrategyManager
 import {IDelegationManager} from "eigenlayer-contracts/interfaces/IDelegationManager.sol";
 import {PushSplitFactory} from "splits-v2/splitters/push/PushSplitFactory.sol";
 
+import {HitchensUnorderedAddressSetLib} from "../libraries/HitchensUnorderedAddressSetLib.sol";
+
 import "../interfaces/IStrategyVaultManager.sol";
 
 abstract contract StrategyVaultManagerStorage is IStrategyVaultManager {
@@ -50,8 +52,8 @@ abstract contract StrategyVaultManagerStorage is IStrategyVaultManager {
 
     /* ============== STATE VARIABLES ============== */
 
-    /// @notice Staker to its owned StrategyVaults
-    mapping(address => address[]) public stakerToStratVaults;
+    /// @notice Unordered Set of all the StratVaultETHs
+    HitchensUnorderedAddressSetLib.Set internal _stratVaultETHSet;
 
     /// @notice ByzNft tokenId to its tied StrategyVault
     mapping(uint256 => address) public nftIdToStratVault;

@@ -5,7 +5,6 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IEigenPod} from "eigenlayer-contracts/interfaces/IEigenPod.sol";
 import {IStrategy} from "eigenlayer-contracts/interfaces/IStrategy.sol";
 import {SplitV2Lib} from "splits-v2/libraries/SplitV2.sol";
-import {IStrategyVaultETH} from "./IStrategyVaultETH.sol";
 
 interface IStrategyVaultManager {
 
@@ -25,11 +24,11 @@ interface IStrategyVaultManager {
     ) external;
 
     /**
-     * @notice A staker (which can also be referred as to a strategy designer) creates a Strategy Vault, triggers an Auction and stake native ETH on it (only multiple of 32ETH).
+     * @notice A staker (which can also be referred as to a strategy designer) creates a Strategy Vault ETH, triggers an Auction and stake native ETH on it (only multiple of 32ETH).
      * @param whitelistedDeposit If false, anyone can deposit into the Strategy Vault. If true, only whitelisted addresses can deposit into the Strategy Vault.
      * @param upgradeable If true, the Strategy Vault is upgradeable. If false, the Strategy Vault is not upgradeable.
      * @param operator The address for the operator that this StrategyVault will delegate to.
-     * @dev This action triggers a new auction to get a new Distributed Validator for the next staker (if enough operators in Auction).
+     * @dev This action triggers a new auction(s) to get a new Distributed Validator(s) to stake on the Beacon Chain. The number of Auction triggered depends on the number of ETH sent.
      * @dev Function will revert unless a multiple of 32 ETH are sent with the transaction.
      * @dev The caller receives Byzantine StrategyVault shares in return for the ETH staked.
      */
@@ -136,5 +135,10 @@ interface IStrategyVaultManager {
 
     /// @dev Returned when unauthorized call to a function only callable by the StrategyVault owner
     error NotStratVaultOwner();
-    
+
+    /// @dev Returned when not enough node operators in Auction to create a new DV
+    error EmptyAuction();
+
+    /// @dev Returned when the ETH transfer to the StrategyVault fails
+    error ETHTransferFailed();
 }

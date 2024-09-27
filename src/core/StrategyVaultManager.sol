@@ -6,6 +6,7 @@ import {Initializable} from "@openzeppelin-upgrades/contracts/proxy/utils/Initia
 import {OwnableUpgradeable} from "@openzeppelin-upgrades/contracts/access/OwnableUpgradeable.sol";
 import {BeaconProxy} from "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
 
+import {IStrategyVaultETH} from "../interfaces/IStrategyVaultETH.sol";
 import {IStrategyVaultERC20} from "../interfaces/IStrategyVaultERC20.sol";
 import {IStrategyVault} from "../interfaces/IStrategyVault.sol";
 
@@ -18,6 +19,8 @@ contract StrategyVaultManager is
     OwnableUpgradeable,
     StrategyVaultManagerStorage
 {
+    using HitchensUnorderedAddressSetLib for HitchensUnorderedAddressSetLib.Set;
+
     /* =============== CONSTRUCTOR & INITIALIZER =============== */
 
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -64,25 +67,19 @@ contract StrategyVaultManager is
         bool upgradeable,
         address operator
     ) external {
-        require (getNumPendingClusters() > 0, "StrategyVaultManager.createStratVaultAndStakeNativeETH: no pending DVs");
-        
         // Create a Native ETH StrategyVault
         IStrategyVaultETH newStratVault = _deployStratVaultETH(whitelistedDeposit, upgradeable);
 
         // Delegate the StrategyVault towards the operator
-        // TODO: Ensure StrategyVault delegating, not caller.
         newStratVault.delegateTo(operator);
-
-        // deploy the Split contract
-        address splitAddr = pushSplitFactory.createSplitDeterministic(pendingClusters[numStratVaults].splitParams, owner(), owner(), bytes32(uint256(keccak256(abi.encode(numStratVaults)))));
     }
 
     /**
-     * @notice A staker (which can also be referred as to a strategy designer) creates a Strategy Vault, triggers an Auction and stake native ETH on it (only multiple of 32ETH).
+     * @notice A staker (which can also be referred as to a strategy designer) creates a Strategy Vault ETH, triggers an Auction and stake native ETH on it (only multiple of 32ETH).
      * @param whitelistedDeposit If false, anyone can deposit into the Strategy Vault. If true, only whitelisted addresses can deposit into the Strategy Vault.
      * @param upgradeable If true, the Strategy Vault is upgradeable. If false, the Strategy Vault is not upgradeable.
      * @param operator The address for the operator that this StrategyVault will delegate to.
-     * @dev This action triggers a new auction to get a new Distributed Validator for the next staker (if enough operators in Auction).
+     * @dev This action triggers a new auction(s) to get a new Distributed Validator(s) to stake on the Beacon Chain. The number of Auction triggered depends on the number of ETH sent.
      * @dev Function will revert unless a multiple of 32 ETH are sent with the transaction.
      * @dev The caller receives Byzantine StrategyVault shares in return for the ETH staked.
      */
@@ -91,22 +88,34 @@ contract StrategyVaultManager is
         bool upgradeable,
         address operator
     ) external payable {
-        require (getNumPendingClusters() > 0, "StrategyVaultManager.createStratVaultAndStakeNativeETH: no pending DVs");
-        /// TODO Verify the pubkey in arguments to be sure it is using the right pubkey of a pre-created cluster. Use a monolithic blockchain
+
+        // Check that the deposit is a multiple of 32 ETH
+        if (msg.value % 32 ether != 0) revert IStrategyVaultETH.CanOnlyDepositMultipleOf32ETH();
+
+        // Calculate how many bundles of 32 ETH were sent
+        uint256 num32ETHBundles = msg.value / 32 ether;
 
         // Create a Native ETH StrategyVault
         IStrategyVaultETH newStratVault = _deployStratVaultETH(whitelistedDeposit, upgradeable);
 
+        // Trigger an auction for each bundle of 32 ETH
+        for (uint256 i = 0; i < num32ETHBundles;) {
+            bytes32 winningClusterId = auction.triggerAuction();
+            /// TODO: Add clusterId in FIFO
+            unchecked {
+                ++i;
+            }
+        }
+
         // Delegate the StrategyVault towards the operator
         newStratVault.delegateTo(operator);
 
-        // Stake 32 ETH in the Beacon Chain
-        newStratVault.stakeNativeETH{value: msg.value}(pubkey, signature, depositDataRoot);
+        // Send the deposited ETH to the newly created StrategyVaultETH
+        (bool success, ) = address(newStratVault).call{value: msg.value}("");
+        if (!success) revert ETHTransferFailed();
 
         // deploy the Split contract
         address splitAddr = pushSplitFactory.createSplitDeterministic(pendingClusters[numStratVaults].splitParams, owner(), owner(), bytes32(uint256(keccak256(abi.encode(numStratVaults)))));
-
-        ++numStratVaults;
 
     }
 
@@ -277,11 +286,11 @@ contract StrategyVaultManager is
         address stratVault = address(new BeaconProxy(address(stratVaultERC20Beacon), ""));
         IStrategyVaultERC20(stratVault).initialize(nftId, msg.sender, token, whitelistedDeposit, upgradeable);
 
-        // store the stratVault in the nftId mapping
+        // store the nftId in the stratVault mapping
         nftIdToStratVault[nftId] = stratVault;
 
-        // store the stratVault in the staker mapping
-        stakerToStratVaults[msg.sender].push(stratVault);
+        // Update the number of StratVaults
+        ++numStratVaults;
 
         return IStrategyVaultERC20(stratVault);
     }
@@ -300,11 +309,14 @@ contract StrategyVaultManager is
         address stratVault = address(new BeaconProxy(address(stratVaultETHBeacon), ""));
         IStrategyVaultETH(stratVault).initialize(nftId, msg.sender, NATIVE_ETH_STRATEGY, whitelistedDeposit, upgradeable);
 
-        // store the stratVault in the nftId mapping
+        // Add the newly created stratVaultETH to the unordered stratVaultETH set
+        _stratVaultETHSet.insert(stratVault);
+
+        // store the nftId in the stratVault mapping
         nftIdToStratVault[nftId] = stratVault;
 
-        // store the stratVault in the staker mapping
-        stakerToStratVaults[msg.sender].push(stratVault);
+        // Update the number of StratVaults
+        ++numStratVaults;
 
         return IStrategyVaultETH(stratVault);
     }
