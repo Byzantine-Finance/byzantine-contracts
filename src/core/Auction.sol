@@ -5,7 +5,6 @@ import { Initializable } from "@openzeppelin-upgrades/contracts/proxy/utils/Init
 import { OwnableUpgradeable } from "@openzeppelin-upgrades/contracts/access/OwnableUpgradeable.sol";
 import { ReentrancyGuardUpgradeable } from "@openzeppelin-upgrades/contracts/security/ReentrancyGuardUpgradeable.sol";
 
-import { HitchensOrderStatisticsTreeLib } from "../libraries/HitchensOrderStatisticsTreeLib.sol";
 import { ByzantineAuctionMath } from "../libraries/ByzantineAuctionMath.sol";
 
 import "./AuctionStorage.sol";
