@@ -8,7 +8,6 @@ import {IAuction} from "../interfaces/IAuction.sol";
 import {IEigenPodManager} from "eigenlayer-contracts/interfaces/IEigenPodManager.sol";
 import {IStrategyManager} from "eigenlayer-contracts/interfaces/IStrategyManager.sol";
 import {IDelegationManager} from "eigenlayer-contracts/interfaces/IDelegationManager.sol";
-import {PushSplitFactory} from "splits-v2/splitters/push/PushSplitFactory.sol";
 
 import {HitchensUnorderedAddressSetLib} from "../libraries/HitchensUnorderedAddressSetLib.sol";
 
@@ -17,17 +16,8 @@ import "../interfaces/IStrategyVaultManager.sol";
 abstract contract StrategyVaultManagerStorage is IStrategyVaultManager {
     /* ============== CONSTANTS + IMMUTABLES ============== */
 
-    /// @notice The split operators allocation
-    uint256 public constant NODE_OP_SPLIT_ALLOCATION = 250_000; // 25%
-
     /// @notice Address of the ETH token strategy
     address public constant NATIVE_ETH_STRATEGY = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
-
-    /// @notice The split distribution incentive
-    uint16 public constant SPLIT_DISTRIBUTION_INCENTIVE = 20_000; // 2% for the distributor
-
-    /// @notice The split total allocation
-    uint256 public constant SPLIT_TOTAL_ALLOCATION = 1_000_000; // 100% is 1_000_000
 
     /// @notice Beacon proxy to which all the StrategyVaultETHs point
     IBeacon public immutable stratVaultETHBeacon;
@@ -46,9 +36,6 @@ abstract contract StrategyVaultManagerStorage is IStrategyVaultManager {
 
     /// @notice EigenLayer's DelegationManager contract
     IDelegationManager public immutable delegationManager;
-
-    /// @notice 0xSplits' PushSplitFactory contract
-    PushSplitFactory public immutable pushSplitFactory;
 
     /* ============== STATE VARIABLES ============== */
 
@@ -69,8 +56,7 @@ abstract contract StrategyVaultManagerStorage is IStrategyVaultManager {
         IAuction _auction,
         IByzNft _byzNft,
         IEigenPodManager _eigenPodManager,
-        IDelegationManager _delegationManager,
-        PushSplitFactory _pushSplitFactory
+        IDelegationManager _delegationManager
     ) {
         stratVaultETHBeacon = _stratVaultETHBeacon;
         stratVaultERC20Beacon = _stratVaultERC20Beacon;
@@ -78,7 +64,6 @@ abstract contract StrategyVaultManagerStorage is IStrategyVaultManager {
         byzNft = _byzNft;
         eigenPodManager = _eigenPodManager;
         delegationManager = _delegationManager;
-        pushSplitFactory = _pushSplitFactory;
     }
 
     /**

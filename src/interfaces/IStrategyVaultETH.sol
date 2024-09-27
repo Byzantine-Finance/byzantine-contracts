@@ -2,7 +2,6 @@
 pragma solidity ^0.8.20;
 
 import {BeaconChainProofs} from "eigenlayer-contracts/libraries/BeaconChainProofs.sol";
-import {SplitV2Lib} from "splits-v2/libraries/SplitV2.sol";
 
 import "./IStrategyVault.sol";
 
@@ -82,19 +81,6 @@ interface IStrategyVaultETH is IStrategyVault {
     external;
 
   /**
-   * @notice Distributes the tokens issued from the PoS rewards evenly between the node operators.
-   * @param _split The current split struct of the StrategyVault. Can be reconstructed offchain since the only variable is the `recipients` field.
-   * @param _token The address of the token to distribute. NATIVE_TOKEN_ADDR = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE
-   * @dev The distributor is the msg.sender. He will earn the distribution fees.
-   * @dev If the push failed, the tokens will be sent to the SplitWarehouse. NodeOp will have to call the withdraw function.
-   */
-  function distributeSplitBalance(
-      SplitV2Lib.Split calldata _split,
-      address _token
-  )
-    external;
-
-  /**
    * @notice Call the EigenPodManager contract
    * @param data to call contract 
    */
@@ -110,12 +96,6 @@ interface IStrategyVaultETH is IStrategyVault {
    * It returns the eth1Addr, the number of Validation Credit and the reputation score of each nodes.
    */
   function getDVNodesDetails() external view returns (IStrategyVaultETH.Node[4] memory);
-
-  /**
-   * @notice Returns the address of the Split contract.
-   * @dev Contract where the PoS rewards will be sent (both execution and consensus rewards).
-   */
-  function getSplitAddress() external view returns (address);
 
   /// @dev Returned when not privided the right number of nodes 
   error InvalidClusterSize();

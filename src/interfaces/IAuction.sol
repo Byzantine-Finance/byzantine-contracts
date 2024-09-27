@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "./IStrategyVaultETH.sol";
-
 interface IAuction {
 
     /* ===================== ENUMS ===================== */
@@ -64,8 +62,13 @@ interface IAuction {
 
     /// @notice Stores the nodes details of a Distributed Validator
     struct ClusterDetails {
+        // Average auction score of all the node operators in the cluster
         uint256 averageAuctionScore;
+        // Node operators making up the cluster
         NodeDetails[] nodes;
+        // Split contract address of the DV
+        address splitAddr;
+        // Status of the cluster
         ClusterStatus status;
     }
 

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+import {PushSplitFactory} from "splits-v2/splitters/push/PushSplitFactory.sol";
+
 import { IAuction } from "../interfaces/IAuction.sol";
 import { IStrategyModuleManager } from "../interfaces/IStrategyModuleManager.sol";
 import { IEscrow } from "../interfaces/IEscrow.sol";
@@ -10,8 +12,17 @@ import {HitchensOrderStatisticsTreeLib } from "../libraries/HitchensOrderStatist
 abstract contract AuctionStorage is IAuction {
     /* ================= CONSTANTS + IMMUTABLES ================= */
 
+    /// @notice The split operators allocation
+    uint256 public constant NODE_OP_SPLIT_ALLOCATION = 250_000; // 25%
+
+    /// @notice The split total allocation
+    uint256 public constant SPLIT_TOTAL_ALLOCATION = 1_000_000; // 100% is 1_000_000
+
     /// @notice Bond to pay for the non whitelisted node operators
     uint256 internal constant _BOND = 1 ether;
+
+    /// @notice The split distribution incentive
+    uint16 public constant SPLIT_DISTRIBUTION_INCENTIVE = 20_000; // 2% for the distributor
 
     /// @notice Number of nodes in a Distributed Validator
     uint8 internal constant _CLUSTER_SIZE_4 = 4;
@@ -22,6 +33,9 @@ abstract contract AuctionStorage is IAuction {
 
     /// @notice StrategyVaultManager contract
     IStrategyVaultManager public immutable strategyVaultManager;
+
+    /// @notice 0xSplits' PushSplitFactory contract
+    PushSplitFactory public immutable pushSplitFactory;
 
     /* ===================== STATE VARIABLES ===================== */
 
@@ -66,10 +80,12 @@ abstract contract AuctionStorage is IAuction {
 
     constructor(
         IEscrow _escrow,
-        IStrategyVaultManager _strategyVaultManager
+        IStrategyVaultManager _strategyVaultManager,
+        PushSplitFactory _pushSplitFactory
     ) {
         escrow = _escrow;
         strategyVaultManager = _strategyVaultManager;
+        pushSplitFactory = _pushSplitFactory;
     }
 
     /**

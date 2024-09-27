@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 import { Initializable } from "@openzeppelin-upgrades/contracts/proxy/utils/Initializable.sol";
 import { OwnableUpgradeable } from "@openzeppelin-upgrades/contracts/access/OwnableUpgradeable.sol";
 import { ReentrancyGuardUpgradeable } from "@openzeppelin-upgrades/contracts/security/ReentrancyGuardUpgradeable.sol";
+import { SplitV2Lib } from "splits-v2/libraries/SplitV2.sol";
 
 import { ByzantineAuctionMath } from "../libraries/ByzantineAuctionMath.sol";
 
@@ -24,8 +25,9 @@ contract Auction is
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor(
         IEscrow _escrow,
-        IStrategyVaultManager _strategyVaultManager
-    ) AuctionStorage(_escrow, _strategyVaultManager) {
+        IStrategyVaultManager _strategyVaultManager,
+        PushSplitFactory _pushSplitFactory
+    ) AuctionStorage(_escrow, _strategyVaultManager, _pushSplitFactory) {
         // Disable initializer in the context of the implementation contract
         _disableInitializers();
     }
@@ -67,6 +69,13 @@ contract Auction is
 
         // Remove the winning cluster from the main auction tree
         _mainAuctionTree.remove(winningClusterId, winningAvgAuctionScore);
+
+        // Create the split struct of the winning cluster
+        SplitV2Lib.Split splitParams= _createSplitParams(winningClusterDetails.nodes);
+
+        // deploy the Split contract and update ClusterDetails
+        address splitAddr = pushSplitFactory.createSplit(splitParams, owner(), owner());
+        _clusterDetails[winningClusterId].splitAddr = splitAddr;
 
         // If winning cluster is a newly created DV4, update dv4 sub-auction tree
         if (_bidDetails[winningClusterDetails.nodes[0].bidId].auctionType == AuctionType.JOIN_CLUSTER_4) {
@@ -583,6 +592,30 @@ contract Auction is
     function _transferToEscrow(uint256 _priceToPay) private {
         (bool success,) = address(escrow).call{value: _priceToPay}("");
         if (!success) revert EscrowTransferFailed();
+    }
+
+    /// @notice Create the split parameters depending on the winning nodes
+    function _createSplitParams(NodeDetails[] storage _nodes) internal pure returns (SplitV2Lib.Split) {
+
+        address[] memory recipients = new address[](_nodes.length);
+        uint256[] memory allocations = new uint256[](_nodes.length);
+
+        // Retrieve the addresses of all the _nodes and create the Split allocation
+        for (uint256 i = 0; i < _nodes.length;) {
+            recipients[i] = _bidDetails[_nodes[i].bidId].nodeOp;
+            allocations[i] = NODE_OP_SPLIT_ALLOCATION;
+            unchecked {
+                ++i;
+            }
+        }
+
+        return SplitV2Lib.Split({
+            recipients: recipients,
+            allocations: allocations,
+            totalAllocation: SPLIT_TOTAL_ALLOCATION,
+            distributionIncentive: SPLIT_DISTRIBUTION_INCENTIVE
+        });
+
     }
 
     /* ===================== MODIFIERS ===================== */

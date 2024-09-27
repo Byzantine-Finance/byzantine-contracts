@@ -139,10 +139,6 @@ contract ExistingDeploymentParser is Script, Test {
             strategyVaultManager.delegationManager() == delegation,
             "strategyVaultManager: delegationManager address not set correctly"
         );
-        require(
-            strategyVaultManager.pushSplitFactory() == pushSplitFactory,
-            "strategyVaultManager: pushSplitFactory address not set correctly"
-        );
         // StrategyVaultETHImplementation
         require(
             strategyVaultETHImplementation.stratVaultManager() == strategyVaultManager,
@@ -193,6 +189,10 @@ contract ExistingDeploymentParser is Script, Test {
         require(
             auction.strategyVaultManager() == strategyVaultManager,
             "auction: strategyVaultManager address not set correctly"
+        );
+        require(
+            auction.pushSplitFactory() == pushSplitFactory,
+            "auction: pushSplitFactory address not set correctly"
         );
         // Escrow
         require(

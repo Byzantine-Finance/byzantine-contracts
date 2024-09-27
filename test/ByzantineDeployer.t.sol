@@ -128,13 +128,13 @@ contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
             auction,
             byzNft,
             eigenPodManager,
-            delegation,
-            pushSplitFactory
+            delegation
         );
         ByzNft byzNftImplementation = new ByzNft();
         Auction auctionImplementation = new Auction(
             escrow,
-            strategyVaultManager
+            strategyVaultManager,
+            pushSplitFactory
         );
         Escrow escrowImplementation = new Escrow(
             bidReceiver,

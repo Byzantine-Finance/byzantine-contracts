@@ -196,21 +196,6 @@ contract StrategyVaultETH is Initializable, StrategyVaultETHStorage, AccessContr
     }
 
     /**
-     * @notice Distributes the tokens issued from the PoS rewards evenly between the node operators.
-     * @param _split The current split struct of the StrategyVault. Can be reconstructed offchain since the only variable is the `recipients` field.
-     * @param _token The address of the token to distribute. NATIVE_TOKEN_ADDR = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE
-     * @dev The distributor is the msg.sender. He will earn the distribution fees.
-     * @dev If the push failed, the tokens will be sent to the SplitWarehouse. NodeOp will have to call the withdraw function.
-     */
-    function distributeSplitBalance(
-        SplitV2Lib.Split calldata _split,
-        address _token
-    ) external onlyIfNativeRestaking {
-        address splitAddr = clusterDetails.splitAddr;
-        PushSplit(splitAddr).distribute(_split, _token, msg.sender);
-    }
-
-    /**
      * @notice Change the whitelistedDeposit flag.
      * @dev Callable only by the owner of the Strategy Vault's ByzNft.
      */
@@ -240,14 +225,6 @@ contract StrategyVaultETH is Initializable, StrategyVaultETHStorage, AccessContr
      */
     function getDVNodesDetails() public view onlyIfNativeRestaking returns (IStrategyVaultETH.Node[4] memory) {
         return clusterDetails.nodes;
-    }
-
-    /**
-     * @notice Returns the address of the Split contract.
-     * @dev Contract where the PoS rewards will be sent (both execution and consensus rewards).
-     */
-    function getSplitAddress() public view onlyIfNativeRestaking returns (address) {
-        return clusterDetails.splitAddr;
     }
 
     /* ============== INTERNAL FUNCTIONS ============== */

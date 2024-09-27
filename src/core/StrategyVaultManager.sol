@@ -30,9 +30,8 @@ contract StrategyVaultManager is
         IAuction _auction,
         IByzNft _byzNft,
         IEigenPodManager _eigenPodManager,
-        IDelegationManager _delegationManager,
-        PushSplitFactory _pushSplitFactory
-    ) StrategyVaultManagerStorage(_stratVaultETHBeacon, _stratVaultERC20Beacon, _auction, _byzNft, _eigenPodManager, _delegationManager, _pushSplitFactory) {
+        IDelegationManager _delegationManager
+    ) StrategyVaultManagerStorage(_stratVaultETHBeacon, _stratVaultERC20Beacon, _auction, _byzNft, _eigenPodManager, _delegationManager) {
         // Disable initializer in the context of the implementation contract
         _disableInitializers();
     }
@@ -114,9 +113,6 @@ contract StrategyVaultManager is
         (bool success, ) = address(newStratVault).call{value: msg.value}("");
         if (!success) revert ETHTransferFailed();
 
-        // deploy the Split contract
-        address splitAddr = pushSplitFactory.createSplitDeterministic(pendingClusters[numStratVaults].splitParams, owner(), owner(), bytes32(uint256(keccak256(abi.encode(numStratVaults)))));
-
     }
 
     /**
@@ -165,6 +161,25 @@ contract StrategyVaultManager is
 
         // Stake ERC20
         newStratVault.stakeERC20(token, amount);
+    }
+
+    /**
+     * @notice Distributes the tokens issued from the PoS rewards evenly between the node operators of a specific cluster.
+     * @param _clusterId The cluster ID to distribute the POS rewards for.
+     * @param _split The current split struct of the cluster. Can be reconstructed offchain since the only variable is the `recipients` field.
+     * @param _token The address of the token to distribute. NATIVE_TOKEN_ADDR = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE
+     * @dev Reverts if the cluster doesn't have a split address set / doesn't exist
+     * @dev The distributor is the msg.sender. He will earn the distribution fees.
+     * @dev If the push failed, the tokens will be sent to the SplitWarehouse. NodeOp will have to call the withdraw function.
+     */
+    function distributeSplitBalance(
+        bytes32 _clusterId,
+        SplitV2Lib.Split calldata _split,
+        address _token
+    ) external {
+        address splitAddr = auction.getClusterDetails(_clusterId).splitAddr;
+        if (splitAddr == address(0)) revert SplitAddressNotSet();
+        PushSplit(splitAddr).distribute(_split, _token, msg.sender);
     }
 
     /* ============== VIEW FUNCTIONS ============== */
@@ -319,22 +334,6 @@ contract StrategyVaultManager is
         ++numStratVaults;
 
         return IStrategyVaultETH(stratVault);
-    }
-
-    function _createSplitParams() internal pure returns (
-        address[] memory recipients,
-        uint256[] memory allocations
-    ) {
-        // Split operators allocation
-        allocations = new uint256[](4);
-        for (uint8 i = 0; i < 4;) {
-            allocations[i] = NODE_OP_SPLIT_ALLOCATION;
-            unchecked {
-                ++i;
-            }
-        }
-        // Split recipient addresses
-        recipients = new address[](4); 
     }
 
 }

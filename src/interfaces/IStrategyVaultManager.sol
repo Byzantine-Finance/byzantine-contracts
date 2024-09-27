@@ -8,8 +8,12 @@ import {SplitV2Lib} from "splits-v2/libraries/SplitV2.sol";
 
 interface IStrategyVaultManager {
 
+    /* ============== GETTERS ============== */
+
     /// @notice Get the total number of Strategy Vaults that have been deployed.
     function numStratVaults() external view returns (uint64);
+
+    /* ============== EXTERNAL FUNCTIONS ============== */
 
     /**
      * @notice A strategy designer creates a StrategyVault for Native ETH.
@@ -75,6 +79,23 @@ interface IStrategyVaultManager {
     ) external;
 
     /**
+     * @notice Distributes the tokens issued from the PoS rewards evenly between the node operators of a specific cluster.
+     * @param _clusterId The cluster ID to distribute the POS rewards for.
+     * @param _split The current split struct of the cluster. Can be reconstructed offchain since the only variable is the `recipients` field.
+     * @param _token The address of the token to distribute. NATIVE_TOKEN_ADDR = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE
+     * @dev Reverts if the cluster doesn't have a split address set / doesn't exist
+     * @dev The distributor is the msg.sender. He will earn the distribution fees.
+     * @dev If the push failed, the tokens will be sent to the SplitWarehouse. NodeOp will have to call the withdraw function.
+     */
+    function distributeSplitBalance(
+        bytes32 _clusterId,
+        SplitV2Lib.Split calldata _split,
+        address _token
+    ) external;
+
+    /* ============== VIEW FUNCTIONS ============== */
+
+    /**
      * @notice Returns the number of StrategyVaults owned by an address.
      * @param staker The address you want to know the number of Strategy Vaults it owns.
      */
@@ -107,6 +128,8 @@ interface IStrategyVaultManager {
      * @param staker The address you want to know if it owns at least a StrategyVault.
      */
     function hasStratVaults(address staker) external view returns (bool);
+
+    /* ============== EIGEN LAYER INTERACTION ============== */
 
     /**
      * @notice Specify which `staker`'s StrategyVaults are delegated.
@@ -141,4 +164,7 @@ interface IStrategyVaultManager {
 
     /// @dev Returned when the ETH transfer to the StrategyVault fails
     error ETHTransferFailed();
+
+    /// @dev Returned when trying to distribute the split balance of a cluster that doesn't have a split address set
+    error SplitAddressNotSet();
 }
