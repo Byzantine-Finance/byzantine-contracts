@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "@openzeppelin-upgrades/contracts/proxy/utils/Initializable.sol";
-import "@openzeppelin-upgrades/contracts/access/OwnableUpgradeable.sol";
-import "@openzeppelin-upgrades/contracts/security/ReentrancyGuardUpgradeable.sol";
-import "ds-math/math.sol";
+import { Initializable } from "@openzeppelin-upgrades/contracts/proxy/utils/Initializable.sol";
+import { OwnableUpgradeable } from "@openzeppelin-upgrades/contracts/access/OwnableUpgradeable.sol";
+import { ReentrancyGuardUpgradeable } from "@openzeppelin-upgrades/contracts/security/ReentrancyGuardUpgradeable.sol";
 
-import "../libraries/HitchensOrderStatisticsTreeLib.sol";
+import { HitchensOrderStatisticsTreeLib } from "../libraries/HitchensOrderStatisticsTreeLib.sol";
+import { ByzantineAuctionMath } from "../libraries/ByzantineAuctionMath.sol";
 
 import "./AuctionStorage.sol";
 
@@ -16,8 +16,7 @@ contract Auction is
     Initializable,
     OwnableUpgradeable,
     ReentrancyGuardUpgradeable,
-    AuctionStorage,
-    DSMath
+    AuctionStorage
 {
     using HitchensOrderStatisticsTreeLib for HitchensOrderStatisticsTreeLib.Tree;
 
@@ -33,194 +32,153 @@ contract Auction is
     }
 
     /**
-     * @dev Initializes the address of the initial owner
+     * @dev Initializes the address of the initial owner plus the auction parameters
      */
     function initialize(
         address _initialOwner,
         uint256 _expectedDailyReturnWei,
         uint16 _maxDiscountRate,
-        uint160 _minDuration,
-        uint8 _clusterSize
+        uint32 _minDuration
     ) external initializer {
         _transferOwnership(_initialOwner);
         __ReentrancyGuard_init();
         expectedDailyReturnWei = _expectedDailyReturnWei;
         maxDiscountRate = _maxDiscountRate;
         minDuration = _minDuration;
-        clusterSize = _clusterSize;
     }
 
     /* ===================== EXTERNAL FUNCTIONS ===================== */
 
     /**
-     * @notice Add a node operator to the the whitelist to not make him pay the bond.
-     * @param _nodeOpAddr: the node operator to whitelist.
-     * @dev Revert if the node operator is already whitelisted.
+     * @notice Function triggered by the StrategyVaultManager or a StrategyVaultETH every time a staker deposits ETH
+     * @dev It triggers the DV Auction, returns the winning cluster ID and triggers a new sub-auction
+     * @dev Reverts if not enough node operators in the protocol
+     * @dev Reverts if the caller is not a StrategyVaultETH contract or the StrategyVaultManager
+     * @return The id of the winning cluster
      */
-    function addNodeOpToWhitelist(address _nodeOpAddr) external onlyOwner {
-        if (isWhitelisted(_nodeOpAddr)) revert AlreadyWhitelisted();
-        _nodeOpsWhitelist[_nodeOpAddr] = true;
+    function triggerAuction() external onlyStratVaultManagerOrStratVaultETH nonReentrant returns (bytes32) {
+
+        // Check if at least one DV is ready in the main auction 
+        if (_mainAuctionTree.count() < 1) revert MainAuctionEmpty();
+
+        // Get the winning cluster details
+        (bytes32 winningClusterId, uint256 winningAvgAuctionScore) = getWinningCluster();
+        _clusterDetails[winningClusterId].status = ClusterStatus.IN_CREATION;
+        ClusterDetails memory winningClusterDetails = getClusterDetails(winningClusterId);
+
+        // Remove the winning cluster from the main auction tree
+        _mainAuctionTree.remove(winningClusterId, winningAvgAuctionScore);
+
+        // If winning cluster is a newly created DV4, update dv4 sub-auction tree
+        if (_bidDetails[winningClusterDetails.nodes[0].bidId].auctionType == AuctionType.JOIN_CLUSTER_4) {
+            _mainUdateDv4SubAuction(winningClusterDetails.nodes);
+        }
+
+        return winningClusterId;
     }
 
     /**
-     * @notice Remove a node operator to the the whitelist.
-     * @param _nodeOpAddr: the node operator to remove from whitelist.
-     * @dev Revert if the node operator is not whitelisted.
+     * @notice Function to determine the bid price a node operator will have to pay
+     * @param _nodeOpAddr: address of the node operator who will bid
+     * @param _discountRate: The desired profit margin in percentage of the operator (scale from 0 to 10000)
+     * @param _timeInDays: duration of being part of a DV, in days
+     * @dev Revert if `_discountRate` or `_timeInDays` don't respect the minimum values set by Byzantine.
      */
-    function removeNodeOpFromWhitelist(address _nodeOpAddr) external onlyOwner {
-        if (!isWhitelisted(_nodeOpAddr)) revert NotWhitelisted();
-        _nodeOpsWhitelist[_nodeOpAddr] = false;
-    }
-
-    /**
-     * @notice Function triggered by the StrategyVaultManager every time a staker deposit 32ETH and ask for a DV.
-     * It allows the pre-creation of a new DV for the next staker.
-     * It finds the `clusterSize` node operators with the highest auction scores and put them in a DV.
-     * @dev Reverts if not enough node operators are available.
-     */
-    function getAuctionWinners()
-        external
-        onlyStategyModuleManager
-        nonReentrant
-        returns(IStrategyVault.Node[] memory)
-    {
-        // Check if enough node ops in the auction to create a DV
-        require(numNodeOpsInAuction >= clusterSize, "Not enough node ops in auction");
-        
-        // Returns the auction winners
-        return _getAuctionWinners();
-    }
-
-    /**
-     * @notice Fonction to determine the auction price for a validator according to its bids parameters
-     * @param _nodeOpAddr: address of the node operator who wants to bid
-     * @param _discountRates: array of discount rates (i.e the desired profit margin) in percentage (scale from 0 to 10000)
-     * @param _timesInDays: array of duration of being a validator, in days
-     * @dev Revert if the two entry arrays `_discountRates` and `_timesInDays` have different length
-     * @dev Revert if `_discountRates` or `_timesInDays` don't respect the values set by the byzantine.
-     */
-    function getPriceToPay(
+    function getPriceToPayCluster4(
         address _nodeOpAddr,
-        uint256[] calldata _discountRates,
-        uint256[] calldata _timesInDays
-    ) public view returns (uint256) {
-        // Verify the two entry arrays have the same length
-        require(_discountRates.length == _timesInDays.length, "_discountRates and _timesInDays must have the same length");
+        uint16 _discountRate,
+        uint32 _timeInDays
+    ) external view returns (uint256) {
 
-        uint256 dailyVcPrice;
-        uint256 totalBidPrice;
+        // Verify the standing bid parameters
+        if (_discountRate > maxDiscountRate) revert DiscountRateTooHigh();
+        if (_timeInDays < minDuration) revert DurationTooShort();
 
-        for (uint256 i = 0; i < _discountRates.length;) {
-            // Verify the standing bid parameters
-            if (_discountRates[i] > maxDiscountRate) revert DiscountRateTooHigh();
-            if (_timesInDays[i] < minDuration) revert DurationTooShort();
+        // Calculate operator's bid price
+        uint256 dailyVcPrice = ByzantineAuctionMath.calculateVCPrice(expectedDailyReturnWei, _discountRate, _CLUSTER_SIZE_4);
+        uint256 bidPrice = ByzantineAuctionMath.calculateBidPrice(_timeInDays, dailyVcPrice);
 
-            // Calculate operator's bid price and add it to the total price
-            dailyVcPrice = _calculateDailyVcPrice(_discountRates[i]);
-            totalBidPrice += _calculateBidPrice(_timesInDays[i], dailyVcPrice);
-
-            unchecked {
-                ++i;
-            }
-        }
-
-        // Return the price to pay according to the whitelist
+        // Calculate the total price to pay
         if (isWhitelisted(_nodeOpAddr)) {
-            return totalBidPrice;
+            return bidPrice;
         }
-        return totalBidPrice + (_discountRates.length * _BOND);
+        return bidPrice + _BOND;
     }
 
     /**
-     * @notice Operators set their standing bid(s) parameters and pay their bid(s) to an escrow smart contract.
-     * If a node op doesn't win the auction, its bids stays in the escrow contract for the next auction.
-     * An node op who hasn't won an auction can ask the escrow contract to refund its bid(s) if he wants to leave the protocol.
-     * If a node op wants to update its bid parameters, call `updateBid` function.
-     * @notice Non-whitelisted operators will have to pay the 1ETH bond as well.
-     * @param _discountRates: array of discount rates (i.e the desired profit margin) in percentage (scale from 0 to 10000)
-     * @param _timesInDays: array of duration of being a validator, in days
-     * @dev By calling this function, the node op insert data in the auction Binary Search Tree (sorted by auction score).
-     * @dev Revert if `_discountRates` or `_timesInDays` don't respect the values set by the byzantine or if they don't have the same length.
-     * @dev Revert if the ethers sent by the node op are not enough to pay for the bid(s) (and the bond).
-     * @dev Reverts if the transfer of the funds to the Escrow contract failed.
-     * @dev If too many ethers has been sent the function give back the excess to the sender.
-     * @return The array of each bid auction score.
+     * @notice Bid function to join a cluster of size 4. A call to that function will search the first 4 winners, calculate their average score, and put the virtual DV in the main auction.
+     * Every time a new bid modify the first 4 winners, it update the main auction by removing the previous virtual DV and adding the new one.
+     * @param _discountRate The desired profit margin in percentage of the operator (scale from 0 to 10000)
+     * @param _timeInDays Duration of being part of a DV, in days
+     * @return bidId The id of the bid
+     * @dev The bid price is sent to an escrow smart contract. As long as the node operator doesn't win the auction, its bids stays in the escrow contract.
+     * It is possible to ask the escrow contract to refund the bid if the operator wants to leave the protocol (call `withdrawBid`)
+     * It is possible to update an existing bid parameters (call `updateBid`).
+     * @dev Reverts if the bidder is not whitelisted (permissionless DV will arrive later)
+     * @dev Reverts if the discount rate is too high or the duration is too short
+     * @dev Reverts if the ethers sent by the node op are not enough to pay for the bid(s) (and the bond). If too many ethers has been sent the function returns the excess to the sender.
      */
-    function bid(
-        uint256[] calldata _discountRates,
-        uint256[] calldata _timesInDays
-    ) external payable nonReentrant returns (uint256[] memory) {
+    function bidCluster4(
+        uint16 _discountRate,
+        uint32 _timeInDays
+    ) external payable nonReentrant returns (bytes32 bidId) {
 
-        // Verify the two entry arrays have the same length
-        require(_discountRates.length == _timesInDays.length, "_discountRates and _timesInDays must have the same length");
+        // Only whitelisted node operators can bid
+        if (!isWhitelisted(msg.sender)) revert NotWhitelisted();
 
-        // Update `numNodeOpsInAuction` if necessary
-        if (_nodeOpsInfo[msg.sender].numBids == 0) {
-            numNodeOpsInAuction += 1;
+        // Verify the standing bid parameters
+        if (_discountRate > maxDiscountRate) revert DiscountRateTooHigh();
+        if (_timeInDays < minDuration) revert DurationTooShort();
+
+        // Update `dv4AuctionNumNodeOps` if necessary
+        if (_nodeOpsDetails[msg.sender].numBidsCluster4 == 0) {
+            dv4AuctionNumNodeOps += 1;
         }
-
-        // Convert msg.sender address in bytes32
-        bytes32 bidder = bytes32(uint256(uint160(msg.sender)));
 
         /// TODO: Get the reputation score of msg.sender
-        uint128 reputationScore = 1;
-        _nodeOpsInfo[msg.sender].reputationScore = reputationScore;
+        uint32 reputationScore = 1;
 
-        uint256 dailyVcPrice;
-        uint256 bidPrice;
-        uint256 totalBidPrice;
-        uint256[] memory auctionScores = new uint256[](_discountRates.length);
+        // Calculate operator's bid price and score
+        uint256 dailyVcPrice = ByzantineAuctionMath.calculateVCPrice(expectedDailyReturnWei, _discountRate, _CLUSTER_SIZE_4);
+        uint256 bidPrice = ByzantineAuctionMath.calculateBidPrice(_timeInDays, dailyVcPrice);
+        uint256 auctionScore = ByzantineAuctionMath.calculateAuctionScore(dailyVcPrice, _timeInDays, reputationScore);
 
-        // Iterate over the number of bids
-        for (uint256 i = 0; i < _discountRates.length;) {
-            // Verify the standing bid parameters
-            if (_discountRates[i] > maxDiscountRate) revert DiscountRateTooHigh();
-            if (_timesInDays[i] < minDuration) revert DurationTooShort();
+        // Calculate the bid ID (hash(msg.sender, timestamp, bidType))
+        bidId = keccak256(abi.encodePacked(msg.sender, block.timestamp, _CLUSTER_SIZE_4));
 
-            /// @notice Calculate operator's bid details
-            dailyVcPrice = _calculateDailyVcPrice(_discountRates[i]);
-            bidPrice = _calculateBidPrice(_timesInDays[i], dailyVcPrice);
-            totalBidPrice += bidPrice;
-            auctionScores[i] = _calculateAuctionScore(dailyVcPrice, _timesInDays[i], reputationScore);
+        // Insert the auction score in the cluster 4 sub-auction tree
+        _dv4AuctionTree.insert(bidId, auctionScore);
 
-            // Update auction tree if necessary
-            if (!_auctionTree.keyExists(bidder, auctionScores[i])) {
-                _auctionTree.insert(bidder, auctionScores[i]);
-            }
-            // Update node op auction details
-            _nodeOpsInfo[msg.sender].numBids += 1;
-            _nodeOpsInfo[msg.sender].auctionScoreToBidPrices[auctionScores[i]].push(bidPrice);
-            _nodeOpsInfo[msg.sender].auctionScoreToVcNumbers[auctionScores[i]].push(_timesInDays[i]);
+        // Add bid to the bids mapping
+        _bidDetails[bidId] = BidDetails({
+            auctionScore: auctionScore,
+            bidPrice: bidPrice,
+            nodeOp: msg.sender,
+            vcNumber: _timeInDays, /// TODO: Split the VC among the different validators (or do it in another contract)
+            discountRate: _discountRate,
+            auctionType: AuctionType.JOIN_CLUSTER_4
+        });
+        // Increment the bid number of the node op
+        _nodeOpsDetails[msg.sender].numBidsCluster4 += 1;
 
-            emit BidPlaced(msg.sender, reputationScore, _discountRates[i], _timesInDays[i], bidPrice, auctionScores[i]);
-
-            unchecked {
-                ++i;
-            }
+        // Update main auction if necessary
+        if (auctionScore > _dv4LatestWinningInfo.lastestWinningScore && dv4AuctionNumNodeOps >= _CLUSTER_SIZE_4) {
+            _dv4UpdateMainAuction();
         }
+        
+        /// TODO Events
+        /// emit BidPlaced(msg.sender, reputationScore, _discountRate[i], _timeInDays[i], bidPrice, auctionScores[i]);
 
+        // Calculate the total price to pay, verify it and send it to the escrow contract
         uint256 priceToPay;
-        // If msg.sender is whitelisted, he only pays the totalBidPrice
         if (isWhitelisted(msg.sender)) {
-            priceToPay = totalBidPrice;
+            priceToPay = bidPrice;
         } else {
-            priceToPay = totalBidPrice + (_discountRates.length * _BOND);
+            priceToPay = bidPrice + _BOND;
+            _nodeOpsDetails[msg.sender].numBonds += 1;
         }
-
-        // Verify if the sender has sent enough ethers
-        if (msg.value < priceToPay) revert NotEnoughEtherSent();
-
-        // If to many ethers has been sent, refund the sender
-        uint256 amountToRefund = msg.value - priceToPay;
-        if (amountToRefund > 0) {
-            payable(msg.sender).transfer(amountToRefund);
-        }
-
-        // Transfer the ethers in the escrow contract
-        (bool success,) = address(escrow).call{value: priceToPay}("");
-        if (!success) revert EscrowTransferFailed();
-
-        return auctionScores;
+        _verifyEthSent(msg.value, priceToPay);
+        _transferToEscrow(priceToPay);
     }
 
     /**
@@ -233,11 +191,11 @@ contract Auction is
      * @dev Reverts if the node op doesn't have a bid with `_oldAuctionScore`.
      * @dev Revert if `_newDiscountRate` or `_newTimeInDays` don't respect the values set by the byzantine.
      */
-    function getUpdateOneBidPrice(
+    /*function getUpdateOneBidPrice(
         address _nodeOpAddr,
         uint256 _oldAuctionScore,
-        uint256 _newDiscountRate,
-        uint256 _newTimeInDays
+        uint16 _newDiscountRate,
+        uint32 _newTimeInDays
     ) public view returns (uint256) {
         // Verify if `_nodeOpAddr` has at least a bid with `_oldAuctionScore`
         require (getNodeOpAuctionScoreBidPrices(_nodeOpAddr, _oldAuctionScore).length > 0, "Wrong node op auctionScore");
@@ -253,8 +211,8 @@ contract Auction is
         uint256 lastBidPrice = _nodeOpsInfo[_nodeOpAddr].auctionScoreToBidPrices[_oldAuctionScore][numSameBids - 1];
 
         // Calculate operator's new bid price
-        uint256 newDailyVcPrice = _calculateDailyVcPrice(_newDiscountRate);
-        uint256 newBidPrice = _calculateBidPrice(_newTimeInDays, newDailyVcPrice);
+        uint256 newDailyVcPrice = ByzantineAuctionMath.calculateVCPrice(expectedDailyReturnWei, _newDiscountRate, clusterSize);
+        uint256 newBidPrice = ByzantineAuctionMath.calculateBidPrice(_newTimeInDays, newDailyVcPrice);
 
         if (newBidPrice > lastBidPrice) {
             unchecked {
@@ -262,7 +220,7 @@ contract Auction is
             }
         }
         return 0;
-    }
+    }*/
 
     /**
      * @notice  Update a bid of a node operator associated to `_oldAuctionScore`. The node op will have to pay more if he outbids. 
@@ -275,10 +233,10 @@ contract Auction is
      * @dev Reverts if the transfer of the funds to the Escrow contract failed.
      * @dev Revert if `_newDiscountRate` or `_newTimeInDays` don't respect the values set by the byzantine.
      */
-    function updateOneBid(
+    /*function updateOneBid(
         uint256 _oldAuctionScore,
-        uint256 _newDiscountRate,
-        uint256 _newTimeInDays
+        uint16 _newDiscountRate,
+        uint32 _newTimeInDays
     ) external payable nonReentrant returns (uint256){
         // Verify if the sender has at least a bid with `_oldAuctionScore`
         require (getNodeOpAuctionScoreBidPrices(msg.sender, _oldAuctionScore).length > 0, "Wrong node op auctionScore");
@@ -307,12 +265,12 @@ contract Auction is
         }
 
         /// TODO: Get the reputation score of msg.sender
-        uint128 reputationScore = 1;
+        uint32 reputationScore = 1;
 
         /// @notice Calculate operator's new bid price and new auction score
-        uint256 newDailyVcPrice = _calculateDailyVcPrice(_newDiscountRate);
-        uint256 newBidPrice = _calculateBidPrice(_newTimeInDays, newDailyVcPrice);
-        uint256 newAuctionScore = _calculateAuctionScore(newDailyVcPrice, _newTimeInDays, reputationScore);
+        uint256 newDailyVcPrice = ByzantineAuctionMath.calculateVCPrice(expectedDailyReturnWei, _newDiscountRate, clusterSize);
+        uint256 newBidPrice = ByzantineAuctionMath.calculateBidPrice(_newTimeInDays, newDailyVcPrice);
+        uint256 newAuctionScore = ByzantineAuctionMath.calculateAuctionScore(newDailyVcPrice, _newTimeInDays, reputationScore);
 
         // Verify if new Auction score doesn't already exist
         if (!_auctionTree.keyExists(bidder, newAuctionScore)) {
@@ -353,14 +311,14 @@ contract Auction is
 
         return newAuctionScore;
 
-    }
+    }*/
 
     /**
      * @notice Allow a node operator to withdraw a specific bid (through its auction score).
      * The withdrawer will be refund its bid price plus (the bond of he paid it).
      * @param _auctionScore: auction score of the bid to withdraw. Will withdraw the last bid with this score.
      */
-    function withdrawBid(uint256 _auctionScore) external {
+    /*function withdrawBid(uint256 _auctionScore) external {
         // Verify if the sender has at least a bid with `_auctionScore`
         require (getNodeOpAuctionScoreBidPrices(msg.sender, _auctionScore).length > 0, "Wrong node op auctionScore");
 
@@ -394,230 +352,247 @@ contract Auction is
         }
 
         emit BidWithdrawn(msg.sender, _auctionScore);
-    }
+    }*/
 
-    /**
-     * @notice Update the auction configuration except cluster size
-     * @param _expectedDailyReturnWei: the new expected daily return of Ethereum staking (in wei)
-     * @param _maxDiscountRate: the new maximum discount rate (i.e the max profit margin of node op) (from 0 to 10000 -> 100%)
-     * @param _minDuration: the new minimum duration of beeing a validator in a DV (in days)
-     */
-    function updateAuctionConfig(
-        uint256 _expectedDailyReturnWei,
-        uint16 _maxDiscountRate,
-        uint160 _minDuration
-    ) external onlyOwner {
-        expectedDailyReturnWei = _expectedDailyReturnWei;
-        maxDiscountRate = _maxDiscountRate;
-        minDuration = _minDuration;
-    }
+    /* ===================== VIEW FUNCTIONS ===================== */
 
-    /**
-     * @notice Update the cluster size (i.e the number of node operators in a DV)
-     * @param _clusterSize: the new cluster size
-     */
-    function updateClusterSize(uint8 _clusterSize) external onlyOwner {
-        require(_clusterSize >= 4, "Cluster size must be at least 4.");
-        clusterSize = _clusterSize;
-    }
-
-    /* ===================== GETTER FUNCTIONS ===================== */
-
-    
-    /// @notice Return true if the `_nodeOpAddr` is whitelisted, false otherwise.
+    /// @notice Returns true if `_nodeOpAddr` is whitelisted, false otherwise.
     function isWhitelisted(address _nodeOpAddr) public view returns (bool) {
-        return _nodeOpsWhitelist[_nodeOpAddr];
+        return _nodeOpsDetails[_nodeOpAddr].isWhitelisted;
     }
 
-    
-    /// @notice Return the pending bid number of the `_nodeOpAddr`.
-    function getNodeOpBidNumber(address _nodeOpAddr) public view returns (uint256) {
-        return _nodeOpsInfo[_nodeOpAddr].numBids;
-    }
-
-    /**
-     * @notice Return the pending bid(s) price of the `_nodeOpAddr` corresponding to `_auctionScore`.
-     * @param _auctionScore The auction score of the node operator you want to get the corresponding bid(s) price.
-     * @return (uint256[] memory) An array of all the bid price for that specific auctionScore
-     * @dev If `_nodeOpAddr` doesn't have `_auctionScore` in his mapping, return an empty array.
-     * @dev A same `_auctionScore` can have different bid prices depending on the reputationScore variations.
-     */
-    function getNodeOpAuctionScoreBidPrices(
-        address _nodeOpAddr,
-        uint256 _auctionScore
-    ) public view returns (uint256[] memory) {
-        return _nodeOpsInfo[_nodeOpAddr].auctionScoreToBidPrices[_auctionScore];
+    /// @notice Returns the number of DVs in the main auction
+    function getNumDVInAuction() public view returns (uint256) {
+        return _mainAuctionTree.count();
     }
 
     /**
-     * @notice Return the pending VCs number of the `_nodeOpAddr` corresponding to `_auctionScore`.
-     * @param _auctionScore The auction score of the node operator you want to get the corresponding VCs numbers.
-     * @return (uint256[] memory) An array of all the VC numbers for that specific auctionScore
-     * @dev If `_nodeOpAddr` doesn't have `_auctionScore` in his mapping, return an empty array.
-     * @dev A same `_auctionScore` can have different VCs numbers depending on the reputationScore variations.
+     * @notice Returns the details of a specific bid
+     * @param _bidId The unique identifier of the bid
+     * @return BidDetails struct containing the bid details
      */
-    function getNodeOpAuctionScoreVcs(
-        address _nodeOpAddr,
-        uint256 _auctionScore
-    ) public view returns (uint256[] memory) {
-        return _nodeOpsInfo[_nodeOpAddr].auctionScoreToVcNumbers[_auctionScore];
-    }
-
-    /* ===================== INTERNAL FUNCTIONS ===================== */
-
-    /**
-     * @notice Calculate and returns the daily Validation Credit price (in WEI)
-     * @param _discountRate: discount rate (i.e the desired profit margin) in percentage (scale from 0 to 10000)
-     * @dev vc_price = Re*(1 - D)/cluster_size
-     * @dev The `expectedDailyReturnWei` is set by Byzantine and corresponds to the Ethereum daily staking return.
-     */
-    function _calculateDailyVcPrice(uint256 _discountRate) internal view returns (uint256) {
-        return (expectedDailyReturnWei * (10000 - _discountRate)) / (clusterSize * 10000);
+    function getBidDetails(bytes32 _bidId) public view returns (BidDetails memory) {
+        return _bidDetails[_bidId];
     }
 
     /**
-     * @notice Calculate and returns the bid price that should be paid by the node operator (in WEI)
-     * @param _timeInDays: duration of being a validator, in days
-     * @param _dailyVcPrice: daily Validation Credit price (in WEI)
-     * @dev bid_price = time_in_days * vc_price
+     * @notice Returns the details of a specific cluster
+     * @param _clusterId The unique identifier of the cluster
+     * @return ClusterDetails struct containing the cluster details
      */
-    function _calculateBidPrice(
-        uint256 _timeInDays,
-        uint256 _dailyVcPrice
-    ) internal pure returns (uint256) {
-        return _timeInDays * _dailyVcPrice;
+    function getClusterDetails(bytes32 _clusterId) public view returns (ClusterDetails memory) {
+        return _clusterDetails[_clusterId];
     }
 
     /**
-     * @notice Calculate and returns the auction score of a node operator
-     * @param _dailyVcPrice: daily Validation Credit price in WEI
-     * @param _timeInDays: duration of being a validator, in days
-     * @param _reputation: reputation score of the operator
-     * @dev powerValue = 1.001**_timeInDays, calculated from `_pow` function
-     * @dev The result is divided by 1e18 to downscaled from 1e36 to 1e18
+     * @notice Returns the id of the cluster with the highest average auction score
+     * @dev Returns (bytes32(0), 0) if main tree is empty
      */
-    function _calculateAuctionScore(
-        uint256 _dailyVcPrice,
-        uint256 _timeInDays,
-        uint256 _reputation
-    ) internal pure returns (uint256) {
-        uint256 powerValue = _pow(_timeInDays);
-        return (_dailyVcPrice * powerValue * _reputation) / _WAD;
+    function getWinningCluster() public view returns (bytes32 winningClusterId, uint256 highestAvgAuctionScore) {
+        highestAvgAuctionScore = _mainAuctionTree.last();
+        if (highestAvgAuctionScore == 0) {
+            winningClusterId = bytes32(0);
+        } else {
+            winningClusterId = _mainAuctionTree.valueKeyAtIndex(highestAvgAuctionScore, 0);
+        }
     }
 
-    /**
-     * @notice Calculate the power value of 1.001**_timeInDays
-     * @dev The result is divided by 1e9 to downscaled to 1e18 as the return value of `rpow` is upscaled to 1e27
-     */
-    function _pow(uint256 _timeIndays) internal pure returns (uint256) {
-        uint256 fixedPoint = 1001 * 1e24;
-        return DSMath.rpow(fixedPoint, _timeIndays) / 1e9;
-    }
+    /* ======================= OWNER FUNCTIONS ======================= */
 
     /**
-     * @notice Function to get the auction winners. It returns the node operators addresses with the highest auction score.
-     * @dev We assume the winners directly accept to join the DV, therefore this function cleans the auction tree and releases the bid price locked in the escrow.
-     * @dev A same Eth address can not figure more than one time a same cluster.  
+     * @notice Add node operators to the whitelist
+     * @param _nodeOpAddrs: A dynamique array of the addresses to whitelist
      */
-    function _getAuctionWinners() internal returns (IStrategyVault.Node[] memory) {
-
-        // Create the Node structure array for the Strategy Vault
-        IStrategyVault.Node[] memory auctionWinners = new IStrategyVault.Node[](clusterSize);
-
-        // Create the best auctionScores array
-        uint256[] memory bestAuctionScores = new uint256[](clusterSize);
-
-        // Variables usefull for the algorithm
-        uint256 i;
-        uint256 count;
-        bytes32 winnerKey;
-        address winnerAddr;
-        bool winnerExists;
-        uint256 numSameBids;
-
-        /* ===================== BEST AUCTION SCORE WINNER(S) ===================== */
-
-        // Get the `clusterSize` biggest AuctionScores (can be 0 if not enough different auction scores)
-        bestAuctionScores[0] = _auctionTree.last();
-        for (i = 1; i < clusterSize;) {
-            bestAuctionScores[i] = _auctionTree.prev(bestAuctionScores[i - 1]);
+    function whitelistNodeOps(address[] calldata _nodeOpAddrs) external onlyOwner {
+        for (uint256 i = 0; i < _nodeOpAddrs.length;) {
+            _nodeOpsDetails[_nodeOpAddrs[i]].isWhitelisted = true;
             unchecked {
                 ++i;
             }
         }
+    }
 
-        for (i = 0; i < clusterSize;) {
-            // Get all the node ops with this auctionScore
-            (,,,,uint256 _keyCount,) = _auctionTree.getNode(bestAuctionScores[i]);
+    /**
+     * @notice Remove a node operator to the the whitelist.
+     * @param _nodeOpAddr: the node operator to remove from whitelist.
+     * @dev Revert if the node operator is not whitelisted.
+     */
+    /*function removeNodeOpFromWhitelist(address _nodeOpAddr) external onlyOwner {
+        if (!isWhitelisted(_nodeOpAddr)) revert NotWhitelisted();
+        _nodeOpsWhitelist[_nodeOpAddr] = false;
+    }*/
 
-            uint256 l; // To find the index of the key to select
-            // Loop through all the node ops with this auctionScore
-            for (uint256 j = 0; j < _keyCount;) {
-                winnerKey = _auctionTree.valueKeyAtIndex(bestAuctionScores[i], l);
-                winnerAddr = address(uint160(uint256(winnerKey)));
-                numSameBids = _nodeOpsInfo[winnerAddr].auctionScoreToBidPrices[bestAuctionScores[i]].length;
+    /**
+     * @notice Update the expected daily PoS rewards variable (in Wei)
+     * @dev This function is callable only by the Auction contract's owner
+     * @param _newExpectedDailyReturnWei: the new expected daily return of Ethereum staking (in wei)
+     */
+    function updateExpectedDailyReturnWei(uint256 _newExpectedDailyReturnWei) external onlyOwner {
+        expectedDailyReturnWei = _newExpectedDailyReturnWei;
+    }
+
+    /**
+     * @notice Update the minimum validation duration
+     * @dev This function is callable only by the Auction contract's owner
+     * @param _newMinDuration: the new minimum duration of being a validator in a DV (in days)
+     */
+    function updateMinDuration(uint32 _newMinDuration) external onlyOwner {
+        minDuration = _newMinDuration;
+    }
+
+    /**
+     * @notice Update the maximum discount rate
+     * @dev This function is callable only by the Auction contract's owner
+     * @param _newMaxDiscountRate: the new maximum discount rate (i.e the max profit margin of node op) (from 0 to 10000 -> 100%)
+     */
+    function updateMaxDiscountRate(uint16 _newMaxDiscountRate) external onlyOwner {
+        maxDiscountRate = _newMaxDiscountRate;
+    }
+
+    /* ======================= PRIVATE FUNCTIONS ======================= */
+
+    function _dv4UpdateMainAuction() private {
+
+        // Create the Node structure array for the Strategy Module
+        NodeDetails[] memory dv4Winners = new NodeDetails[](_CLUSTER_SIZE_4);
+
+        // 4 best auctionScores array
+        uint256[] memory bestAuctionScores = new uint256[](_CLUSTER_SIZE_4);
+
+        // 4 winners address array
+        address[] memory winnersAddr = new address[](_CLUSTER_SIZE_4);
+
+        uint256 winnerCount;
+        bytes32 bidId;
+        uint256 frozenAuctionScore;
+        bool winnerExists;
+
+        // Find the sub-auction 4 winners
+        while (winnerCount < _CLUSTER_SIZE_4) {
+            // Fill bestAuctionScores array
+            if (winnerCount == 0) {
+                bestAuctionScores[winnerCount] = _dv4AuctionTree.last();
+            } else {
+                bestAuctionScores[winnerCount] = _dv4AuctionTree.prev(frozenAuctionScore);
+            }
+
+            (,,,,uint256 numSameBids,) = _dv4AuctionTree.getNode(bestAuctionScores[winnerCount]);
+
+            frozenAuctionScore = bestAuctionScores[winnerCount];
+            for (uint256 i = 0; i < numSameBids && winnerCount < _CLUSTER_SIZE_4;) {
+                bidId = _dv4AuctionTree.valueKeyAtIndex(frozenAuctionScore, i);
 
                 // Verify if the `winnerAddr` isn't already in the array
                 winnerExists = false;
-                for (uint256 k = 0; k < count;) {
-                    if (auctionWinners[k].eth1Addr == winnerAddr) {
+                for (uint256 j = 0; j < winnerCount;) {
+                    if (_bidDetails[bidId].nodeOp == winnersAddr[j]) {
                         winnerExists = true;
                         break;
                     }
                     unchecked {
-                        ++k;
+                        ++j;
                     }
                 }
 
+                // Save winner's details
                 if (!winnerExists) {
-                    // Unlock the winner's bid price from the escrow
-                    escrow.releaseFunds(_nodeOpsInfo[winnerAddr].auctionScoreToBidPrices[bestAuctionScores[i]][numSameBids - 1]);
-
-                    // Create Node structure for the Strategy Vault
-                    auctionWinners[count] = IStrategyVault.Node(
-                        _nodeOpsInfo[winnerAddr].auctionScoreToVcNumbers[bestAuctionScores[i]][numSameBids - 1], // Validation Credits number associated to the auction score
-                        _nodeOpsInfo[winnerAddr].reputationScore, // Reputation score of the node
-                        winnerAddr // Winner address
-                    );
-                    ++count;
-
-                    // Update auction tree (if necessary) and node ops details mappings
-                    if (numSameBids == 1) {
-                        _auctionTree.remove(winnerKey, bestAuctionScores[i]);
-                        delete _nodeOpsInfo[winnerAddr].auctionScoreToBidPrices[bestAuctionScores[i]];
-                        delete _nodeOpsInfo[winnerAddr].auctionScoreToVcNumbers[bestAuctionScores[i]];
-                    } else {
-                        _nodeOpsInfo[winnerAddr].auctionScoreToBidPrices[bestAuctionScores[i]].pop();
-                        _nodeOpsInfo[winnerAddr].auctionScoreToVcNumbers[bestAuctionScores[i]].pop();
-                        ++l;
-                    }
-                    _nodeOpsInfo[winnerAddr].numBids -= 1;
-
-                    // Decrease the number of node ops in the auction if the winner has no more bids
-                    if (_nodeOpsInfo[winnerAddr].numBids == 0) --numNodeOpsInAuction;
-                    
-                    emit WinnerJoinedDV(winnerAddr, bestAuctionScores[i]);
-
-                    // End function if enough winners
-                    if (count == clusterSize) return auctionWinners;
+                    winnersAddr[winnerCount] = _bidDetails[bidId].nodeOp;
+                    dv4Winners[winnerCount].bidId = bidId;
+                    dv4Winners[winnerCount].currentVCNumber = _bidDetails[bidId].vcNumber;
+                    if (i > 0) bestAuctionScores[winnerCount] = bestAuctionScores[winnerCount - 1];
+                    ++winnerCount;
                 }
 
                 unchecked {
-                    ++j;
+                    ++i;
                 }
             }
+        }
+
+        // Calculate the average auction score and cluster ID
+        uint256 averageAuctionScore = ByzantineAuctionMath.calculateAverageAuctionScore(bestAuctionScores);
+        bytes32 clusterId = ByzantineAuctionMath.generateClusterId(block.timestamp, winnersAddr, averageAuctionScore);        
+
+        // Update main auction
+        _updateMainAuctionTree(clusterId, averageAuctionScore);
+
+        // Update cluster mapping
+        _createClusterDetails(clusterId, averageAuctionScore, dv4Winners);
+
+        // Update the lastest winning info
+        _dv4LatestWinningInfo.lastestWinningScore = bestAuctionScores[_CLUSTER_SIZE_4 - 1];
+        _dv4LatestWinningInfo.latestWinningClusterId = clusterId;
+    }
+
+    /// @notice Called if a winning DV comes from the dv4 sub-auction
+    function _mainUdateDv4SubAuction(NodeDetails[] memory _nodesToRemove) private {
+
+        // Reset the latest winning info
+        _dv4LatestWinningInfo.lastestWinningScore = 0;
+        _dv4LatestWinningInfo.latestWinningClusterId = bytes32(0);
+
+        for (uint256 i = 0; i < _nodesToRemove.length;) {
+            // Remove the winning node operator bid from the dv4 sub-auction tree
+            _dv4AuctionTree.remove(_nodesToRemove[i].bidId, _bidDetails[_nodesToRemove[i].bidId].auctionScore);
+            // Update the bids number of the node op in dv4 sub-auction
+            _nodeOpsDetails[_bidDetails[_nodesToRemove[i].bidId].nodeOp].numBidsCluster4 -= 1;
+            // Update the number of node ops in dv4 sub-auction if necessary
+            if (_nodeOpsDetails[_bidDetails[_nodesToRemove[i].bidId].nodeOp].numBidsCluster4 == 0) dv4AuctionNumNodeOps -= 1;
             unchecked {
                 ++i;
             }
         }
+        
+        // If enough operators in dv4 sub-auction, update main tree
+        if (dv4AuctionNumNodeOps >= _CLUSTER_SIZE_4) _dv4UpdateMainAuction();
+    }
 
-        return auctionWinners;
+    /// @notice Update the main auction tree by adding a new virtual cluster and removing the old one
+    function _updateMainAuctionTree(bytes32 _newClusterId, uint256 _newAvgAuctionScore) private {
+        if (_dv4LatestWinningInfo.latestWinningClusterId != bytes32(0)) {
+            uint256 lastAverageAuctionScore = _clusterDetails[_dv4LatestWinningInfo.latestWinningClusterId].averageAuctionScore;
+            _mainAuctionTree.remove(_dv4LatestWinningInfo.latestWinningClusterId, lastAverageAuctionScore);
+            delete _clusterDetails[_dv4LatestWinningInfo.latestWinningClusterId];
+        }
+        _mainAuctionTree.insert(_newClusterId, _newAvgAuctionScore);
+    }
+
+    /// @notice Create a new entry in the `_clusterDetails` mapping
+    function _createClusterDetails(bytes32 _clusterId, uint256 _averageAuctionScore, NodeDetails[] memory _nodes) private {
+        _clusterDetails[_clusterId].averageAuctionScore = _averageAuctionScore;
+        for (uint256 i = 0; i < _CLUSTER_SIZE_4;) {
+            _clusterDetails[_clusterId].nodes.push(_nodes[i]);
+            unchecked {
+                ++i;
+            }
+        }
+    }
+
+    /// @notice Verify if the bidder has sent enough ethers. Refund the excess if it's the case.
+    function _verifyEthSent(uint256 _ethSent, uint256 _priceToPay) private {
+        if (_ethSent < _priceToPay) revert NotEnoughEtherSent();
+
+        // If too many ethers have been sent, refund the sender
+        uint256 amountToRefund = _ethSent - _priceToPay;
+        if (amountToRefund > 0) {
+            (bool success, ) = msg.sender.call{value: amountToRefund}("");
+            if (!success) revert RefundFailed();
+        }
+    }
+
+    /// @notice Transfer `_priceToPay` to the Escrow contract
+    function _transferToEscrow(uint256 _priceToPay) private {
+        (bool success,) = address(escrow).call{value: _priceToPay}("");
+        if (!success) revert EscrowTransferFailed();
     }
 
     /* ===================== MODIFIERS ===================== */
 
-    modifier onlyStategyModuleManager() {
-        if (msg.sender != address(strategyVaultManager)) revert OnlyStrategyVaultManager();
+    modifier onlyStratVaultManagerOrStratVaultETH() {
+        if (msg.sender != address(strategyModuleManager)) {
+            /// TODO Verify if msg.sender is a StratVaultETH through a StrategyModuleManager function
+            revert OnlyStratVaultManagerOrStratVaultETH();
+        }
         _;
     }
 

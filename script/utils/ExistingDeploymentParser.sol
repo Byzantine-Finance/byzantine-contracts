@@ -54,8 +54,7 @@ contract ExistingDeploymentParser is Script, Test {
     // Initial Auction parameters
     uint256 EXPECTED_POS_DAILY_RETURN_WEI;
     uint16 MAX_DISCOUNT_RATE;
-    uint160 MIN_VALIDATION_DURATION;
-    uint8 CLUSTER_SIZE;
+    uint32 MIN_VALIDATION_DURATION;
 
     /// @notice use for deploying a new set of Byzantine contracts
     function _parseInitialDeploymentParams(string memory initialDeploymentParamsPath) internal virtual {
@@ -73,8 +72,7 @@ contract ExistingDeploymentParser is Script, Test {
         // read auction config
         EXPECTED_POS_DAILY_RETURN_WEI = stdJson.readUint(initialDeploymentData, ".auctionConfig.expected_pos_daily_return_wei");
         MAX_DISCOUNT_RATE = uint16(stdJson.readUint(initialDeploymentData, ".auctionConfig.max_discount_rate"));
-        MIN_VALIDATION_DURATION = uint160(stdJson.readUint(initialDeploymentData, ".auctionConfig.min_Validation_duration"));
-        CLUSTER_SIZE = uint8(stdJson.readUint(initialDeploymentData, ".auctionConfig.cluster_size"));
+        MIN_VALIDATION_DURATION = uint32(stdJson.readUint(initialDeploymentData, ".auctionConfig.min_validation_duration"));
 
         // read bidReceiver address
         bidReceiver = stdJson.readAddress(initialDeploymentData, ".bidReceiver");
@@ -253,7 +251,7 @@ contract ExistingDeploymentParser is Script, Test {
         byzNft.initialize(strategyVaultManager);
         // Auction
         vm.expectRevert(bytes("Initializable: contract is already initialized"));
-        auction.initialize(byzantineAdmin, EXPECTED_POS_DAILY_RETURN_WEI, MAX_DISCOUNT_RATE, MIN_VALIDATION_DURATION, CLUSTER_SIZE);
+        auction.initialize(byzantineAdmin, EXPECTED_POS_DAILY_RETURN_WEI, MAX_DISCOUNT_RATE, MIN_VALIDATION_DURATION);
     }
 
     /// @notice Verify params based on config constants that are updated from calling `_parseInitialDeploymentParams`
@@ -279,7 +277,6 @@ contract ExistingDeploymentParser is Script, Test {
         emit log_named_uint("EXPECTED_POS_DAILY_RETURN_WEI", EXPECTED_POS_DAILY_RETURN_WEI);
         emit log_named_uint("MAX_DISCOUNT_RATE", MAX_DISCOUNT_RATE);
         emit log_named_uint("MIN_VALIDATION_DURATION", MIN_VALIDATION_DURATION);
-        emit log_named_uint("CLUSTER_SIZE", CLUSTER_SIZE);
 
         emit log_named_address("eigenPodManager contract address", address(eigenPodManager));
         emit log_named_address("delegationManager contract address", address(delegation));

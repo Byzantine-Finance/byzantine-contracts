@@ -32,10 +32,9 @@ contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
     // Address which receives the bid of the winners (will be a smart contract in the future to distribute the rewards)
     address public bidReceiver = makeAddr("bidReceiver");
     // Initial Auction parameters
-    uint256 public currentPoSDailyReturnWei = (uint256(32 ether) * 37) / (1000 * 365); // 3.7% APY
+    uint256 public currentPoSDailyReturnWei = (uint256(32 ether) * 37) / (1000 * 365); // 3.7% APY --> 3243835616438356 WEI
     uint16 public maxDiscountRate = 15e2; // 15%
     uint160 public minValidationDuration = 30; // 30 days
-    uint8 public clusterSize = 4;
 
     /* =============== TEST VARIABLES AND STRUCT =============== */
    
@@ -60,10 +59,12 @@ contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
         makeAddr("node_operator_9")
     ];
 
-    struct NodeOpBid {
-        address nodeOp;
-        uint256[] discountRates;
-        uint256[] timesInDays;
+    // Struct for storing the current winning cluster details
+    struct WinningClusterInfo {
+        uint256[] auctionScores;
+        address[] winnersAddr;
+        uint256 averageAuctionScore;
+        bytes32 clusterId;
     }
 
     function setUp() public virtual override(EigenLayerDeployer, SplitsV2Deployer) {
@@ -168,8 +169,7 @@ contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
                 byzantineAdmin,
                 currentPoSDailyReturnWei,
                 maxDiscountRate,
-                minValidationDuration,
-                clusterSize
+                minValidationDuration
             )
         );
         // Upgrade Escrow
@@ -191,7 +191,6 @@ contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
         assertEq(auction.expectedDailyReturnWei(), currentPoSDailyReturnWei);
         assertEq(auction.maxDiscountRate(), maxDiscountRate);
         assertEq(auction.minDuration(), minValidationDuration);
-        assertEq(auction.clusterSize(), clusterSize);
     }
 
 } 

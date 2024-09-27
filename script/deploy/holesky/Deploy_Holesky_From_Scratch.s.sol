@@ -132,8 +132,7 @@ contract Deploy_Holesky_From_Scratch is ExistingDeploymentParser {
                 byzantineAdmin,
                 EXPECTED_POS_DAILY_RETURN_WEI,
                 MAX_DISCOUNT_RATE,
-                MIN_VALIDATION_DURATION,
-                CLUSTER_SIZE
+                MIN_VALIDATION_DURATION
             )
         );
         // Upgrade Escrow

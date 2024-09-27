@@ -13,9 +13,6 @@
 [submodule "lib/eigenlayer-contracts"]
 	path = lib/eigenlayer-contracts
 	url = https://github.com/Layr-Labs/eigenlayer-contracts
-[submodule "lib/ds-math"]
-	path = lib/ds-math
-	url = https://github.com/dapphub/ds-math
 [submodule "lib/splits-contracts-v2"]
 	path = lib/splits-contracts-v2
 	url = https://github.com/asanson1404/splits-contracts-monorepo
