@@ -31,6 +31,13 @@ contract StrategyVaultETH is Initializable, StrategyVaultETHStorage, ERC4626Mult
         _;
     }
 
+    modifier checkDelegator() {
+        if (msg.sender != address(stratVaultManager)) { // delegation during the vault creation
+            if (!upgradeable || msg.sender != stratVaultOwner()) revert OnlyNftOwner();
+        }
+        _;
+    }
+
     /* ============== CONSTRUCTOR & INITIALIZER ============== */
 
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -178,7 +185,7 @@ contract StrategyVaultETH is Initializable, StrategyVaultETHStorage, ERC4626Mult
      *          1) the `staker` is not already delegated to an operator
      *          2) the `operator` has indeed registered as an operator in EigenLayer
      */
-    function delegateTo(address operator) external onlyNftOwner {
+    function delegateTo(address operator) external checkDelegator {
 
         // Create an empty delegation approver signature
         ISignatureUtils.SignatureWithExpiry memory emptySignatureAndExpiry;

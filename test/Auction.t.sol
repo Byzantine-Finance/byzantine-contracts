@@ -430,6 +430,9 @@ contract AuctionTest is ByzantineDeployer {
         // 6 nodeOps bid, 11 bids in total
         bytes32[] memory bidIds = _createMultipleBids();
 
+        // Create a StratVaultETH
+        address stratVaultETH = _createStratVaultETH();
+
         // Verify the number of node ops and DV
         assertEq(auction.dv4AuctionNumNodeOps(), 6);
         assertEq(auction.getNumDVInAuction(), 1);
@@ -441,7 +444,7 @@ contract AuctionTest is ByzantineDeployer {
         auction.triggerAuction();
 
         // A main auction is triggered
-        vm.prank(address(strategyVaultManager));
+        vm.prank(stratVaultETH);
         bytes32 firstClusterId = auction.triggerAuction();
 
         // Get the winning cluster details
@@ -479,7 +482,7 @@ contract AuctionTest is ByzantineDeployer {
         /* ===================== SECOND DV CREATION ===================== */
 
         // A main auction is triggered
-        vm.prank(address(strategyVaultManager));
+        vm.prank(stratVaultETH);
         bytes32 secondClusterId = auction.triggerAuction();
 
         // Get the second winning cluster details
@@ -512,7 +515,7 @@ contract AuctionTest is ByzantineDeployer {
 
         // Cannot trigger a new auction if not enough node operators to create a new DV
         vm.expectRevert(IAuction.MainAuctionEmpty.selector);
-        vm.prank(address(strategyVaultManager));
+        vm.prank(stratVaultETH);
         auction.triggerAuction();
     }
 
@@ -603,6 +606,11 @@ contract AuctionTest is ByzantineDeployer {
         bidIds[10] = _bidCluster4(nodeOps[5], 14e2, 50); // 6th
 
         return bidIds;
+    }
+
+    function _createStratVaultETH() internal returns (address) {
+        vm.prank(alice);
+        return strategyVaultManager.createStratVaultETH(true, true, ELOperator1);
     }
 
 }

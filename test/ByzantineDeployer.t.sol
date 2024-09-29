@@ -6,6 +6,8 @@ import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.so
 import "@openzeppelin/contracts/proxy/beacon/IBeacon.sol";
 import "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 
+import "eigenlayer-contracts/interfaces/IDelegationManager.sol";
+
 import "./eigenlayer-helper/EigenLayerDeployer.t.sol";
 import "./splits-helper/SplitsV2Deployer.t.sol";
 
@@ -74,6 +76,8 @@ contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
         SplitsV2Deployer.setUp();
         // deploy locally Byzantine contracts
         _deployByzantineContractsLocal();
+        // register ELOperator1 as an EL operator
+        _registerAsELOperator(ELOperator1);
     }
 
     function _deployByzantineContractsLocal() internal {
@@ -193,4 +197,29 @@ contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
         assertEq(auction.minDuration(), minValidationDuration);
     }
 
-} 
+    function _registerAsELOperator(
+        address operator
+    ) internal {
+
+        // Create the operator details for the operator to delegate to
+        IDelegationManager.OperatorDetails memory operatorDetails = IDelegationManager.OperatorDetails({
+            __deprecated_earningsReceiver: operator,
+            delegationApprover: address(0),
+            stakerOptOutWindowBlocks: 0
+        });
+
+        string memory emptyStringForMetadataURI;
+
+        vm.startPrank(operator);
+        delegation.registerAsOperator(operatorDetails, emptyStringForMetadataURI);
+        vm.stopPrank();
+
+        assertTrue(delegation.isOperator(operator), "_registerAsELOperator: failed to resgister `operator` as an EL operator");
+        assertTrue(
+            keccak256(abi.encode(delegation.operatorDetails(operator))) == keccak256(abi.encode(operatorDetails)),
+            "_registerAsELOperator: operatorDetails not set appropriately"
+        );
+        assertTrue(delegation.isDelegated(operator), "_registerAsELOperator: operator doesn't delegate itself");
+    }
+
+}

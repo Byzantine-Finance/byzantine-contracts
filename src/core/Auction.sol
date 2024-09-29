@@ -595,7 +595,7 @@ contract Auction is
     }
 
     /// @notice Create the split parameters depending on the winning nodes
-    function _createSplitParams(NodeDetails[] memory _nodes) internal pure returns (SplitV2Lib.Split memory) {
+    function _createSplitParams(NodeDetails[] memory _nodes) internal view returns (SplitV2Lib.Split memory) {
 
         address[] memory recipients = new address[](_nodes.length);
         uint256[] memory allocations = new uint256[](_nodes.length);

@@ -4,7 +4,6 @@ pragma solidity ^0.8.12;
 import "@openzeppelin/contracts/utils/Create2.sol";
 import "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
 import "eigenlayer-contracts/interfaces/IEigenPod.sol";
-import "eigenlayer-contracts/interfaces/IDelegationManager.sol";
 import "eigenlayer-contracts/interfaces/IStrategy.sol";
 import "eigenlayer-contracts/libraries/BeaconChainProofs.sol";
 import { SplitV2Lib } from "splits-v2/libraries/SplitV2.sol";
