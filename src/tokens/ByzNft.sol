@@ -49,7 +49,8 @@ contract ByzNft is
         address to,
         uint256 tokenId
     ) internal override view {
-        revert("ByzNft is non-transferable");
+        // Allow transfers only during minting
+        if (from != address(0)) revert("ByzNft is non-transferable");
     }
 
 }
