@@ -8,6 +8,8 @@ import {IEigenPodManager} from "eigenlayer-contracts/interfaces/IEigenPodManager
 import {IEigenPod} from "eigenlayer-contracts/interfaces/IEigenPod.sol";
 import {IDelegationManager} from "eigenlayer-contracts/interfaces/IDelegationManager.sol";
 
+import {FIFOLib} from "../libraries/FIFOLib.sol";
+
 import "../interfaces/IStrategyVaultETH.sol";
 
 abstract contract StrategyVaultETHStorage is IStrategyVaultETH {
@@ -42,11 +44,11 @@ abstract contract StrategyVaultETHStorage is IStrategyVaultETH {
     /// TODO When non-upgradeable put that variable immutable and set it in the constructor
     uint256 public stratVaultNftId;
 
-    // Empty struct, all the fields have their default value
-    ClusterDetails public clusterDetails;
-
     /// @notice Whitelisted addresses that are allowed to deposit into the StrategyVault (activated only the whitelistedDeposit == true)
     mapping (address => bool) public isWhitelisted;
+
+    // FIFO of all the cluster IDs of the StrategyVault
+    FIFOLib.FIFO public clusterIdsFIFO;
 
     /// @notice Whether the deposit function is whitelisted or not.
     bool public whitelistedDeposit;

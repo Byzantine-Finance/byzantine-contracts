@@ -7,33 +7,7 @@ import "./IStrategyVault.sol";
 
 interface IStrategyVaultETH is IStrategyVault {
 
-  enum DVStatus {
-    NATIVE_RESTAKING_NOT_ACTIVATED, // Native restaking is not activated and 0 ETH has been deposited
-    DEPOSITED_NOT_VERIFIED, // Deposited on ethpos but withdrawal credentials has not been verified
-    ACTIVE_AND_VERIFIED, // Staked on ethpos and withdrawal credentials has been verified
-    EXITED // Withdraw the principal and exit the DV
-  }
-  
-  /// @notice Struct to store the details of a DV node registered on Byzantine 
-  struct Node {
-    // The number of Validation Credits (1 VC = the right to run a validator as part of a DV for a day)
-    uint256 vcNumber;
-    // The node reputation (TODO : Add a reputation system to the protocol)
-    uint128 reputation;
-    // The node's address on the execution layer
-    address eth1Addr;
-  }
-
-  /// @notice Struct to store the details of a Distributed Validator created on Byzantine
-  /// @dev Byzantine is the owner of the Split contract and can thus update it if the DV changes
-  struct ClusterDetails {
-    // The Split contract address
-    address splitAddr;
-    // The status of the Distributed Validator
-    DVStatus dvStatus;
-    // A record of the 4 nodes being part of the cluster
-    Node[4] nodes;
-  }
+  /* ============== EXTERNAL FUNCTIONS ============== */
 
   /**
    * @notice Deposit 32ETH in the beacon chain to activate a Distributed Validator and start validating on the consensus layer.
@@ -87,15 +61,14 @@ interface IStrategyVaultETH is IStrategyVault {
   function callEigenPodManager(bytes calldata data) external payable returns (bytes memory);
 
   /**
-   * @notice Returns the status of the Distributed Validator (DV)
+   * @notice Returns the number of active DVs staked by the Strategy Vault.
    */
-  function getDVStatus() external view returns (DVStatus);
+  function getVaultDVNumber() external view returns (uint256);
 
   /**
-   * @notice Returns the DV nodes details of the Strategy Vault
-   * It returns the eth1Addr, the number of Validation Credit and the reputation score of each nodes.
+   * @notice Returns the IDs of the active DVs staked by the Strategy Vault.
    */
-  function getDVNodesDetails() external view returns (IStrategyVaultETH.Node[4] memory);
+  function getAllDVIds() external view returns (bytes32[] memory);
 
   /// @dev Returned when not privided the right number of nodes 
   error InvalidClusterSize();

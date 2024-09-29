@@ -12,6 +12,7 @@ import "./StrategyVaultETHStorage.sol";
 // TODO: Finish withdrawal logic
 
 contract StrategyVaultETH is Initializable, StrategyVaultETHStorage, ERC4626MultiRewardVault {
+    using FIFOLib for FIFOLib.FIFO;
     using BeaconChainProofs for *;
 
     /* ============== MODIFIERS ============== */
@@ -26,8 +27,8 @@ contract StrategyVaultETH is Initializable, StrategyVaultETHStorage, ERC4626Mult
         _;
     }
 
-    modifier onlyIfNativeRestaking() {
-        if (clusterDetails.dvStatus == DVStatus.NATIVE_RESTAKING_NOT_ACTIVATED) revert NativeRestakingNotActivated();
+    modifier checkWhitelist() {
+        if (whitelistedDeposit && !isWhitelisted[msg.sender]) revert OnlyWhitelistedDeposit();
         _;
     }
 
@@ -90,30 +91,33 @@ contract StrategyVaultETH is Initializable, StrategyVaultETHStorage, ERC4626Mult
     /**
      * @notice Deposit 32ETH in the beacon chain to activate a Distributed Validator and start validating on the consensus layer.
      * Also creates an EigenPod for the StrategyVault.
-     * @param pubkey The 48 bytes public key of the beacon chain DV.
-     * @param signature The DV's signature of the deposit data.
-     * @param depositDataRoot The root/hash of the deposit data for the DV's deposit.
      * @dev If whitelistedDeposit is true, then only users with the whitelisted role can call this function.
      * @dev The first call to this function is done by the StrategyVaultManager and creates the StrategyVault's EigenPod.
      * @dev The caller receives Byzantine StrategyVault shares in return for the ETH staked.
+     * @dev 
      */
-    function stakeNativeETH(
-        bytes calldata pubkey, 
-        bytes calldata signature,
-        bytes32 depositDataRoot
-    ) external payable {
-        // Check that the deposit is a multiple of 32 ETH
-        if (deposit % 32 ether != 0) revert CanOnlyDepositMultipleOf32ETH();
-        
-        // If whitelistedDeposit is true, then only users with the whitelisted role can call this function.
-        if (whitelistedDeposit && !hasRole(whitelisted, msg.sender)) revert OnlyWhitelistedDeposit();
-        
-        // Stake the native ETH into StrategyVault
-        ERC4626MultiRewardVault.deposit(msg.value, msg.sender);
+    function stakeNativeETH() external payable checkWhitelist {
 
-        // Create Eigen Pod (if not already has one) and stake the native ETH
-        eigenPodManager.stake{value: msg.value}(pubkey, signature, depositDataRoot);
+        // Check that the deposit is a multiple of 32 ETH
+        if (msg.value % 32 ether != 0) revert CanOnlyDepositMultipleOf32ETH();
+
+        // Calculate how many bundles of 32 ETH were sent
+        uint256 num32ETHBundles = msg.value / 32 ether;
+
+        // Trigger an auction for each bundle of 32 ETH
+        for (uint256 i = 0; i < num32ETHBundles;) {
+            bytes32 winningClusterId = auction.triggerAuction();
+            clusterIdsFIFO.push(winningClusterId);
+            unchecked {
+                ++i;
+            }
+        }
+        
+        // Mint vault shares to the staker in return for the ETH staked
+        _mintVaultShares(msg.value, msg.sender);
     }
+
+    /* ============== VAULT CREATOR FUNCTIONS ============== */
 
     /**
      * @notice Call the EigenPodManager contract
@@ -149,7 +153,7 @@ contract StrategyVaultETH is Initializable, StrategyVaultETHStorage, ERC4626Mult
         bytes[] calldata validatorFieldsProofs,
         bytes32[][] calldata validatorFields,
         IStrategy strategy
-    ) external onlyNftOwner onlyIfNativeRestaking {
+    ) external onlyNftOwner {
 
         IEigenPod myPod = eigenPodManager.ownerToPod(address(this));
 
@@ -201,23 +205,30 @@ contract StrategyVaultETH is Initializable, StrategyVaultETHStorage, ERC4626Mult
     function stratVaultOwner() public view returns (address) {
         return byzNft.ownerOf(stratVaultNftId);
     }
-    
+
     /**
-     * @notice Returns the status of the Distributed Validator (DV)
+     * @notice Returns the number of active DVs staked by the Strategy Vault.
      */
-    function getDVStatus() public view returns (DVStatus) {
-        return clusterDetails.dvStatus;
+    function getVaultDVNumber() public view returns (uint256) {
+        return clusterIdsFIFO.getNumElements();
     }
 
     /**
-     * @notice Returns the DV nodes details of the Strategy Vault
-     * It returns the eth1Addr, the number of Validation Credit and the reputation score of each nodes.
+     * @notice Returns the IDs of the active DVs staked by the Strategy Vault.
      */
-    function getDVNodesDetails() public view onlyIfNativeRestaking returns (IStrategyVaultETH.Node[4] memory) {
-        return clusterDetails.nodes;
+    function getAllDVIds() public view returns (bytes32[] memory) {
+        return clusterIdsFIFO.getAllElements();
     }
 
     /* ============== INTERNAL FUNCTIONS ============== */
+
+    function _mintVaultShares(uint256 amount, address receiver) internal {
+        if (receiver != address(stratVaultManager)) {
+            deposit(amount, receiver);
+        } else {
+            deposit(amount, stratVaultOwner());
+        }
+    }
 
     /**
      * @notice Execute a low level call

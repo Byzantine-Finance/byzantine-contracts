@@ -20,28 +20,32 @@ interface IStrategyVaultManager {
      * @param whitelistedDeposit If false, anyone can deposit into the Strategy Vault. If true, only whitelisted addresses can deposit into the Strategy Vault.
      * @param upgradeable If true, the Strategy Vault is upgradeable. If false, the Strategy Vault is not upgradeable.
      * @param operator The address for the operator that this StrategyVault will delegate to.
+     * @return The address of the newly created StrategyVaultETH.
      */
     function createStratVaultETH(
         bool whitelistedDeposit,
         bool upgradeable,
         address operator
-    ) external;
+    ) 
+        external returns (address);
 
     /**
-     * @notice A staker (which can also be referred as to a strategy designer) creates a Strategy Vault ETH, triggers an Auction and stake native ETH on it (only multiple of 32ETH).
+     * @notice A staker (which can also be referred as to a strategy designer) first creates a Strategy Vault ETH and then stakes ETH on it.
+     * @dev It calls newStratVault.stakeNativeETH(): that function triggers the necessary number of auctions to create the DVs who gonna validate the ETH staked.
      * @param whitelistedDeposit If false, anyone can deposit into the Strategy Vault. If true, only whitelisted addresses can deposit into the Strategy Vault.
      * @param upgradeable If true, the Strategy Vault is upgradeable. If false, the Strategy Vault is not upgradeable.
      * @param operator The address for the operator that this StrategyVault will delegate to.
-     * @dev This action triggers a new auction(s) to get a new Distributed Validator(s) to stake on the Beacon Chain. The number of Auction triggered depends on the number of ETH sent.
+     * @dev This action triggers (a) new auction(s) to get (a) new Distributed Validator(s) to stake on the Beacon Chain. The number of Auction triggered depends on the number of ETH sent.
      * @dev Function will revert unless a multiple of 32 ETH are sent with the transaction.
      * @dev The caller receives Byzantine StrategyVault shares in return for the ETH staked.
+     * @return The address of the newly created StrategyVaultETH.
      */
     function createStratVaultAndStakeNativeETH(
         bool whitelistedDeposit,
         bool upgradeable,
         address operator
     ) 
-        external payable;
+        external payable returns (address);
 
     /**
      * @notice Staker creates a StrategyVault with an ERC20 deposit token.
@@ -154,9 +158,6 @@ interface IStrategyVaultManager {
 
     /// @dev Returned when not enough node operators in Auction to create a new DV
     error EmptyAuction();
-
-    /// @dev Returned when the ETH transfer to the StrategyVault fails
-    error ETHTransferFailed();
 
     /// @dev Returned when trying to distribute the split balance of a cluster that doesn't have a split address set
     error SplitAddressNotSet();
