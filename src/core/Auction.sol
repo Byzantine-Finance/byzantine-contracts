@@ -71,7 +71,7 @@ contract Auction is
         _mainAuctionTree.remove(winningClusterId, winningAvgAuctionScore);
 
         // Create the split struct of the winning cluster
-        SplitV2Lib.Split splitParams= _createSplitParams(winningClusterDetails.nodes);
+        SplitV2Lib.Split memory splitParams = _createSplitParams(winningClusterDetails.nodes);
 
         // deploy the Split contract and update ClusterDetails
         address splitAddr = pushSplitFactory.createSplit(splitParams, owner(), owner());
@@ -595,7 +595,7 @@ contract Auction is
     }
 
     /// @notice Create the split parameters depending on the winning nodes
-    function _createSplitParams(NodeDetails[] storage _nodes) internal pure returns (SplitV2Lib.Split) {
+    function _createSplitParams(NodeDetails[] memory _nodes) internal pure returns (SplitV2Lib.Split memory) {
 
         address[] memory recipients = new address[](_nodes.length);
         uint256[] memory allocations = new uint256[](_nodes.length);

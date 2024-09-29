@@ -437,11 +437,11 @@ contract AuctionTest is ByzantineDeployer {
         /* ===================== FIRST DV CREATION ===================== */
 
         // Revert if the caller is not the StrategyModuleManager
-        vm.expectRevert(IAuction.OnlyStratVaultManagerOrStratVaultETH.selector);
+        vm.expectRevert(IAuction.OnlyStratVaultETH.selector);
         auction.triggerAuction();
 
         // A main auction is triggered
-        vm.prank(address(strategyModuleManager));
+        vm.prank(address(strategyVaultManager));
         bytes32 firstClusterId = auction.triggerAuction();
 
         // Get the winning cluster details
@@ -479,7 +479,7 @@ contract AuctionTest is ByzantineDeployer {
         /* ===================== SECOND DV CREATION ===================== */
 
         // A main auction is triggered
-        vm.prank(address(strategyModuleManager));
+        vm.prank(address(strategyVaultManager));
         bytes32 secondClusterId = auction.triggerAuction();
 
         // Get the second winning cluster details
@@ -512,7 +512,7 @@ contract AuctionTest is ByzantineDeployer {
 
         // Cannot trigger a new auction if not enough node operators to create a new DV
         vm.expectRevert(IAuction.MainAuctionEmpty.selector);
-        vm.prank(address(strategyModuleManager));
+        vm.prank(address(strategyVaultManager));
         auction.triggerAuction();
     }
 

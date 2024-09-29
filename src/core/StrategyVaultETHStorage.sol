@@ -35,6 +35,7 @@ abstract contract StrategyVaultETHStorage is IStrategyVaultETH {
     /// @notice Average time for block finality in the Beacon Chain
     uint16 internal constant FINALITY_TIME = 16 minutes;
 
+    /// @notice The token to be staked. 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE if staking Native ETH.
     address public constant depositToken = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
     
     /* ============== STATE VARIABLES ============== */

@@ -88,12 +88,12 @@ contract StrategyVaultETH is Initializable, StrategyVaultETHStorage, ERC4626Mult
     /* ============== EXTERNAL FUNCTIONS ============== */
 
     /**
-     * @notice Deposit 32ETH in the beacon chain to activate a Distributed Validator and start validating on the consensus layer.
-     * Also creates an EigenPod for the StrategyVault.
+     * @notice Deposit ETH to the StrategyVault and get Vault shares in return.
+     * @dev If first deposit, create an Eigen Pod for the StrategyVault.
      * @dev If whitelistedDeposit is true, then only users with the whitelisted role can call this function.
-     * @dev The first call to this function is done by the StrategyVaultManager and creates the StrategyVault's EigenPod.
      * @dev The caller receives Byzantine StrategyVault shares in return for the ETH staked.
-     * @dev 
+     * @dev Revert if the amount deposited is not a multiple of 32 ETH.
+     * @dev Trigger auction(s) for each bundle of 32 ETH deposited to get Distributed Validator(s)
      */
     function stakeNativeETH() external payable checkWhitelist {
 
@@ -137,7 +137,6 @@ contract StrategyVaultETH is Initializable, StrategyVaultETHStorage, ERC4626Mult
      * @param validatorFieldsProofs proofs against the `beaconStateRoot` for each validator in `validatorFields`
      * @param validatorFields are the fields of the "Validator Container", refer to consensus specs for details: 
      * https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/beacon-chain.md#validator
-     * @param strategy The EigenLayer StrategyBaseTVLLimits contract for the depositing token. TODO: Check address for Native ETH.
      * @dev That function must be called for a validator which is "INACTIVE".
      * @dev The timestamp used to generate the Beacon Block Root is `block.timestamp - FINALITY_TIME` to be sure
      * that the Beacon Block is finalized.
@@ -150,8 +149,7 @@ contract StrategyVaultETH is Initializable, StrategyVaultETHStorage, ERC4626Mult
         BeaconChainProofs.StateRootProof calldata stateRootProof,
         uint40[] calldata validatorIndices,
         bytes[] calldata validatorFieldsProofs,
-        bytes32[][] calldata validatorFields,
-        IStrategy strategy
+        bytes32[][] calldata validatorFields
     ) external onlyNftOwner {
 
         IEigenPod myPod = eigenPodManager.ownerToPod(address(this));

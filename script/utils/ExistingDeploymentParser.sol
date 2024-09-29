@@ -170,14 +170,6 @@ contract ExistingDeploymentParser is Script, Test {
             "strategyVaultERC20Implementation: byzNft address not set correctly"
         );
         require(
-            strategyVaultERC20Implementation.auction() == auction,
-            "strategyVaultERC20Implementation: auction address not set correctly"
-        );
-        require(
-            strategyVaultERC20Implementation.eigenPodManager() == eigenPodManager,
-            "strategyVaultERC20Implementation: eigenPodManager address not set correctly"
-        );
-        require(
             strategyVaultERC20Implementation.delegationManager() == delegation,
             "strategyVaultERC20Implementation: delegationManager address not set correctly"
         );

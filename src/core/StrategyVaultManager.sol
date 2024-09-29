@@ -5,6 +5,7 @@ import {Create2} from "@openzeppelin/contracts/utils/Create2.sol";
 import {Initializable} from "@openzeppelin-upgrades/contracts/proxy/utils/Initializable.sol";
 import {OwnableUpgradeable} from "@openzeppelin-upgrades/contracts/access/OwnableUpgradeable.sol";
 import {BeaconProxy} from "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
+import {PushSplit} from "splits-v2/splitters/push/PushSplit.sol";
 
 import {IStrategyVaultETH} from "../interfaces/IStrategyVaultETH.sol";
 import {IStrategyVaultERC20} from "../interfaces/IStrategyVaultERC20.sol";
@@ -188,11 +189,11 @@ contract StrategyVaultManager is
     }
 
     /// @notice Returns all the Native Strategy Vaults addresses (a StratVaultETH)
-    function getAllStratVaultETHs() public view returns (address[]) {
-        uint256 numStratVaultETHs = _stratVaultETHSet.count();
+    function getAllStratVaultETHs() public view returns (address[] memory) {
+        uint256 stratVaultETHNum = _stratVaultETHSet.count();
 
-        address[] memory stratVaultETHs = new address[](numStratVaultETHs);
-        for (uint256 i = 0; i < numStratVaultETHs;) {
+        address[] memory stratVaultETHs = new address[](stratVaultETHNum);
+        for (uint256 i = 0; i < stratVaultETHNum;) {
             stratVaultETHs[i] = _stratVaultETHSet.keyAtIndex(i);
             unchecked {
                 ++i;

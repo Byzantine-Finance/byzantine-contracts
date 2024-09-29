@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import {Initializable} from "@openzeppelin-upgrades/contracts/proxy/utils/Initializable.sol";
 import {AccessControlUpgradeable} from "@openzeppelin-upgrades/contracts/access/AccessControlUpgradeable.sol";
+import {ISignatureUtils} from "eigenlayer-contracts/interfaces/ISignatureUtils.sol";
 
 import {ERC4626MultiRewardVault} from "../vault/ERC4626MultiRewardVault.sol";
 import "./StrategyVaultERC20Storage.sol";
@@ -115,8 +116,8 @@ contract StrategyVaultERC20 is Initializable, StrategyVaultERC20Storage, AccessC
      * @dev Withdrawal is not instant - a withdrawal delay exists for removing the assets from EigenLayer
      */
     function startWithdrawERC20(
-        QueuedWithdrawalParams[] calldata queuedWithdrawalParams,
-        IStrategy[] strategies
+        IDelegationManager.QueuedWithdrawalParams[] calldata queuedWithdrawalParams,
+        IStrategy[] calldata strategies
         ) external {
         // Begins withdrawal procedure with EigenLayer.
         delegationManager.queueWithdrawals(queuedWithdrawalParams);

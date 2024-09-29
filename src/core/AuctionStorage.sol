@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 import {PushSplitFactory} from "splits-v2/splitters/push/PushSplitFactory.sol";
 
 import { IAuction } from "../interfaces/IAuction.sol";
-import { IStrategyModuleManager } from "../interfaces/IStrategyModuleManager.sol";
+import { IStrategyVaultManager } from "../interfaces/IStrategyVaultManager.sol";
 import { IEscrow } from "../interfaces/IEscrow.sol";
 
 import {HitchensOrderStatisticsTreeLib } from "../libraries/HitchensOrderStatisticsTreeLib.sol";

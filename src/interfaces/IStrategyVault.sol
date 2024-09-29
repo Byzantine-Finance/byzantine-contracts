@@ -5,29 +5,15 @@ import {IStrategy} from "eigenlayer-contracts/interfaces/IStrategy.sol";
 
 interface IStrategyVault {
 
-    /**
-     * @notice Used to initialize the StrategyVault given it's setup parameters.
-     * @param _nftId The id of the ByzNft associated to this StrategyVault.
-     * @param _initialOwner The initial owner of the ByzNft.
-     * @param _token The address of the token to be staked. 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE if staking ETH.
-     * @param _whitelistedDeposit Whether the deposit function is whitelisted or not.
-     * @param _upgradeable Whether the StrategyVault is upgradeable or not.
-     * @dev Called on construction by the StrategyVaultManager.
-     */
-    function initialize(
-      uint256 _nftId,
-      address _initialOwner,
-      address _token,
-      bool _whitelistedDeposit,
-      bool _upgradeable
-    ) external;
-
     /// @notice Returns the StrategyVault's ByzNft id
     function stratVaultNftId() external view returns (uint256);
 
     
     /// @notice Returns StrategyVault's creator address
     function stratVaultOwner() external view returns (address);
+
+    /// @notice Returns the token that the StrategyVault is staking
+    function depositToken() external view returns (address);
 
     /// @notice Returns whether a staker needs to be whitelisted to deposit in the vault
     function whitelistedDeposit() external view returns (bool);

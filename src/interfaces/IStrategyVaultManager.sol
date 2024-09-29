@@ -110,7 +110,7 @@ interface IStrategyVaultManager {
     function numStratVaultETHs() external view returns (uint256);
     
     /// @notice Returns all the Native Strategy Vaults addresses (aka StratVaultETH)
-    function getAllStratVaultETHs() external view returns (address[]);
+    function getAllStratVaultETHs() external view returns (address[] memory);
 
     /**
      * @notice Returns 'true' if the `stratVault` is a Native Strategy Vault (a StratVaultETH), and 'false' otherwise.

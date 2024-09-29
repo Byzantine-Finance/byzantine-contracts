@@ -7,25 +7,35 @@ import "./IStrategyVault.sol";
 
 interface IStrategyVaultETH is IStrategyVault {
 
+  /* ============== INITIALIZER ============== */
+
+  /**
+   * @notice Used to initialize the StrategyVaultETH given it's setup parameters.
+   * @param _nftId The id of the ByzNft associated to this StrategyVault.
+   * @param _stratVaultCreator The address of the creator of the StrategyVault.
+   * @param _whitelistedDeposit Whether the deposit function is whitelisted or not.
+   * @param _upgradeable Whether the StrategyVault is upgradeable or not.
+   * @dev Called on construction by the StrategyVaultManager.
+   * @dev StrategyVaultETH so the deposit token is 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE
+   */
+  function initialize(
+    uint256 _nftId,
+    address _stratVaultCreator,
+    bool _whitelistedDeposit,
+    bool _upgradeable
+  ) external;
+
   /* ============== EXTERNAL FUNCTIONS ============== */
 
   /**
-   * @notice Deposit 32ETH in the beacon chain to activate a Distributed Validator and start validating on the consensus layer.
-   * Also creates an EigenPod for the StrategyVault. The NFT owner can staker additional native ETH by calling again this function.
-   * @param pubkey The 48 bytes public key of the beacon chain DV.
-   * @param signature The DV's signature of the deposit data.
-   * @param depositDataRoot The root/hash of the deposit data for the DV's deposit.
-   * @dev Function is callable only by the StrategyVaultManager or the NFT Owner.
-   * @dev The first call to this function is done by the StrategyVaultManager and creates the StrategyVault's EigenPod.
+   * @notice Deposit ETH to the StrategyVault and get Vault shares in return.
+   * @dev If first deposit, create an Eigen Pod for the StrategyVault.
+   * @dev If whitelistedDeposit is true, then only users with the whitelisted role can call this function.
    * @dev The caller receives Byzantine StrategyVault shares in return for the ETH staked.
+   * @dev Revert if the amount deposited is not a multiple of 32 ETH.
+   * @dev Trigger auction(s) for each bundle of 32 ETH deposited to get Distributed Validator(s)
    */
-  function stakeNativeETH(
-    bytes calldata pubkey, 
-    bytes calldata signature, 
-    bytes32 depositDataRoot
-  ) 
-    external payable; 
-
+  function stakeNativeETH() external payable; 
 
   /**
    * @notice This function verifies that the withdrawal credentials of the Distributed Validator(s) owned by

@@ -5,11 +5,11 @@ import "../../utils/ExistingDeploymentParser.sol";
 
 /**
  * @notice Script used for upgrading all StrategyVault deployed on Holesky
- * forge script script/upgrade/holesky/StrategyVaultsUpgrade.s.sol --rpc-url http://127.0.0.1:8545 --private-key $PRIVATE_KEY --broadcast --etherscan-api-key $ETHERSCAN_API_KEY --verify -vvvv
- * forge script script/upgrade/holesky/StrategyVaultsUpgrade.s.sol --rpc-url $HOLESKY_RPC_URL --private-key $PRIVATE_KEY --broadcast --etherscan-api-key $ETHERSCAN_API_KEY --verify -vvvv
+ * forge script script/upgrade/holesky/StrategyVaultsETHUpgrade.s.sol --rpc-url http://127.0.0.1:8545 --private-key $PRIVATE_KEY --broadcast --etherscan-api-key $ETHERSCAN_API_KEY --verify -vvvv
+ * forge script script/upgrade/holesky/StrategyVaultsETHUpgrade.s.sol --rpc-url $HOLESKY_RPC_URL --private-key $PRIVATE_KEY --broadcast --etherscan-api-key $ETHERSCAN_API_KEY --verify -vvvv
  * 
  */
-contract StrategyVaultsUpgrade is ExistingDeploymentParser {
+contract StrategyVaultsETHUpgrade is ExistingDeploymentParser {
     function run() external virtual {
         _parseInitialDeploymentParams("script/configs/holesky/Deploy_from_scratch.holesky.config.json");
         _parseDeployedContractAddresses("script/output/holesky/Deploy_from_scratch.holesky.config.json");
@@ -38,7 +38,7 @@ contract StrategyVaultsUpgrade is ExistingDeploymentParser {
      */
     function _upgradeStrategyVaults() internal {
         // Deploy new implementation contract
-        strategyVaultImplementation = new StrategyVault(
+        strategyVaultETHImplementation = new StrategyVaultETH(
             strategyVaultManager,
             auction,
             byzNft,
@@ -46,6 +46,6 @@ contract StrategyVaultsUpgrade is ExistingDeploymentParser {
             delegation
         );
         // Upgrade UpgradeableBeacon
-        strategyVaultBeacon.upgradeTo(address(strategyVaultImplementation));
+        strategyVaultETHBeacon.upgradeTo(address(strategyVaultETHImplementation));
     }
 }

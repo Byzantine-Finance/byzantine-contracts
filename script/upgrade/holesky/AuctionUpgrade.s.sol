@@ -40,7 +40,8 @@ contract AuctionUpgrade is ExistingDeploymentParser {
         // Deploy new implementation contract
         auctionImplementation = new Auction(
             escrow,
-            strategyVaultManager
+            strategyVaultManager,
+            pushSplitFactory
         );
         // Upgrade Auction
         byzantineProxyAdmin.upgrade(
