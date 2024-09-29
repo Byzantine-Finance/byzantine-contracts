@@ -75,10 +75,9 @@ contract Deploy_Holesky_From_Scratch is ExistingDeploymentParser {
         // StrategyVaultERC20 implementation contract
         strategyVaultERC20Implementation = new StrategyVaultERC20(
             strategyVaultManager,
-            auction,
             byzNft,
-            eigenPodManager,
-            delegation
+            delegation,
+            strategyManager
         );
         // StrategyVaultERC20 beacon contract. The Beacon Proxy contract is deployed in the StrategyVaultManager
         // This contract points to the implementation contract.
@@ -91,7 +90,8 @@ contract Deploy_Holesky_From_Scratch is ExistingDeploymentParser {
             auction,
             byzNft,
             eigenPodManager,
-            delegation
+            delegation,
+            strategyManager
         );
         byzNftImplementation = new ByzNft();
         auctionImplementation = new Auction(

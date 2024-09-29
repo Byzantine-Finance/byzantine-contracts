@@ -112,10 +112,9 @@ contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
         // StrategyVaultERC20 implementation contract
         IStrategyVault strategyVaultERC20Implementation = new StrategyVaultERC20(
             strategyVaultManager,
-            auction,
             byzNft,
-            eigenPodManager,
-            delegation
+            delegation,
+            strategyManager
         );
         // StrategyVaultERC20 beacon contract. The Beacon Proxy contract is deployed in the StrategyVaultManager
         // This contract points to the implementation contract.
@@ -128,7 +127,8 @@ contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
             auction,
             byzNft,
             eigenPodManager,
-            delegation
+            delegation,
+            strategyManager
         );
         ByzNft byzNftImplementation = new ByzNft();
         Auction auctionImplementation = new Auction(

@@ -14,6 +14,7 @@ import {Escrow} from "../../src/vault/Escrow.sol";
 
 import {EigenPodManager} from "eigenlayer-contracts/pods/EigenPodManager.sol";
 import {DelegationManager} from "eigenlayer-contracts/core/DelegationManager.sol";
+import {StrategyManager} from "eigenlayer-contracts/core/StrategyManager.sol";
 
 import {PushSplitFactory} from "splits-v2/splitters/push/PushSplitFactory.sol";
 
@@ -41,6 +42,7 @@ contract ExistingDeploymentParser is Script, Test {
     // EigenLayer contracts
     DelegationManager public delegation;
     EigenPodManager public eigenPodManager;
+    StrategyManager public strategyManager;
 
     // Splits contracts
     PushSplitFactory public pushSplitFactory;
@@ -80,6 +82,7 @@ contract ExistingDeploymentParser is Script, Test {
         // read eigen layer contract addresses
         eigenPodManager = EigenPodManager(stdJson.readAddress(initialDeploymentData, ".eigenLayerContractAddr.eigenPodManager"));
         delegation = DelegationManager(stdJson.readAddress(initialDeploymentData, ".eigenLayerContractAddr.delegation"));
+        strategyManager = StrategyManager(stdJson.readAddress(initialDeploymentData, ".eigenLayerContractAddr.strategyManager"));
 
         // read Splits contract addresses
         pushSplitFactory = PushSplitFactory(stdJson.readAddress(initialDeploymentData, ".splitsContracts.pushSplitFactory"));
@@ -139,6 +142,10 @@ contract ExistingDeploymentParser is Script, Test {
             strategyVaultManager.delegationManager() == delegation,
             "strategyVaultManager: delegationManager address not set correctly"
         );
+        require(
+            strategyVaultManager.strategyManager() == strategyManager,
+            "strategyVaultManager: strategyManager address not set correctly"
+        );
         // StrategyVaultETHImplementation
         require(
             strategyVaultETHImplementation.stratVaultManager() == strategyVaultManager,
@@ -172,6 +179,10 @@ contract ExistingDeploymentParser is Script, Test {
         require(
             strategyVaultERC20Implementation.delegationManager() == delegation,
             "strategyVaultERC20Implementation: delegationManager address not set correctly"
+        );
+        require(
+            strategyVaultERC20Implementation.strategyManager() == strategyManager,
+            "strategyVaultERC20Implementation: strategyManager address not set correctly"
         );
         // Auction
         require(
@@ -272,6 +283,7 @@ contract ExistingDeploymentParser is Script, Test {
 
         emit log_named_address("eigenPodManager contract address", address(eigenPodManager));
         emit log_named_address("delegationManager contract address", address(delegation));
+        emit log_named_address("strategyManager contract address", address(strategyManager));
 
         emit log_named_address("pushSplitFactory contract address", address(pushSplitFactory));
 

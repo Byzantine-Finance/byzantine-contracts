@@ -34,6 +34,9 @@ abstract contract StrategyVaultManagerStorage is IStrategyVaultManager {
     /// @notice EigenLayer's DelegationManager contract
     IDelegationManager public immutable delegationManager;
 
+    /// @notice EigenLayer's StrategyManager contract
+    IStrategyManager public immutable strategyManager;
+
     /* ============== STATE VARIABLES ============== */
 
     /// @notice Unordered Set of all the StratVaultETHs
@@ -53,7 +56,8 @@ abstract contract StrategyVaultManagerStorage is IStrategyVaultManager {
         IAuction _auction,
         IByzNft _byzNft,
         IEigenPodManager _eigenPodManager,
-        IDelegationManager _delegationManager
+        IDelegationManager _delegationManager,
+        IStrategyManager _strategyManager
     ) {
         stratVaultETHBeacon = _stratVaultETHBeacon;
         stratVaultERC20Beacon = _stratVaultERC20Beacon;
@@ -61,6 +65,7 @@ abstract contract StrategyVaultManagerStorage is IStrategyVaultManager {
         byzNft = _byzNft;
         eigenPodManager = _eigenPodManager;
         delegationManager = _delegationManager;
+        strategyManager = _strategyManager;
     }
 
     /**

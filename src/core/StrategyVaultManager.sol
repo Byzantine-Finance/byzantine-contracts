@@ -31,8 +31,9 @@ contract StrategyVaultManager is
         IAuction _auction,
         IByzNft _byzNft,
         IEigenPodManager _eigenPodManager,
-        IDelegationManager _delegationManager
-    ) StrategyVaultManagerStorage(_stratVaultETHBeacon, _stratVaultERC20Beacon, _auction, _byzNft, _eigenPodManager, _delegationManager) {
+        IDelegationManager _delegationManager,
+        IStrategyManager _strategyManager
+    ) StrategyVaultManagerStorage(_stratVaultETHBeacon, _stratVaultERC20Beacon, _auction, _byzNft, _eigenPodManager, _delegationManager, _strategyManager) {
         // Disable initializer in the context of the implementation contract
         _disableInitializers();
     }
