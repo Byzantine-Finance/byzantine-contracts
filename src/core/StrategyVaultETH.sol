@@ -4,7 +4,6 @@ pragma solidity ^0.8.20;
 import {Initializable} from "@openzeppelin-upgrades/contracts/proxy/utils/Initializable.sol";
 
 import {ISignatureUtils} from "eigenlayer-contracts/interfaces/ISignatureUtils.sol";
-import {PushSplit} from "splits-v2/splitters/push/PushSplit.sol";
 
 import {ERC4626MultiRewardVault} from "../vault/ERC4626MultiRewardVault.sol";
 import "./StrategyVaultETHStorage.sol";
