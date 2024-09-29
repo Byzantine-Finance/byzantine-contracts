@@ -96,24 +96,13 @@ interface IStrategyVaultManager {
     /* ============== VIEW FUNCTIONS ============== */
 
     /**
-     * @notice Returns the number of StrategyVaults owned by an address.
-     * @param staker The address you want to know the number of Strategy Vaults it owns.
-     */
-    function getStratVaultNumber(address staker) external view returns (uint256);
-
-    /**
      * @notice Returns the StrategyVault address by its bound ByzNft ID.
      * @param nftId The ByzNft ID you want to know the attached Strategy Vault.
      * @dev Returns address(0) if the nftId is not bound to a Strategy Vault (nftId is not a ByzNft)
      */
     function getStratVaultByNftId(uint256 nftId) external view returns (address);
 
-    /**
-     * @notice Returns the addresses of the `staker`'s StrategyVaults
-     * @param staker The staker address you want to know the Strategy Vaults it owns.
-     * @dev Returns an empty array if the staker has no Strategy Vaults.
-     */
-    function getStratVaults(address staker) external view returns (address[] memory);
+    /* ============== EIGEN LAYER INTERACTION ============== */
 
     /**
      * @notice Returns the address of the Strategy Vault's EigenPod (whether it is deployed yet or not).
@@ -122,14 +111,6 @@ interface IStrategyVaultManager {
      * returns the EigenPod of the input address. SO USE THAT FUNCTION CARREFULLY.
      */
     function getPodByStratVaultAddr(address stratVaultAddr) external view returns (address);
-
-    /**
-     * @notice Returns 'true' if the `staker` owns at least one StrategyVault, and 'false' otherwise.
-     * @param staker The address you want to know if it owns at least a StrategyVault.
-     */
-    function hasStratVaults(address staker) external view returns (bool);
-
-    /* ============== EIGEN LAYER INTERACTION ============== */
 
     /**
      * @notice Specify which `staker`'s StrategyVaults are delegated.
