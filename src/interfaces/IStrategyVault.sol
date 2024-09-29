@@ -22,15 +22,21 @@ interface IStrategyVault {
       bool _upgradeable
     ) external;
 
-    /**
-     * @notice Returns the owner of this StrategyVault
-     */
+    /// @notice Returns the StrategyVault's ByzNft id
     function stratVaultNftId() external view returns (uint256);
 
-    /**
-     * @notice Returns the address of the owner of the Strategy Vault's ByzNft.
-     */
+    
+    /// @notice Returns StrategyVault's creator address
     function stratVaultOwner() external view returns (address);
+
+    /// @notice Returns whether a staker needs to be whitelisted to deposit in the vault
+    function whitelistedDeposit() external view returns (bool);
+
+    /// @notice Returns whether the StrategyVault's underlying strategy is upgradeable / updatable
+    function upgradeable() external view returns (bool);
+
+    /// @notice Returns whether a staker is whitelisted to deposit in the vault
+    function isWhitelisted(address account) external view returns (bool);
 
     /**
      * @notice The caller delegate its Strategy Vault's stake to an Eigen Layer operator.

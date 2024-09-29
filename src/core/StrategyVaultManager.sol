@@ -322,7 +322,7 @@ contract StrategyVaultManager is
 
         // create the stratVault
         address stratVault = address(new BeaconProxy(address(stratVaultETHBeacon), ""));
-        IStrategyVaultETH(stratVault).initialize(nftId, msg.sender, NATIVE_ETH_STRATEGY, whitelistedDeposit, upgradeable);
+        IStrategyVaultETH(stratVault).initialize(nftId, msg.sender, whitelistedDeposit, upgradeable);
 
         // Add the newly created stratVaultETH to the unordered stratVaultETH set
         _stratVaultETHSet.insert(stratVault);

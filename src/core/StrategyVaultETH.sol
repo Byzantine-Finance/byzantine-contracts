@@ -2,7 +2,6 @@
 pragma solidity ^0.8.20;
 
 import {Initializable} from "@openzeppelin-upgrades/contracts/proxy/utils/Initializable.sol";
-import {AccessControlUpgradeable} from "@openzeppelin-upgrades/contracts/access/AccessControlUpgradeable.sol";
 
 import {ISignatureUtils} from "eigenlayer-contracts/interfaces/ISignatureUtils.sol";
 import {PushSplit} from "splits-v2/splitters/push/PushSplit.sol";
@@ -12,7 +11,7 @@ import "./StrategyVaultETHStorage.sol";
 
 // TODO: Finish withdrawal logic
 
-contract StrategyVaultETH is Initializable, StrategyVaultETHStorage, AccessControlUpgradeable, ERC4626MultiRewardVault {
+contract StrategyVaultETH is Initializable, StrategyVaultETHStorage, ERC4626MultiRewardVault {
     using BeaconChainProofs for *;
 
     /* ============== MODIFIERS ============== */
@@ -52,36 +51,27 @@ contract StrategyVaultETH is Initializable, StrategyVaultETHStorage, AccessContr
     }
 
     /**
-     * @notice Used to initialize the StrategyVault given it's setup parameters.
+     * @notice Used to initialize the StrategyVaultETH given it's setup parameters.
      * @param _nftId The id of the ByzNft associated to this StrategyVault.
-     * @param _initialOwner The initial owner of the ByzNft.
-     * @param _token The address of the token to be staked. 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE if staking ETH.
+     * @param _stratVaultCreator The address of the creator of the StrategyVault.
      * @param _whitelistedDeposit Whether the deposit function is whitelisted or not.
      * @param _upgradeable Whether the StrategyVault is upgradeable or not.
      * @dev Called on construction by the StrategyVaultManager.
+     * @dev StrategyVaultETH so the deposit token is 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE
      */
-    function initialize(uint256 _nftId, address _initialOwner, address _token, bool _whitelistedDeposit, bool _upgradeable) external initializer {
-        try byzNft.ownerOf(_nftId) returns (address nftOwner) {
-            require(nftOwner == _initialOwner, "Only NFT owner can initialize the StrategyVault");
-            stratVaultNftId = _nftId;
-        } catch Error(string memory reason) {
-            revert(string.concat("Cannot initialize StrategyVault: ", reason));
-        }
+    function initialize(uint256 _nftId, address _stratVaultCreator, bool _whitelistedDeposit, bool _upgradeable) external initializer {
 
-        // Define the token to be staked
-        depositToken = _token;
-
-        // Setup whitelist
+        // Set up the vault state variables
+        stratVaultNftId = _nftId;
         whitelistedDeposit = _whitelistedDeposit;
-        __AccessControl_init();
-        _grantRole(DEFAULT_ADMIN_ROLE, _initialOwner);
+        upgradeable = _upgradeable;        
 
         // Initialize the ERC4626MultiRewardVault
-        ERC4626MultiRewardVault.initialize(_token);
+        __ERC4626MultiRewardVault_init(depositToken);
 
-        // If contract is not upgradeable, disable initialization (removing ability to upgrade contract)
-        if (!_upgradeable) {
-            _disableInitializers();
+        // If whitelisted Vault, whitelist the creator
+        if (_whitelistedDeposit) {
+            isWhitelisted[_stratVaultCreator] = true;
         }
     }
 

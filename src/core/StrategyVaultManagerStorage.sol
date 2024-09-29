@@ -16,9 +16,6 @@ import "../interfaces/IStrategyVaultManager.sol";
 abstract contract StrategyVaultManagerStorage is IStrategyVaultManager {
     /* ============== CONSTANTS + IMMUTABLES ============== */
 
-    /// @notice Address of the ETH token strategy
-    address public constant NATIVE_ETH_STRATEGY = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
-
     /// @notice Beacon proxy to which all the StrategyVaultETHs point
     IBeacon public immutable stratVaultETHBeacon;
 

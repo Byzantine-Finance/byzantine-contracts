@@ -14,11 +14,6 @@ abstract contract StrategyVaultETHStorage is IStrategyVaultETH {
 
     /* ============== CONSTANTS + IMMUTABLES ============== */
 
-    /// @notice Average time for block finality in the Beacon Chain
-    uint16 internal constant FINALITY_TIME = 16 minutes;
-
-    uint8 internal constant CLUSTER_SIZE = 4;
-
     /// @notice The single StrategyVaultManager for Byzantine
     IStrategyVaultManager public immutable stratVaultManager;
 
@@ -34,20 +29,30 @@ abstract contract StrategyVaultETHStorage is IStrategyVaultETH {
 
     /// @notice EigenLayer's DelegationManager contract
     IDelegationManager public immutable delegationManager;
-    
 
+    /// @notice Average time for block finality in the Beacon Chain
+    uint16 internal constant FINALITY_TIME = 16 minutes;
+
+    address public constant depositToken = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
+    
     /* ============== STATE VARIABLES ============== */
 
     /// @notice The ByzNft associated to this StrategyVault.
-    /// @notice The owner of the ByzNft is the StrategyVault owner.
+    /// @notice The owner of the ByzNft is the StrategyVault creator.
     /// TODO When non-upgradeable put that variable immutable and set it in the constructor
     uint256 public stratVaultNftId;
 
     // Empty struct, all the fields have their default value
     ClusterDetails public clusterDetails;
 
+    /// @notice Whitelisted addresses that are allowed to deposit into the StrategyVault (activated only the whitelistedDeposit == true)
+    mapping (address => bool) public isWhitelisted;
+
     /// @notice Whether the deposit function is whitelisted or not.
     bool public whitelistedDeposit;
+
+    /// @notice Whether the strategy is upgradeable (i.e can delegate to a different operator)
+    bool public upgradeable;
 
     /**
      * @dev This empty reserved space is put in place to allow future versions to add new
