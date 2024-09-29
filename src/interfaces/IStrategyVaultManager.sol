@@ -102,6 +102,18 @@ interface IStrategyVaultManager {
      */
     function getStratVaultByNftId(uint256 nftId) external view returns (address);
 
+    /// @notice Returns the number of Native Strategy Vaults (aka StratVaultETH)
+    function numStratVaultETHs() external view returns (uint256);
+    
+    /// @notice Returns all the Native Strategy Vaults addresses (aka StratVaultETH)
+    function getAllStratVaultETHs() external view returns (address[]);
+
+    /**
+     * @notice Returns 'true' if the `stratVault` is a Native Strategy Vault (a StratVaultETH), and 'false' otherwise.
+     * @param stratVault The address of the StrategyVault contract you want to know if it is a StratVaultETH.
+     */
+    function isStratVaultETH(address stratVault) external view returns (bool);
+
     /* ============== EIGEN LAYER INTERACTION ============== */
 
     /**

@@ -57,7 +57,7 @@ contract Auction is
      * @dev Reverts if the caller is not a StrategyVaultETH contract or the StrategyVaultManager
      * @return The id of the winning cluster
      */
-    function triggerAuction() external onlyStratVaultManagerOrStratVaultETH nonReentrant returns (bytes32) {
+    function triggerAuction() external onlyStratVaultETH nonReentrant returns (bytes32) {
 
         // Check if at least one DV is ready in the main auction 
         if (_mainAuctionTree.count() < 1) revert MainAuctionEmpty();
@@ -620,11 +620,8 @@ contract Auction is
 
     /* ===================== MODIFIERS ===================== */
 
-    modifier onlyStratVaultManagerOrStratVaultETH() {
-        if (msg.sender != address(strategyModuleManager)) {
-            /// TODO Verify if msg.sender is a StratVaultETH through a StrategyModuleManager function
-            revert OnlyStratVaultManagerOrStratVaultETH();
-        }
+    modifier onlyStratVaultETH() {
+        if (!strategyVaultManager.isStratVaultETH(msg.sender)) revert OnlyStratVaultETH();
         _;
     }
 

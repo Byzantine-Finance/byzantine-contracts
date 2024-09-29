@@ -261,8 +261,8 @@ interface IAuction {
      */
     function updateMaxDiscountRate(uint16 _newMaxDiscountRate) external;
 
-    /// @dev Error when unauthorized call to a function callable only by the StrategyVaultManager or a StratVaultETH.
-    error OnlyStratVaultManagerOrStratVaultETH();
+    /// @dev Error when unauthorized call to a function callable only by a StratVaultETH.
+    error OnlyStratVaultETH();
 
     /// @dev Error when address already whitelisted
     error AlreadyWhitelisted();

@@ -193,6 +193,34 @@ contract StrategyVaultManager is
         return nftIdToStratVault[nftId];
     }
 
+    
+    /// @notice Returns the number of Native Strategy Vaults (a StratVaultETH)
+    function numStratVaultETHs() public view returns (uint256) {
+        return _stratVaultETHSet.count();
+    }
+
+    /// @notice Returns all the Native Strategy Vaults addresses (a StratVaultETH)
+    function getAllStratVaultETHs() public view returns (address[]) {
+        uint256 numStratVaultETHs = _stratVaultETHSet.count();
+
+        address[] memory stratVaultETHs = new address[](numStratVaultETHs);
+        for (uint256 i = 0; i < numStratVaultETHs;) {
+            stratVaultETHs[i] = _stratVaultETHSet.keyAtIndex(i);
+            unchecked {
+                ++i;
+            }
+        }
+        return stratVaultETHs;
+    }
+
+    /**
+     * @notice Returns 'true' if the `stratVault` is a Native Strategy Vault (a StratVaultETH), and 'false' otherwise.
+     * @param stratVault The address of the StrategyVault contract you want to know if it is a StratVaultETH.
+     */
+    function isStratVaultETH(address stratVault) public view returns (bool) {
+        return _stratVaultETHSet.exists(stratVault);
+    }
+
     /* ============== EIGEN LAYER INTERACTION ============== */
 
     /**
