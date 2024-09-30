@@ -1,7 +1,10 @@
-// SPDX-License-Identifier: BUSL-1.1
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.12;
 
-import "@openzeppelin/contracts/utils/Create2.sol";
+// solhint-disable private-vars-leading-underscore
+// solhint-disable var-name-mixedcase
+// solhint-disable func-name-mixedcase
+
 import "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
 import "eigenlayer-contracts/interfaces/IEigenPod.sol";
 import "eigenlayer-contracts/interfaces/IStrategy.sol";
@@ -17,253 +20,185 @@ import "../src/core/Auction.sol";
 import "../src/interfaces/IStrategyVaultERC20.sol";
 import "../src/interfaces/IStrategyVaultETH.sol";
 import "../src/interfaces/IStrategyVaultManager.sol";
+import "../src/interfaces/IAuction.sol";
 
 contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
     // using BeaconChainProofs for *;
 
-    // /// @notice Canonical, virtual beacon chain ETH strategy
-    // IStrategy public constant beaconChainETHStrategy = IStrategy(0xbeaC0eeEeeeeEEeEeEEEEeeEEeEeeeEeeEEBEaC0);
+    /// @notice Canonical, virtual beacon chain ETH strategy
+    IStrategy public constant beaconChainETHStrategy = IStrategy(0xbeaC0eeEeeeeEEeEeEEEEeeEEeEeeeEeeEEBEaC0);
 
     // /// @notice Random validator deposit data to be able to call `createStratVaultAndStakeNativeETH` function
     // bytes pubkey;
     // bytes signature;
     // bytes32 depositDataRoot;
 
-    // /// @notice address of the native token in the Split contract
-    // address public constant SPLIT_NATIVE_TOKEN_ADDR = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
+    /// @notice address of the native token in the Split contract
+    address public constant SPLIT_NATIVE_TOKEN_ADDR = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
 
-    // /// @notice Initial balance of all the node operators
-    // uint256 constant STARTING_BALANCE = 100 ether;
+    /// @notice Initial balance of all the node operators
+    uint256 internal constant STARTING_BALANCE = 500 ether;
 
-    // function setUp() public override {
-    //     // deploy locally EigenLayer and Byzantine contracts
-    //     ByzantineDeployer.setUp();
+    /// @notice Array of all the bid ids
+    bytes32[] internal bidId;
 
-    //     // Fill the node ops' balance
-    //     for (uint i = 0; i < nodeOps.length; i++) {
-    //         vm.deal(nodeOps[i], STARTING_BALANCE);
-    //     }
-    //     // Fill protagonists' balance
-    //     vm.deal(alice, STARTING_BALANCE);
-    //     vm.deal(bob, STARTING_BALANCE);
+    function setUp() public override {
+        // deploy locally EigenLayer and Byzantine contracts
+        ByzantineDeployer.setUp();
 
-    //     // For the context of these tests, we assume 8 node operators has pending bids
-    //     _8NodeOpsBid();
+        // Fill the node ops' balance
+        for (uint256 i = 0; i < nodeOps.length; i++) {
+            vm.deal(nodeOps[i], STARTING_BALANCE);
+        }
+        // Fill protagonists' balance
+        vm.deal(alice, STARTING_BALANCE);
+        vm.deal(bob, STARTING_BALANCE);
 
-    //     // Get deposit data of a random validator
-    //     _getDepositData(abi.encodePacked("./test/test-data/deposit-data-DV0-noPod.json"));
-    // }
+        // whitelist all the node operators
+        auction.whitelistNodeOps(nodeOps);
 
-    // function testStratVaultManagerOwner() public view {
-    //     assertEq(strategyVaultManager.owner(), address(this));
-    // }
+        // nodeOps bid to be able to create 4 DVs
+        bidId = _createMultipleBids();
 
-    // function testByzNftContractOwner() public view {
-    //     ByzNft byzNftContract = _getByzNftContract();
-    //     assertEq(byzNftContract.owner(), address(strategyVaultManager));
-    // }
+        // Get deposit data of a random validator
+        // _getDepositData(abi.encodePacked("./test/test-data/deposit-data-DV0-noPod.json"));
+    }
 
-    // function testPreCreateDVs() public {
-    //     // Alice would like to create a StrategyVault but no pending clusters
-    //     vm.expectRevert(bytes("StrategyVaultManager.createStratVaultAndStakeNativeETH: no pending DVs"));
-    //     _createStratVaultAndStakeNativeETH(alice, 32 ether);
+    function test_byzantineContractsOwnership() public view {
+        assertEq(strategyVaultManager.owner(), address(this));
+        ByzNft byzNftContract = _getByzNftContract();
+        assertEq(byzNftContract.owner(), address(strategyVaultManager));
+    }
 
-    //     // Alice tries to pre-create 2 DVs but she is not allowed
-    //     vm.expectRevert(bytes("Ownable: caller is not the owner"));
-    //     vm.prank(alice);
-    //     strategyVaultManager.preCreateDVs(2);
+    function test_createStratVaultETH() public {
 
-    //     // Byzantine pre-create the first 2 DVs
-    //     strategyVaultManager.preCreateDVs(2);
+        /* ===================== ALICE CREATES A FIRST STRATVAULTETH ===================== */
+        // whitelistedDeposit = true, upgradeable = true, EL Operator = ELOperator1, oracle = 0x0
+        vm.prank(alice);
+        IStrategyVaultETH aliceStratVault1 = IStrategyVaultETH(strategyVaultManager.createStratVaultETH(true, true, ELOperator1, address(0)));
 
-    //     // Verify number of pre-created DVs
-    //     assertEq(strategyVaultManager.numPreCreatedClusters(), 2);
-    //     assertEq(strategyVaultManager.getNumPendingClusters(), 2);
+        // Verify aliceStratVault1 has been created and has delegated
+        assertEq(aliceStratVault1.stratVaultNftId(), uint256(keccak256(abi.encodePacked(block.timestamp, uint64(0), alice))));
+        assertEq(strategyVaultManager.getStratVaultByNftId(aliceStratVault1.stratVaultNftId()), address(aliceStratVault1));
+        assertEq(aliceStratVault1.stratVaultOwner(), alice);
+        assertEq(aliceStratVault1.whitelistedDeposit(), true);
+        assertEq(aliceStratVault1.isWhitelisted(alice), true);
+        assertEq(aliceStratVault1.upgradeable(), true);
+        assertEq(eigenPodManager.hasPod(address(aliceStratVault1)), true);
+        assertEq(strategyVaultManager.isStratVaultETH(address(aliceStratVault1)), true);
+        assertEq(strategyVaultManager.numStratVaultETHs(), 1);
+        assertEq(strategyVaultManager.numStratVaults(), 1);
+        assertEq(aliceStratVault1.hasDelegatedTo(), ELOperator1);
+        assertEq(aliceStratVault1.getVaultDVNumber(), 0);
 
-    //     // Verify the nodes details of the pre-created DVs
-    //     IStrategyVaultETH.Node[4] memory nodesDV1 = strategyVaultManager.getPendingClusterNodeDetails(0);
-    //     IStrategyVaultETH.Node[4] memory nodesDV2 = strategyVaultManager.getPendingClusterNodeDetails(1);
-    //     // Verify the nodes details of the pre-created DV1
-    //     for (uint i = 0; i < clusterSize; i++) {
-    //         assertEq(nodesDV1[i].eth1Addr, nodeOps[i]);
-    //     }
-    //     assertEq(nodesDV1[0].vcNumber, 999);
-    //     assertEq(nodesDV1[1].vcNumber, 900);
-    //     assertEq(nodesDV1[2].vcNumber, 800);
-    //     assertEq(nodesDV1[3].vcNumber, 700);
-    //     // Verify the nodes details of the pre-created DV1
-    //     for (uint i = 0; i < clusterSize; i++) {
-    //         assertEq(nodesDV2[i].eth1Addr, nodeOps[i + 4]);
-    //     }
-    //     assertEq(nodesDV2[0].vcNumber, 600);
-    //     assertEq(nodesDV2[1].vcNumber, 500);
-    //     assertEq(nodesDV2[2].vcNumber, 400);
-    //     assertEq(nodesDV2[3].vcNumber, 300);
+        /* ===================== ALICE CREATES A FIRST STRATVAULTETH ===================== */
+        // whitelistedDeposit = false, upgradeable = false, EL Operator = ELOperator1, oracle = 0x0
+        vm.prank(alice);
+        IStrategyVaultETH aliceStratVault2 = IStrategyVaultETH(strategyVaultManager.createStratVaultETH(false, false, ELOperator1, address(0)));
 
-    //     // Alice creates a StrategyVault and activates the first DV
-    //     _createStratVaultAndStakeNativeETH(alice, 32 ether);
-    //     assertEq(alice.balance, STARTING_BALANCE - 32 ether);
+        // Verify some variables of aliceStratVault2
+        assertEq(aliceStratVault2.whitelistedDeposit(), false);
+        assertEq(aliceStratVault2.isWhitelisted(alice), false);
+        assertEq(aliceStratVault2.upgradeable(), false);
+        assertEq(strategyVaultManager.numStratVaultETHs(), 2);
+        assertEq(strategyVaultManager.numStratVaults(), 2);
+        assertEq(aliceStratVault2.hasDelegatedTo(), ELOperator1);
 
-    //     // Verify the first pending DV has been deleted from the pending container
-    //     nodesDV1 = strategyVaultManager.getPendingClusterNodeDetails(0);
-    //     // Verify the nodes details of the pre-created DV1 has been deleted
-    //     for (uint i = 0; i < clusterSize; i++) {
-    //         assertEq(nodesDV1[i].eth1Addr, address(0));
-    //     }
-    //     assertEq(nodesDV1[0].vcNumber, 0);
-    //     assertEq(nodesDV1[1].vcNumber, 0);
-    //     assertEq(nodesDV1[2].vcNumber, 0);
-    //     assertEq(nodesDV1[3].vcNumber, 0);
+        /// Get all the deployed StratVaultETH
+        address[] memory stratVaultETHs = strategyVaultManager.getAllStratVaultETHs();
+        assertEq(stratVaultETHs.length, 2);
+        assertEq(stratVaultETHs[0], address(aliceStratVault1));
+        assertEq(stratVaultETHs[1], address(aliceStratVault2));
 
-    //     // Verify number of pending DVs
-    //     assertEq(strategyVaultManager.numPreCreatedClusters(), 2);
-    //     assertEq(strategyVaultManager.getNumPendingClusters(), 1);
-    // }
+    }
 
-    // function testCreateStratVaults() public preCreateClusters(2) {
+    function test_createStratVaultETHAndStake() public {
 
-    //     // Node ops bids again
-    //     _8NodeOpsBid();
+        /* ===================== STRATVAULTETH CREATION FAILS BECAUSE NOT MULTIPLE OF 32ETH STAKED ===================== */
+        vm.prank(alice);
+        vm.expectRevert(IStrategyVaultETH.CanOnlyDepositMultipleOf32ETH.selector);
+        strategyVaultManager.createStratVaultAndStakeNativeETH{value: 58 ether}(true, true, ELOperator1, address(0));
 
-    //     // First, verify if Alice and Bob have StrategyVaults
-    //     assertFalse(strategyVaultManager.hasStratVaults(alice));
-    //     assertFalse(strategyVaultManager.hasStratVaults(bob));
+        /* ===================== STRATVAULTETH CREATION FAILS BECAUSE NOT NODE OPS IN AUCTION ===================== */
+        vm.prank(alice);
+        vm.expectRevert(IAuction.MainAuctionEmpty.selector);
+        strategyVaultManager.createStratVaultAndStakeNativeETH{value: 320 ether}(true, true, ELOperator1, address(0));
 
-    //     // Alice creates a StrategyVault
-    //     address aliceStratVaultAddr1 = _createStratVaultAndStakeNativeETH(alice, 32 ether);
-    //     uint256 nft1 = IStrategyVaultETH(aliceStratVaultAddr1).stratVaultNftId();
-    //     assertTrue(strategyVaultManager.hasStratVaults(alice));
-    //     assertEq(strategyVaultManager.numStratVaults(), 1);
-    //     assertEq(strategyVaultManager.getStratVaultNumber(alice), 1);
-    //     assertEq(IStrategyVaultETH(aliceStratVaultAddr1).stratVaultOwner(), alice);
-    //     assertEq(strategyVaultManager.getStratVaultByNftId(nft1), aliceStratVaultAddr1);
+        /* ===================== ALICE CREATES A STRATVAULTETH AND STAKES 96ETH ===================== */
+        // whitelistedDeposit = true, upgradeable = true, EL Operator = ELOperator1, oracle = 0x0
+        vm.prank(alice);
+        IStrategyVaultETH aliceStratVault1 = IStrategyVaultETH(strategyVaultManager.createStratVaultAndStakeNativeETH{value: 96 ether}(true, true, ELOperator1, address(0)));
 
-    //     // Verify alice strat vault 1 DV details
-    //     IStrategyVaultETH.Node[4] memory nodesDV1Alice = IStrategyVaultETH(aliceStratVaultAddr1).getDVNodesDetails();
-    //     IStrategyVaultETH.DVStatus dvStatusDV1Alice = IStrategyVaultETH(aliceStratVaultAddr1).getDVStatus();
-    //     // Verify the nodes details
-    //     for (uint i = 0; i < clusterSize; i++) {
-    //         assertEq(nodesDV1Alice[i].eth1Addr, nodeOps[i]);
-    //     }
-    //     assertEq(nodesDV1Alice[0].vcNumber, 999);
-    //     assertEq(nodesDV1Alice[1].vcNumber, 900);
-    //     assertEq(nodesDV1Alice[2].vcNumber, 800);
-    //     assertEq(nodesDV1Alice[3].vcNumber, 700);
-    //     // Verify the DV status
-    //     assertEq(uint(dvStatusDV1Alice), uint(IStrategyVaultETH.DVStatus.DEPOSITED_NOT_VERIFIED));
+        // Verify the StratVaultETH clusters
+        assertEq(aliceStratVault1.getVaultDVNumber(), 3);
+        bytes32[] memory clusterIds = aliceStratVault1.getAllDVIds();
+        assertEq(clusterIds.length, 3);
+        // Verify DV1 node ops addresses
+        address[] memory nodeOpsDV1 = _getClusterIdNodeOp(clusterIds[0]);
+        assertEq(nodeOpsDV1.length, 4);
+        assertEq(nodeOpsDV1[0], nodeOps[0]);
+        assertEq(nodeOpsDV1[1], nodeOps[1]);
+        assertEq(nodeOpsDV1[2], nodeOps[2]);
+        assertEq(nodeOpsDV1[3], nodeOps[3]);
+        // Verify DV2 node ops addresses
+        address[] memory nodeOpsDV2 = _getClusterIdNodeOp(clusterIds[1]);
+        assertEq(nodeOpsDV2.length, 4);
+        assertEq(nodeOpsDV2[0], nodeOps[1]);
+        assertEq(nodeOpsDV2[1], nodeOps[0]);
+        assertEq(nodeOpsDV2[2], nodeOps[2]);
+        assertEq(nodeOpsDV2[3], nodeOps[4]);
+        // Verify DV3 node ops addresses
+        address[] memory nodeOpsDV3 = _getClusterIdNodeOp(clusterIds[2]);
+        assertEq(nodeOpsDV3.length, 4);
+        assertEq(nodeOpsDV3[0], nodeOps[2]);
+        assertEq(nodeOpsDV3[1], nodeOps[5]);
+        assertEq(nodeOpsDV3[2], nodeOps[6]);
+        assertEq(nodeOpsDV3[3], nodeOps[7]);
 
-    //     // Verify number of pending DVs
-    //     assertEq(strategyVaultManager.numPreCreatedClusters(), 3);
-    //     assertEq(strategyVaultManager.getNumPendingClusters(), 2);
+        /* ===================== BOB TRIES TO STAKE IN ALICE'S STRATVAULTETH ===================== */
+        vm.prank(bob);
+        vm.expectRevert(IStrategyVault.OnlyWhitelistedDeposit.selector);
+        aliceStratVault1.stakeNativeETH{value: 32 ether}();
 
-    //     // Bob creates a StrategyVault
-    //     address bobStratVaultAddr1 = _createStratVaultAndStakeNativeETH(bob, 32 ether);
-    //     uint256 nft2 = IStrategyVaultETH(bobStratVaultAddr1).stratVaultNftId();
-    //     assertTrue(strategyVaultManager.hasStratVaults(bob));
-    //     assertEq(strategyVaultManager.numStratVaults(), 2);
-    //     assertEq(strategyVaultManager.getStratVaultNumber(bob), 1);
-    //     assertEq(IStrategyVaultETH(bobStratVaultAddr1).stratVaultOwner(), bob);
-    //     assertEq(strategyVaultManager.getStratVaultByNftId(nft2), bobStratVaultAddr1);
+        // alice whitelists bob
+        vm.prank(alice);
+        aliceStratVault1.whitelistStaker(bob);
 
-    //     // Verify bob strat vault 1 DV details
-    //     IStrategyVaultETH.Node[4] memory nodesDV1Bob = IStrategyVaultETH(bobStratVaultAddr1).getDVNodesDetails();
-    //     IStrategyVaultETH.DVStatus dvStatusDV1Bob = IStrategyVaultETH(bobStratVaultAddr1).getDVStatus();
-    //     // Verify the nodes details
-    //     for (uint i = 0; i < clusterSize; i++) {
-    //        assertEq(nodesDV1Bob[i].eth1Addr, nodeOps[i + 4]);
-    //     }
-    //     assertEq(nodesDV1Bob[0].vcNumber, 600);
-    //     assertEq(nodesDV1Bob[1].vcNumber, 500);
-    //     assertEq(nodesDV1Bob[2].vcNumber, 400);
-    //     assertEq(nodesDV1Bob[3].vcNumber, 300);
-    //     // Verify the DV status
-    //     assertEq(uint(dvStatusDV1Bob), uint(IStrategyVaultETH.DVStatus.DEPOSITED_NOT_VERIFIED));
+        // bob stakes in alice's stratvault
+        vm.prank(bob);
+        aliceStratVault1.stakeNativeETH{value: 32 ether}();
 
-    //     // Verify number of pending DVs
-    //     assertEq(strategyVaultManager.numPreCreatedClusters(), 4);
-    //     assertEq(strategyVaultManager.getNumPendingClusters(), 2);
+        // Verify the StratVaultETH clusters
+        assertEq(aliceStratVault1.getVaultDVNumber(), 4);
+        clusterIds = aliceStratVault1.getAllDVIds();
+        assertEq(clusterIds.length, 4);
+        // Verify DV4 node ops addresses
+        address[] memory nodeOpsDV4 = _getClusterIdNodeOp(clusterIds[3]);
+        assertEq(nodeOpsDV4.length, 4);
+        assertEq(nodeOpsDV4[0], nodeOps[2]);
+        assertEq(nodeOpsDV4[1], nodeOps[6]);
+        assertEq(nodeOpsDV4[2], nodeOps[7]);
+        assertEq(nodeOpsDV4[3], nodeOps[8]);
 
-    //     // Alice creates a second StrategyVault
-    //     address aliceStratVaultAddr2 = _createStratVaultAndStakeNativeETH(alice, 32 ether);
-    //     uint256 nft3 = IStrategyVaultETH(aliceStratVaultAddr2).stratVaultNftId();
-    //     assertEq(strategyVaultManager.numStratVaults(), 3);
-    //     assertEq(strategyVaultManager.getStratVaultNumber(alice), 2);
-    //     assertEq(IStrategyVaultETH(aliceStratVaultAddr2).stratVaultOwner(), alice);
-    //     assertEq(strategyVaultManager.getStratVaultByNftId(nft3), aliceStratVaultAddr2);
+    }
 
-    //     // Verify alice strat vault 2 DV details
-    //     IStrategyVaultETH.Node[4] memory nodesDV2Alice = IStrategyVaultETH(aliceStratVaultAddr2).getDVNodesDetails();
-    //     IStrategyVaultETH.DVStatus dvStatusDV2Alice = IStrategyVaultETH(aliceStratVaultAddr2).getDVStatus();
-    //     // Verify the nodes details
-    //     for (uint i = 0; i < clusterSize; i++) {
-    //         assertEq(nodesDV2Alice[i].eth1Addr, nodeOps[i]);
-    //     }
-    //     assertEq(nodesDV2Alice[0].vcNumber, 999);
-    //     assertEq(nodesDV2Alice[1].vcNumber, 900);
-    //     assertEq(nodesDV2Alice[2].vcNumber, 800);
-    //     assertEq(nodesDV2Alice[3].vcNumber, 700);
-    //     // Verify the DV status
-    //     assertEq(uint(dvStatusDV2Alice), uint(IStrategyVaultETH.DVStatus.DEPOSITED_NOT_VERIFIED));
+    function test_RevertWhen_TransferByzNft() public {
 
-    //     // Verify number of pending DVs
-    //     assertEq(strategyVaultManager.numPreCreatedClusters(), 4);
-    //     assertEq(strategyVaultManager.getNumPendingClusters(), 1);
+        // Alice creates a StratVaultETH
+        vm.prank(alice);
+        IStrategyVaultETH aliceStratVault1 = IStrategyVaultETH(strategyVaultManager.createStratVaultETH(true, true, ELOperator1, address(0)));
+        uint256 nftId = IStrategyVaultETH(aliceStratVault1).stratVaultNftId();
 
-    // }
+        // Verify Alice owns the nft
+        ByzNft byzNftContract = _getByzNftContract();
+        assertEq(byzNftContract.ownerOf(nftId), alice);
 
-    // function testpreCalculatePodAndSplitAddress() public preCreateClusters(2) {
+        // Alice tries to transfer her ByzNft to Bob by calling the ERC721 `safeTransferFrom` function
+        vm.startPrank(alice);
+        vm.expectRevert(bytes("ByzNft is non-transferable"));
+        byzNftContract.safeTransferFrom(alice, bob, nftId);
 
-    //     // Pre-calculate pod and split address of DV1 and DV2
-    //     (address podAddressDV1, address splitAddressDV1) = strategyVaultManager.preCalculatePodAndSplitAddr(0);
-    //     (address podAddressDV2, address splitAddressDV2) = strategyVaultManager.preCalculatePodAndSplitAddr(1);
-
-    //     // Sould revert because DV3 is not in the precreated clusters range
-    //     vm.expectRevert(bytes("StrategyVaultManager.preCalculatePodAndSplitAddr: invalid nounce. Should be in the precreated clusters range"));
-    //     (address podAddressDV3, address splitAddressDV3) = strategyVaultManager.preCalculatePodAndSplitAddr(2);
-
-    //     // Node ops bids again
-    //     _8NodeOpsBid();
-
-    //     // Alice creates two StrategyVaults
-    //     address aliceStratVaultAddr1 = _createStratVaultAndStakeNativeETH(alice, 32 ether);
-    //     address aliceStratVaultAddr2 = _createStratVaultAndStakeNativeETH(alice, 32 ether);
-
-    //     // Should revert because DV1 is already created
-    //     vm.expectRevert(bytes("StrategyVaultManager.preCalculatePodAndSplitAddr: invalid nounce. Should be in the precreated clusters range"));
-    //     strategyVaultManager.preCalculatePodAndSplitAddr(0);
-
-    //     (podAddressDV3, splitAddressDV3) = strategyVaultManager.preCalculatePodAndSplitAddr(2);
-
-    //     // Bob creates a StrategyVault
-    //     address bobStratVaultAddr1 = _createStratVaultAndStakeNativeETH(bob, 32 ether);
-
-    //     // Verify pod addresses of DV1, DV2 and DV3
-    //     assertEq(strategyVaultManager.getPodByStratVaultAddr(aliceStratVaultAddr1), podAddressDV1);
-    //     assertEq(strategyVaultManager.getPodByStratVaultAddr(aliceStratVaultAddr2), podAddressDV2);
-    //     assertEq(strategyVaultManager.getPodByStratVaultAddr(bobStratVaultAddr1), podAddressDV3);
-
-    //     // Verify split addresses of DV1, DV2 and DV3
-    //     assertEq(IStrategyVaultETH(aliceStratVaultAddr1).getSplitAddress(), splitAddressDV1);
-    //     assertEq(IStrategyVaultETH(aliceStratVaultAddr2).getSplitAddress(), splitAddressDV2);
-    //     assertEq(IStrategyVaultETH(bobStratVaultAddr1).getSplitAddress(), splitAddressDV3);
-    // }
-
-    // // Within foundry, resulting address of a contract deployed with CREATE2 differs according to the msg.sender.
-    // // Why??
-    // function testFrontRunStratVaultDeployment() public preCreateClusters(2) {
-    //     // Bob a hacker, front run the deployment of the first StrategyVault
-    //     vm.startPrank(bob);
-    //     uint256 firstNftId = uint256(keccak256(abi.encode(0)));
-    //     address stratVaultAddr = Create2.deploy(
-    //         0,
-    //         bytes32(firstNftId),
-    //         abi.encodePacked(type(BeaconProxy).creationCode, abi.encode(strategyVaultBeacon, ""))
-    //     );
-    //     // Bob wants to initialize the StrategyVault but can't because he doesn't own the nft
-    //     vm.expectRevert(bytes("Cannot initialize StrategyVault: ERC721: invalid token ID"));
-    //     IStrategyVaultETH(stratVaultAddr).initialize(firstNftId, bob);
-    //     vm.stopPrank();
-    // }
+    }
 
     // function testSplitDistribution() public preCreateClusters(2) {
     //     // Alice creates a StrategyVault
@@ -304,86 +239,6 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
 
     //     // Verify the distributor balance
     //     assertEq(bob.balance, distributorBalance + 2 ether - 1);
-    // }
-
-    // function testStratVaultTransfer() public preCreateClusters(2) {
-    //     // Alice creates a StrategyVault
-    //     address stratVaultAddrAlice = _createStratVaultAndStakeNativeETH(alice, 32 ether);
-    //     uint256 nftId = IStrategyVaultETH(stratVaultAddrAlice).stratVaultNftId();
-
-    //     // Verify Alice owns the nft
-    //     ByzNft byzNftContract = _getByzNftContract();
-    //     assertEq(byzNftContract.ownerOf(nftId), alice);
-
-    //     // Alice tries to transfer the StrategyVault by call the ERC721 `safeTransferFrom` function
-    //     // It's forbidden because the nft owner will change but the mapping `stakerToStratVaults` won't be updated
-    //     vm.startPrank(alice);
-    //     vm.expectRevert(bytes("ByzNft._transfer: Token transfer can only be initiated by the StrategyVaultManager, call StrategyVaultManager.transferStratVaultOwnership"));
-    //     byzNftContract.safeTransferFrom(alice, bob, nftId);
-    //     vm.stopPrank();
-
-    //     // Alice approves the StrategyVaultManager to transfer to Bob
-    //     _approveNftTransferByStratVaultManager(alice, IStrategyVaultETH(stratVaultAddrAlice).stratVaultNftId());
-
-    //     // Alice transfers the StrategyVault to Bob
-    //     vm.prank(alice);
-    //     strategyVaultManager.transferStratVaultOwnership(stratVaultAddrAlice, bob);
-    //     assertEq(strategyVaultManager.getStratVaultNumber(alice), 0);
-
-    //     // Verify if Bob is the new owner
-    //     assertEq(bob, IStrategyVaultETH(stratVaultAddrAlice).stratVaultOwner());
-    //     assertEq(strategyVaultManager.getStratVaultNumber(bob), 1);
-
-    //     // Verify if the mappings has been correctly updated
-    //     address[] memory aliceStratVaults = strategyVaultManager.getStratVaults(alice);
-    //     assertEq(aliceStratVaults.length, 0);
-    //     assertEq(aliceStratVaults, new address[](0));
-    //     address[] memory bobStratVaults = strategyVaultManager.getStratVaults(bob);
-    //     assertEq(bobStratVaults.length, 1);
-    //     assertEq(bobStratVaults[0], stratVaultAddrAlice);
-    // }
-
-    // function test_RevertWhen_NonStratVaultOwnerTransfersStratVault() public preCreateClusters(2) {
-    //     // Alice creates a StrategyVault
-    //     address stratVaultAddrAlice = _createStratVaultAndStakeNativeETH(alice, 32 ether);
-
-    //     // Alice approves the StrategyVaultManager to transfer to Bob
-    //     _approveNftTransferByStratVaultManager(alice, IStrategyVaultETH(stratVaultAddrAlice).stratVaultNftId());
-
-    //     // This smart contract transfers the StrategyVault to Bob
-    //     vm.expectRevert(IStrategyVaultManager.NotStratVaultOwner.selector);
-    //     strategyVaultManager.transferStratVaultOwnership(stratVaultAddrAlice, bob);
-    // }
-
-    // function test_RevertWhen_TransferStratVaultToItself() public preCreateClusters(2) {
-    //     // Alice creates a StrategyVault
-    //     address stratVaultAddrAlice = _createStratVaultAndStakeNativeETH(alice, 32 ether);
-
-    //     // Alice approves the StrategyVault to transfer to herself
-    //     _approveNftTransferByStratVaultManager(alice, IStrategyVaultETH(stratVaultAddrAlice).stratVaultNftId());     
-
-    //     vm.expectRevert(bytes("StrategyVaultManager.transferStratVaultOwnership: cannot transfer ownership to the same address"));
-    //     vm.prank(alice);
-    //     strategyVaultManager.transferStratVaultOwnership(stratVaultAddrAlice, alice);
-    // }
-
-    // function test_HasPod() public preCreateClusters(2) {
-    //     // Alice creates a StrategyVault
-    //     address stratVaultAddrAlice = _createStratVaultAndStakeNativeETH(alice, 32 ether);
-    //     assertTrue(strategyVaultManager.hasPod(stratVaultAddrAlice));
-    // }
-
-    // function test_callEigenPodManager() public preCreateClusters(2) {
-    //     // Alice creates a StrategyVault
-    //     address stratVaultAddr = _createStratVaultAndStakeNativeETH(alice, 32 ether);
-
-    //     // Alice wants to call EigenPodManager directly
-    //     bytes memory functionToCall = abi.encodeWithSignature("ownerToPod(address)", stratVaultAddr);
-    //     vm.prank(alice);
-    //     bytes memory ret = IStrategyVaultETH(stratVaultAddr).callEigenPodManager(functionToCall);
-    //     IEigenPod pod = abi.decode(ret, (IEigenPod));
-
-    //     assertEq(address(pod), strategyVaultManager.getPodByStratVaultAddr(stratVaultAddr));
     // }
 
     // function test_RevertWhen_Not32ETHDeposited() public preCreateClusters(2) {
@@ -486,10 +341,6 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
     //         return address(0);
     //     }
     //     return strategyVaultManager.getStratVaults(_staker)[stratVaultNumber - 1];
-    // }
-
-    // function _getByzNftContract() internal view returns (ByzNft) {
-    //     return ByzNft(address(strategyVaultManager.byzNft()));
     // }
 
     // function _approveNftTransferByStratVaultManager(address approver, uint256 nftId) internal {
@@ -620,33 +471,72 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
     //     return nodeOpsAuctionScores;
     // }
 
-    // function _8NodeOpsBid() internal {
-    //     (uint16[] memory DR0, uint32[] memory time0) = _createOneBidParamArray(13e2, 999);  // 1st
-    //     (, uint32[] memory time1) = _createOneBidParamArray(13e2, 900);  // 2nd
-    //     (, uint32[] memory time2) = _createOneBidParamArray(13e2, 800);  // 3rd
-    //     (, uint32[] memory time3) = _createOneBidParamArray(13e2, 700);  // 4th
-    //     (, uint32[] memory time4) = _createOneBidParamArray(13e2, 600);  // 5th
-    //     (, uint32[] memory time5) = _createOneBidParamArray(13e2, 500);  // 6th
-    //     (, uint32[] memory time6) = _createOneBidParamArray(13e2, 400);  // 7th
-    //     (, uint32[] memory time7) = _createOneBidParamArray(13e2, 300);  // 8th
+    /* ===================== HELPER FUNCTIONS ===================== */
 
-    //     NodeOpBid[] memory nodeOpBids = new NodeOpBid[](8);
-    //     nodeOpBids[0] = NodeOpBid(nodeOps[0], DR0, time0);
-    //     nodeOpBids[1] = NodeOpBid(nodeOps[1], DR0, time1); 
-    //     nodeOpBids[2] = NodeOpBid(nodeOps[2], DR0, time2); 
-    //     nodeOpBids[3] = NodeOpBid(nodeOps[3], DR0, time3);
-    //     nodeOpBids[4] = NodeOpBid(nodeOps[4], DR0, time4);
-    //     nodeOpBids[5] = NodeOpBid(nodeOps[5], DR0, time5);
-    //     nodeOpBids[6] = NodeOpBid(nodeOps[6], DR0, time6);
-    //     nodeOpBids[7] = NodeOpBid(nodeOps[7], DR0, time7);
-    //     _nodeOpsBid(nodeOpBids);
-    // }
+    function _bidCluster4(
+        address _nodeOp,
+        uint16 _discountRate,
+        uint32 _timeInDays
+    ) internal returns (bytes32) {
+        vm.warp(block.timestamp + 1);
+        // Get price to pay
+        uint256 priceToPay = auction.getPriceToPayCluster4(_nodeOp, _discountRate, _timeInDays);
+        vm.prank(_nodeOp);
+        return   auction.bidCluster4{value: priceToPay}(_discountRate, _timeInDays);
+    }
 
-    // /* ===================== MODIFIERS ===================== */
+    function _createMultipleBids() internal returns (bytes32[] memory) {
+        bytes32[] memory bidIds = new bytes32[](16);
 
-    // modifier preCreateClusters(uint8 _numDVsToPreCreate) {
-    //     strategyVaultManager.preCreateDVs(_numDVsToPreCreate);
-    //     _;
-    // }
+        // nodeOps[0] bids 2 times with the same parameters
+        bidIds[0] = _bidCluster4(nodeOps[0], 5e2, 200); // 1st
+        bidIds[1] = _bidCluster4(nodeOps[0], 5e2, 200); // 6th
+
+        // nodeOps[1] bids 2 times with the same parameters
+        bidIds[2] = _bidCluster4(nodeOps[1], 5e2, 200); // 2nd
+        bidIds[3] = _bidCluster4(nodeOps[1], 5e2, 200); // 5th
+
+        // nodeOps[2] bids 4 times with different parameters
+        bidIds[4] = _bidCluster4(nodeOps[2], 5e2, 150); // 3rd
+        bidIds[5] = _bidCluster4(nodeOps[2], 5e2, 149); // 7th
+        bidIds[6] = _bidCluster4(nodeOps[2], 5e2, 148); // 9th
+        bidIds[7] = _bidCluster4(nodeOps[2], 5e2, 147); // 13th
+
+        // nodeOps[3] bids
+        bidIds[8] = _bidCluster4(nodeOps[3], 5e2, 150); // 4th
+
+        // nodeOps[4] bids
+        bidIds[9] = _bidCluster4(nodeOps[4], 5e2, 149); // 8th
+
+        // nodeOps[5] bids
+        bidIds[10] = _bidCluster4(nodeOps[5], 9e2, 100); // 10th
+
+        // nodeOps[6] bids
+        bidIds[11] = _bidCluster4(nodeOps[6], 12e2, 50); // 11th
+        bidIds[12] = _bidCluster4(nodeOps[6], 14e2, 50); // 14th
+
+        // nodeOps[7] bids
+        bidIds[13] = _bidCluster4(nodeOps[7], 14e2, 45); // 12th
+        bidIds[14] = _bidCluster4(nodeOps[7], 14e2, 40); // 15th
+
+        // nodeOps[8] bids
+        bidIds[15] = _bidCluster4(nodeOps[8], 15e2, 40); // 16th
+
+        return bidIds;
+    }
+    
+    function _getByzNftContract() internal view returns (ByzNft) {
+        return ByzNft(address(strategyVaultManager.byzNft()));
+    }
+
+    function _getClusterIdNodeOp(bytes32 _clusterId) internal view returns (address[] memory) {
+        IAuction.NodeDetails[] memory nodeDetails = auction.getClusterDetails(_clusterId).nodes;
+
+        address[] memory nodeOps = new address[](nodeDetails.length);
+        for (uint256 i = 0; i < nodeDetails.length; i++) {
+            nodeOps[i] = auction.getBidDetails(nodeDetails[i].bidId).nodeOp;
+        }
+        return nodeOps;
+    }
 
 }
