@@ -199,8 +199,8 @@ contract ExistingDeploymentParser is Script, Test {
         );
         // Escrow
         require(
-            escrow.bidPriceReceiver() == bidReceiver,
-            "escrow: bidPriceReceiver address not set correctly"
+            escrow.stakerRewards() == bidReceiver,
+            "escrow: stakerRewards address not set correctly"
         );
         require(
             escrow.auction() == auction,

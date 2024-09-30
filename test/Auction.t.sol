@@ -120,6 +120,7 @@ contract AuctionTest is ByzantineDeployer {
         assertEq(bid0Details.vcNumber, 100);
         assertEq(bid0Details.discountRate, 10e2);
         assertEq(uint256(bid0Details.auctionType), uint256(IAuction.AuctionType.JOIN_CLUSTER_4));
+        assertEq(address(escrow).balance, bid0Details.bidPrice);
 
         // Second bid parameter: 13.75%, 129 days
         bytes32 bid1Id = _bidCluster4(nodeOps[1], 1375, 129);
@@ -483,6 +484,9 @@ contract AuctionTest is ByzantineDeployer {
         assertEq(auction.dv4AuctionNumNodeOps(), 4);
         assertEq(auction.getNumDVInAuction(), 1);
 
+        // Check if StakerRewards has received the bids prices
+        assertEq(bidReceiver.balance, _getBidIdBidPrice(winningBidIds[0]) + _getBidIdBidPrice(winningBidIds[1]) + _getBidIdBidPrice(winningBidIds[2]) + _getBidIdBidPrice(winningBidIds[3]));
+
         /* ===================== SECOND DV CREATION ===================== */
 
         // A main auction is triggered
@@ -548,6 +552,11 @@ contract AuctionTest is ByzantineDeployer {
     function _getBidIdNodeAddr(bytes32 _bidId) internal view returns (address) {
         IAuction.BidDetails memory bidDetails = auction.getBidDetails(_bidId);
         return bidDetails.nodeOp;
+    }
+
+    function _getBidIdBidPrice(bytes32 _bidId) internal view returns (uint256) {
+        IAuction.BidDetails memory bidDetails = auction.getBidDetails(_bidId);
+        return bidDetails.bidPrice;
     }
 
     function _calculateAvgAuctionScore(uint256[] memory _auctionScores) internal pure returns (uint256) {
