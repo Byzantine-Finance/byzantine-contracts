@@ -27,7 +27,9 @@ contract StrategyVaultETH is Initializable, StrategyVaultETHStorage, ERC4626ETHM
     }
 
     modifier checkWhitelist() {
-        if (whitelistedDeposit && !isWhitelisted[msg.sender]) revert OnlyWhitelistedDeposit();
+        if (msg.sender != address(stratVaultManager)) { // deposit during the vault creation
+            if (whitelistedDeposit && !isWhitelisted[msg.sender]) revert OnlyWhitelistedDeposit();
+        }
         _;
     }
 
@@ -164,7 +166,7 @@ contract StrategyVaultETH is Initializable, StrategyVaultETHStorage, ERC4626ETHM
         }
         
         // Mint vault shares to the staker in return for the ETH staked
-        _mintVaultShares(msg.value, msg.sender);
+        // _mintVaultShares(msg.value, msg.sender);
     }
 
     /**
