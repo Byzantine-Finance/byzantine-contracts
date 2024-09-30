@@ -186,6 +186,7 @@ contract AuctionTest is ByzantineDeployer {
         // Verify the `ClusterDetails` struct
         IAuction.ClusterDetails memory winningClusterDetails = auction.getClusterDetails(winningClusterId);
         assertEq(winningClusterDetails.averageAuctionScore, highestAvgAuctionScore);
+        assertEq(winningClusterDetails.splitAddr, address(0));
         assertEq(uint256(winningClusterDetails.status), uint256(IAuction.ClusterStatus.INACTIVE));
         assertEq(winningClusterDetails.nodes[0].bidId, bidId1);
         assertEq(winningClusterDetails.nodes[0].currentVCNumber, 200);
@@ -450,6 +451,9 @@ contract AuctionTest is ByzantineDeployer {
         // Get the winning cluster details
         IAuction.ClusterDetails memory winningClusterDetails = auction.getClusterDetails(firstClusterId);
 
+        // Verify a Split has been deployed
+        assertNotEq(winningClusterDetails.splitAddr, address(0));
+
         // Get the winning bid ids
         bytes32[] memory winningBidIds = new bytes32[](4);
         winningBidIds[0] = winningClusterDetails.nodes[0].bidId;
@@ -487,6 +491,9 @@ contract AuctionTest is ByzantineDeployer {
 
         // Get the second winning cluster details
         winningClusterDetails = auction.getClusterDetails(secondClusterId);
+
+        // Verify a Split has been deployed
+        assertNotEq(winningClusterDetails.splitAddr, address(0));
 
         // Get the second DV winning bid ids
         winningBidIds[0] = winningClusterDetails.nodes[0].bidId;
