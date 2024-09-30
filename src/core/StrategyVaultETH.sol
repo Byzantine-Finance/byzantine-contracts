@@ -215,15 +215,17 @@ contract StrategyVaultETH is Initializable, StrategyVaultETHStorage, ERC4626ETHM
     //     super.withdraw(assetAmount, receiver, msg.sender);
     // }
 
-    /* ============== VAULT CREATOR FUNCTIONS ============== */
+    /* ============== STRATEGY VAULT MANAGER FUNCTIONS ============== */
 
     /**
-     * @notice Call the EigenPodManager contract
-     * @param data to call contract 
+     * @notice Create an EigenPod for the StrategyVault.
+     * @dev Can only be called by the StrategyVaultManager during the vault creation.
      */
-    function callEigenPodManager(bytes calldata data) external payable onlyNftOwner returns (bytes memory) {
-        return _executeCall(payable(address(eigenPodManager)), msg.value, data);
+    function createEigenPod() external onlyStratVaultManager {
+        eigenPodManager.createPod();
     }
+
+    /* ============== VAULT CREATOR FUNCTIONS ============== */
 
     /**
      * @notice This function verifies that the withdrawal credentials of the Distributed Validator(s) owned by
@@ -304,6 +306,13 @@ contract StrategyVaultETH is Initializable, StrategyVaultETHStorage, ERC4626ETHM
     }
 
     /**
+     * @notice Returns the Eigen Layer operator that the Strategy Vault is delegated to
+     */
+    function hasDelegatedTo() public view returns (address) {
+        return delegationManager.delegatedTo(address(this));
+    }
+
+    /**
      * @notice Returns the number of active DVs staked by the Strategy Vault.
      */
     function getVaultDVNumber() public view returns (uint256) {
@@ -325,22 +334,6 @@ contract StrategyVaultETH is Initializable, StrategyVaultETHStorage, ERC4626ETHM
         } else {
             deposit(amount, stratVaultOwner());
         }
-    }
-
-    /**
-     * @notice Execute a low level call
-     * @param to address to execute call
-     * @param value amount of ETH to send with call
-     * @param data bytes array to execute
-     */
-    function _executeCall(
-        address payable to,
-        uint256 value,
-        bytes memory data
-    ) private returns (bytes memory) {
-        (bool success, bytes memory retData) = address(to).call{value: value}(data);
-        if (!success) revert CallFailed(data);
-        return retData;
     }
 
 }

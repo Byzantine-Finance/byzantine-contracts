@@ -40,6 +40,12 @@ interface IStrategyVaultETH is IStrategyVault {
   function stakeNativeETH() external payable; 
 
   /**
+   * @notice Create an EigenPod for the StrategyVault.
+   * @dev Can only be called by the StrategyVaultManager during the vault creation.
+   */
+  function createEigenPod() external;
+
+  /**
    * @notice This function verifies that the withdrawal credentials of the Distributed Validator(s) owned by
    * the stratVaultOwner are pointed to the EigenPod of this contract. It also verifies the effective balance of the DV.
    * It verifies the provided proof of the ETH DV against the beacon chain state root, marks the validator as 'active'
@@ -65,12 +71,6 @@ interface IStrategyVaultETH is IStrategyVault {
     bytes32[][] calldata validatorFields
   )
     external;
-
-  /**
-   * @notice Call the EigenPodManager contract
-   * @param data to call contract 
-   */
-  function callEigenPodManager(bytes calldata data) external payable returns (bytes memory);
 
   /**
    * @notice Returns the number of active DVs staked by the Strategy Vault.

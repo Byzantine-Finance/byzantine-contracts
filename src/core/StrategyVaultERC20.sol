@@ -183,22 +183,13 @@ contract StrategyVaultERC20 is Initializable, StrategyVaultERC20Storage, ERC4626
         return byzNft.ownerOf(stratVaultNftId);
     }
 
-    /* ============== INTERNAL FUNCTIONS ============== */
-
     /**
-     * @notice Execute a low level call
-     * @param to address to execute call
-     * @param value amount of ETH to send with call
-     * @param data bytes array to execute
+     * @notice Returns the Eigen Layer operator that the Strategy Vault is delegated to
      */
-    function _executeCall(
-        address payable to,
-        uint256 value,
-        bytes memory data
-    ) private returns (bytes memory) {
-        (bool success, bytes memory retData) = address(to).call{value: value}(data);
-        if (!success) revert CallFailed(data);
-        return retData;
+    function hasDelegatedTo() public view returns (address) {
+        return delegationManager.delegatedTo(address(this));
     }
+
+    /* ============== INTERNAL FUNCTIONS ============== */
 
 }

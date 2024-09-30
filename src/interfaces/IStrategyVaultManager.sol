@@ -137,28 +137,6 @@ interface IStrategyVaultManager {
      */
     function getPodByStratVaultAddr(address stratVaultAddr) external view returns (address);
 
-    /**
-     * @notice Specify which `staker`'s StrategyVaults are delegated.
-     * @param staker The address of the StrategyVaults' owner.
-     * @dev Revert if the `staker` doesn't have any StrategyVault.
-     */
-    function isDelegated(address staker) external view returns (bool[] memory);
-
-    /**
-     * @notice Specify to which operators `staker`'s StrategyVaults has delegated to.
-     * @param staker The address of the StrategyVaults' owner.
-     * @dev Revert if the `staker` doesn't have any StrategyVault.
-     */
-    function hasDelegatedTo(address staker) external view returns (address[] memory);
-
-    /**
-     * @notice Returns 'true' if the `stratVaultAddr` has created an EigenPod, and 'false' otherwise.
-     * @param stratVaultAddr The StrategyVault Address you want to know if it has created an EigenPod.
-     * @dev If the `stratVaultAddr` is not an instance of a StrategyVault contract, the function will all the same 
-     * returns the EigenPod of the input address. SO USE THAT FUNCTION CARREFULLY.
-     */
-    function hasPod(address stratVaultAddr) external view returns (bool);
-
     /// @dev Returned when a specific address doesn't have a StrategyVault
     error DoNotHaveStratVault(address);
 

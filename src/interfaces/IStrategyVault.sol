@@ -32,6 +32,10 @@ interface IStrategyVault {
      */
     function delegateTo(address operator) external;
 
+    
+    /// @notice Returns the Eigen Layer operator that the Strategy Vault is delegated to
+    function hasDelegatedTo() external view returns (address);
+
     /// @dev Error when unauthorized call to a function callable only by the Strategy Vault Owner (aka the ByzNft holder).
     error OnlyNftOwner();
 
@@ -40,9 +44,6 @@ interface IStrategyVault {
 
     /// @dev Error when unauthorized call to a function callable only by the StrategyVaultManager.
     error OnlyStrategyVaultManager();
-
-    /// @dev Returned on failed Eigen Layer contracts call
-    error CallFailed(bytes data);
 
     /// @dev Returned when trying to deposit an incorrect token
     error IncorrectToken();
