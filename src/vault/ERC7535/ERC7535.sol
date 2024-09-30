@@ -1,17 +1,19 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import {IERC20, IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import {ERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
-import {IERC7535} from "./interfaces/IERC7535.sol";
-import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import {IERC20Upgradeable, IERC20MetadataUpgradeable} from "@openzeppelin-upgrades/contracts/token/ERC20/extensions/IERC20MetadataUpgradeable.sol";
+import {Initializable} from "@openzeppelin-upgrades/contracts/proxy/utils/Initializable.sol";
+import {ERC20Upgradeable} from "@openzeppelin-upgrades/contracts/token/ERC20/ERC20Upgradeable.sol";
+import {MathUpgradeable} from "@openzeppelin-upgrades/contracts/utils/math/MathUpgradeable.sol";
+import {IERC7535} from "./IERC7535.sol";
 
 /**
  * @title ERC-7535: Native Asset ERC-4626 Tokenized Vault - https://eips.ethereum.org/EIPS/eip-7535
  * @notice ERC-4626 Tokenized Vaults with Ether (Native Asset) as the underlying asset
+ * @notice OpenZeppelin Upgradeable version of ERC7535
  */
-abstract contract ERC7535 is ERC20Upgradeable, IERC7535 {
-    using Math for uint256;
+abstract contract ERC7535Upgradeable is Initializable, ERC20Upgradeable, IERC7535 {
+    using MathUpgradeable for uint256;
 
     /**
      * @dev Attempted to deposit more assets than the max amount for `receiver`.
@@ -34,13 +36,29 @@ abstract contract ERC7535 is ERC20Upgradeable, IERC7535 {
     error ERC7535ExceededMaxRedeem(address owner, uint256 shares, uint256 max);
 
     /**
+     * @dev Initializes the ERC7535 contract. Calls initializer of parent contracts.
+     * @param name The name of the token.
+     * @param symbol The symbol of the token.
+     */
+    function __ERC7535_init(string memory name, string memory symbol) internal initializer {
+        __ERC20_init(name, symbol);
+        __ERC7535_init_unchained();
+    }
+
+    /**
+     * @dev Contains initialization logic specific to this contract.
+     */
+    function __ERC7535_init_unchained() internal initializer {
+    }
+
+    /**
      * @dev Decimals are computed by adding the decimal offset on top of the underlying asset's decimals. This
      * "original" value is cached during construction of the vault contract. If this read operation fails (e.g., the
      * asset has not been created yet), a default of 18 is used to represent the underlying asset's decimals.
      *
      * See {IERC20Metadata-decimals}.
      */
-    function decimals() public view virtual override(IERC20Metadata, ERC20Upgradeable) returns (uint8) {
+    function decimals() public view virtual override(IERC20MetadataUpgradeable, ERC20Upgradeable) returns (uint8) {
         return 18 + _decimalsOffset();
     }
 
@@ -62,14 +80,14 @@ abstract contract ERC7535 is ERC20Upgradeable, IERC7535 {
      * @dev See {IERC7535-convertToShares}.
      */
     function convertToShares(uint256 assets) public view virtual returns (uint256) {
-        return _convertToShares(assets, Math.Rounding.Floor);
+        return _convertToShares(assets, MathUpgradeable.Rounding.Down);
     }
 
     /**
      * @dev See {IERC7535-convertToAssets}.
      */
     function convertToAssets(uint256 shares) public view virtual returns (uint256) {
-        return _convertToAssets(shares, Math.Rounding.Floor);
+        return _convertToAssets(shares, MathUpgradeable.Rounding.Down);
     }
 
     /**
@@ -90,7 +108,7 @@ abstract contract ERC7535 is ERC20Upgradeable, IERC7535 {
      * @dev See {IERC7535-maxWithdraw}.
      */
     function maxWithdraw(address owner) public view virtual returns (uint256) {
-        return _convertToAssets(balanceOf(owner), Math.Rounding.Floor);
+        return _convertToAssets(balanceOf(owner), MathUpgradeable.Rounding.Down);
     }
 
     /**
@@ -104,28 +122,28 @@ abstract contract ERC7535 is ERC20Upgradeable, IERC7535 {
      * @dev See {IERC7535-previewDeposit}.
      */
     function previewDeposit(uint256 assets) public view virtual returns (uint256) {
-        return _convertToShares(assets, Math.Rounding.Floor);
+        return _convertToShares(assets, MathUpgradeable.Rounding.Down);
     }
 
     /**
      * @dev See {IERC7535-previewMint}.
      */
     function previewMint(uint256 shares) public view virtual returns (uint256) {
-        return _convertToAssets(shares, Math.Rounding.Ceil);
+        return _convertToAssets(shares, MathUpgradeable.Rounding.Up);
     }
 
     /**
      * @dev See {IERC7535-previewWithdraw}.
      */
     function previewWithdraw(uint256 assets) public view virtual returns (uint256) {
-        return _convertToShares(assets, Math.Rounding.Ceil);
+        return _convertToShares(assets, MathUpgradeable.Rounding.Up);
     }
 
     /**
      * @dev See {IERC7535-previewRedeem}.
      */
     function previewRedeem(uint256 shares) public view virtual returns (uint256) {
-        return _convertToAssets(shares, Math.Rounding.Floor);
+        return _convertToAssets(shares, MathUpgradeable.Rounding.Down);
     }
 
     /**
@@ -200,14 +218,14 @@ abstract contract ERC7535 is ERC20Upgradeable, IERC7535 {
     /**
      * @dev Internal conversion function (from assets to shares) with support for rounding direction.
      */
-    function _convertToShares(uint256 assets, Math.Rounding rounding) internal view virtual returns (uint256) {
+    function _convertToShares(uint256 assets, MathUpgradeable.Rounding rounding) internal view virtual returns (uint256) {
         return assets.mulDiv(totalSupply() + 10 ** _decimalsOffset(), totalAssets() + 1, rounding);
     }
 
     /**
      * @dev Internal conversion function (from shares to assets) with support for rounding direction.
      */
-    function _convertToAssets(uint256 shares, Math.Rounding rounding) internal view virtual returns (uint256) {
+    function _convertToAssets(uint256 shares, MathUpgradeable.Rounding rounding) internal view virtual returns (uint256) {
         return shares.mulDiv(totalAssets() + 1, totalSupply() + 10 ** _decimalsOffset(), rounding);
     }
 
@@ -241,4 +259,6 @@ abstract contract ERC7535 is ERC20Upgradeable, IERC7535 {
     function _decimalsOffset() internal view virtual returns (uint8) {
         return 0;
     }
+
+    uint256[50] private __gap;
 }

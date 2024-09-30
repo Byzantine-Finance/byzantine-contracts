@@ -3,14 +3,14 @@
 
 pragma solidity ^0.8.20;
 
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {IERC20Metadata} from "@openzeppelin/contracts/interfaces/IERC20Metadata.sol";
+import {IERC20Upgradeable} from "@openzeppelin-upgrades/contracts/token/ERC20/IERC20Upgradeable.sol";
+import {IERC20MetadataUpgradeable} from "@openzeppelin-upgrades/contracts/token/ERC20/extensions/IERC20MetadataUpgradeable.sol";
 
 /**
  * @dev Interface of the ERC-7535: Native Asset ERC-4626 Tokenized Vault - https://eips.ethereum.org/EIPS/eip-7535
  * https://eips.ethereum.org/EIPS/eip-7535[ERC-7535].
  */
-interface IERC7535 is IERC20, IERC20Metadata {
+interface IERC7535 is IERC20Upgradeable, IERC20MetadataUpgradeable {
     event Deposit(address indexed sender, address indexed owner, uint256 assets, uint256 shares);
 
     event Withdraw(
