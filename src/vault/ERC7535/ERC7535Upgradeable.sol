@@ -2,16 +2,17 @@
 pragma solidity ^0.8.20;
 
 import {Initializable} from "@openzeppelin-upgrades/contracts/proxy/utils/Initializable.sol";
+import {IERC20MetadataUpgradeable} from "@openzeppelin-upgrades/contracts/token/ERC20/extensions/IERC20MetadataUpgradeable.sol";
 import {ERC20Upgradeable} from "@openzeppelin-upgrades/contracts/token/ERC20/ERC20Upgradeable.sol";
 import {MathUpgradeable} from "@openzeppelin-upgrades/contracts/utils/math/MathUpgradeable.sol";
-import {IERC7535} from "./IERC7535.sol";
+import {IERC7535Upgradeable} from "./IERC7535Upgradeable.sol";
 
 /**
  * @title ERC-7535: Native Asset ERC-4626 Tokenized Vault - https://eips.ethereum.org/EIPS/eip-7535
  * @notice ERC-4626 Tokenized Vaults with Ether (Native Asset) as the underlying asset
  * @notice OpenZeppelin Upgradeable version of ERC7535
  */
-abstract contract ERC7535Upgradeable is Initializable, ERC20Upgradeable, IERC7535 {
+abstract contract ERC7535Upgradeable is Initializable, ERC20Upgradeable, IERC7535Upgradeable {
     using MathUpgradeable for uint256;
 
     /**
@@ -36,11 +37,8 @@ abstract contract ERC7535Upgradeable is Initializable, ERC20Upgradeable, IERC753
 
     /**
      * @dev Initializes the ERC7535 contract. Calls initializer of parent contracts.
-     * @param name The name of the token.
-     * @param symbol The symbol of the token.
      */
-    function __ERC7535_init(string memory name, string memory symbol) internal onlyInitializing {
-        __ERC20_init(name, symbol);
+    function __ERC7535_init() internal onlyInitializing {
         __ERC7535_init_unchained();
     }
 

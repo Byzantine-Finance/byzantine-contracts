@@ -10,7 +10,7 @@ import {IERC20MetadataUpgradeable} from "@openzeppelin-upgrades/contracts/token/
  * @dev Interface of the ERC-7535: Native Asset ERC-4626 Tokenized Vault - https://eips.ethereum.org/EIPS/eip-7535
  * https://eips.ethereum.org/EIPS/eip-7535[ERC-7535].
  */
-interface IERC7535 is IERC20Upgradeable, IERC20MetadataUpgradeable {
+interface IERC7535Upgradeable is IERC20Upgradeable, IERC20MetadataUpgradeable {
     event Deposit(address indexed sender, address indexed owner, uint256 assets, uint256 shares);
 
     event Withdraw(
