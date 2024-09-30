@@ -174,6 +174,17 @@ contract StrategyVaultERC20 is Initializable, StrategyVaultERC20Storage, ERC4626
         whitelistedDeposit = _whitelistedDeposit;
     }
 
+    /**
+     * @notice Whitelist a staker.
+     * @param staker The address to whitelist.
+     * @dev Callable only by the owner of the Strategy Vault's ByzNft.
+     */
+    function whitelistStaker(address staker) external onlyNftOwner {
+        if (!whitelistedDeposit) revert WhitelistedDepositDisabled();
+        if (isWhitelisted[staker]) revert StakerAlreadyWhitelisted();
+        isWhitelisted[staker] = true;
+    }
+
     /* ================ VIEW FUNCTIONS ================ */
 
     /**
