@@ -62,7 +62,7 @@ contract ERC4626ETHMultiRewardVault is Initializable, ERC4626Upgradeable, Ownabl
      * @dev ETH is used as the asset for this vault, represented as 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE.
      * @param _oracle The oracle implementation address to use for the vault.
      */
-    function __ERC4626ETHMultiRewardVault_init(address _oracle) public initializer {
+    function __ERC4626ETHMultiRewardVault_init(address _oracle) public onlyInitializing {
         __ERC4626_init(IERC20MetadataUpgradeable(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE));
         __ERC20_init("ETH Byzantine StrategyVault Token", "byzETH");
         __Ownable_init();
