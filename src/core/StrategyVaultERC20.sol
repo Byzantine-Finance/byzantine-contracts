@@ -65,7 +65,7 @@ contract StrategyVaultERC20 is Initializable, StrategyVaultERC20Storage, AccessC
         _grantRole(DEFAULT_ADMIN_ROLE, _initialOwner);
 
         // Initialize the ERC4626MultiRewardVault
-        ERC4626MultiRewardVault.initialize(_token);
+        //ERC4626MultiRewardVault.initialize(_token);
 
         // If contract is not upgradeable, disable initialization (removing ability to upgrade contract)
         if (!_upgradeable) {
@@ -87,26 +87,25 @@ contract StrategyVaultERC20 is Initializable, StrategyVaultERC20Storage, AccessC
 
     /**
      * @notice Deposit ERC20 tokens into the StrategyVault.
-     * @param strategy The EigenLayer StrategyBaseTVLLimits contract for the depositing token.
      * @param token The address of the ERC20 token to deposit.
      * @param amount The amount of tokens to deposit.
      * @dev The caller receives Byzantine StrategyVault shares in return for the ERC20 tokens staked.
      */
-    function stakeERC20(IStrategy strategy, IERC20 token, uint256 amount) external {
+    function stakeERC20(IERC20 token, uint256 amount) external {
         // If whitelistedDeposit is true, then only users with the whitelisted role can call this function.
-        if (whitelistedDeposit && !hasRole(whitelisted, msg.sender)) revert OnlyWhitelistedDeposit();
+        //if (whitelistedDeposit && !hasRole(whitelisted, msg.sender)) revert OnlyWhitelistedDeposit();
 
         // Check the correct token is being deposited
-        if (token != depositToken) revert IncorrectToken();
+        //if (token != depositToken) revert IncorrectToken();
 
         // Stake the ERC20 tokens into StrategyVault
-        ERC4626MultiRewardVault.deposit(amount, msg.sender);
+        //ERC4626MultiRewardVault.deposit(amount, msg.sender);
 
         // Deposit the ERC20 tokens into the EigenLayer StrategyManager
-        strategyManager.depositIntoStrategy(strategy, token, amount);
+        //strategyManager.depositIntoStrategy(strategy, token, amount);
 
         // Update the amount of tokens that the StrategyVault is delegating
-        delegationManager.increaseDelegatedShares(address(this), strategy, amount);
+        //delegationManager.increaseDelegatedShares(address(this), strategy, amount);
     }
 
     /**
