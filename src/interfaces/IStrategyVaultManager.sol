@@ -71,7 +71,6 @@ interface IStrategyVaultManager {
 
     /**
      * @notice Staker creates a Strategy Vault and stakes ERC20.
-     * @param strategy The EigenLayer StrategyBaseTVLLimits contract for the depositing token.
      * @param token The ERC20 token to stake.
      * @param amount The amount of token to stake.
      * @param whitelistedDeposit If false, anyone can deposit into the Strategy Vault. If true, only whitelisted addresses can deposit into the Strategy Vault.
@@ -82,7 +81,6 @@ interface IStrategyVaultManager {
      * @dev The caller receives Byzantine StrategyVault shares in return for the ERC20 tokens staked.
      */
     function createStratVaultAndStakeERC20(
-        IStrategy strategy,
         IERC20 token,
         uint256 amount,
         bool whitelistedDeposit,

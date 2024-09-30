@@ -87,7 +87,6 @@ contract StrategyVaultERC20 is Initializable, StrategyVaultERC20Storage, AccessC
 
     /**
      * @notice Deposit ERC20 tokens into the StrategyVault.
-     * @param strategy The EigenLayer StrategyBaseTVLLimits contract for the depositing token.
      * @param token The address of the ERC20 token to deposit.
      * @param amount The amount of tokens to deposit.
      * @dev The caller receives Byzantine StrategyVault shares in return for the ERC20 tokens staked.
