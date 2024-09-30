@@ -203,6 +203,14 @@ contract ERC7535MultiRewardVault is Initializable, ERC7535Upgradeable, OwnableUp
         emit PriceFeedUpdated(_token, _newPriceFeed);
     }
 
+    /**
+     * @notice Updates the oracle implementation address for the vault.
+     * @param _oracle The new oracle implementation address.
+     */
+    function updateOracle(address _oracle) external onlyOwner {
+        oracle = IOracle(_oracle);
+    }
+
     /* ================ VIEW FUNCTIONS ================ */
 
     /**
