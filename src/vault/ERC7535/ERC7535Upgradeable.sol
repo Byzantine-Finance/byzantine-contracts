@@ -9,6 +9,7 @@ import {IERC7535Upgradeable} from "./IERC7535Upgradeable.sol";
 
 /**
  * @title ERC-7535: Native Asset ERC-4626 Tokenized Vault - https://eips.ethereum.org/EIPS/eip-7535
+ * @author Byzantine-Finance
  * @notice ERC-4626 Tokenized Vaults with Ether (Native Asset) as the underlying asset
  * @notice OpenZeppelin Upgradeable version of ERC7535
  */

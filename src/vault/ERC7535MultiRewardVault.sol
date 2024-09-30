@@ -10,18 +10,18 @@ import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgrades/contracts/secur
 import {MathUpgradeable} from "@openzeppelin-upgrades/contracts/utils/math/MathUpgradeable.sol";
 import "../interfaces/IOracle.sol";
 
-// TODO: Add logic for multiple asset tokens
-// TODO: removeAssetToken()
-// TODO: removeRewardToken()
-// TODO: updateOracle()
-// TODO: Ensure standard vault function events firing
-
+/**
+ * @title ERC7535MultiRewardVault
+ * @author Byzantine-Finance
+ * @notice ERC-7535: Native Asset ERC-4626 Tokenized Vault with support for multiple reward tokens
+ */
 contract ERC7535MultiRewardVault is Initializable, ERC7535Upgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
     using SafeERC20Upgradeable for IERC20Upgradeable;
     using MathUpgradeable for uint256;
 
     /* ============== STATE VARIABLES ============== */
 
+    /// @notice Struct to store token information
     struct TokenInfo {
         address priceFeed;
         uint8 decimals;
