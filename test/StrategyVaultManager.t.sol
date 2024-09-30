@@ -111,22 +111,23 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
 
     }
 
-    // // Within foundry, resulting address of a contract deployed with CREATE2 differs according to the msg.sender.
-    // // Why??
-    // function testFrontRunStratVaultDeployment() public preCreateClusters(2) {
-    //     // Bob a hacker, front run the deployment of the first StrategyVault
-    //     vm.startPrank(bob);
-    //     uint256 firstNftId = uint256(keccak256(abi.encode(0)));
-    //     address stratVaultAddr = Create2.deploy(
-    //         0,
-    //         bytes32(firstNftId),
-    //         abi.encodePacked(type(BeaconProxy).creationCode, abi.encode(strategyVaultBeacon, ""))
-    //     );
-    //     // Bob wants to initialize the StrategyVault but can't because he doesn't own the nft
-    //     vm.expectRevert(bytes("Cannot initialize StrategyVault: ERC721: invalid token ID"));
-    //     IStrategyVaultETH(stratVaultAddr).initialize(firstNftId, bob);
-    //     vm.stopPrank();
-    // }
+    function test_RevertWhen_TransferByzNft() public {
+
+        // Alice creates a StratVaultETH
+        vm.prank(alice);
+        IStrategyVaultETH aliceStratVault1 = IStrategyVaultETH(strategyVaultManager.createStratVaultETH(true, true, ELOperator1, address(0)));
+        uint256 nftId = IStrategyVaultETH(aliceStratVault1).stratVaultNftId();
+
+        // Verify Alice owns the nft
+        ByzNft byzNftContract = _getByzNftContract();
+        assertEq(byzNftContract.ownerOf(nftId), alice);
+
+        // Alice tries to transfer her ByzNft to Bob by calling the ERC721 `safeTransferFrom` function
+        vm.startPrank(alice);
+        vm.expectRevert(bytes("ByzNft is non-transferable"));
+        byzNftContract.safeTransferFrom(alice, bob, nftId);
+
+    }
 
     // function testSplitDistribution() public preCreateClusters(2) {
     //     // Alice creates a StrategyVault
@@ -167,86 +168,6 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
 
     //     // Verify the distributor balance
     //     assertEq(bob.balance, distributorBalance + 2 ether - 1);
-    // }
-
-    // function testStratVaultTransfer() public preCreateClusters(2) {
-    //     // Alice creates a StrategyVault
-    //     address stratVaultAddrAlice = _createStratVaultAndStakeNativeETH(alice, 32 ether);
-    //     uint256 nftId = IStrategyVaultETH(stratVaultAddrAlice).stratVaultNftId();
-
-    //     // Verify Alice owns the nft
-    //     ByzNft byzNftContract = _getByzNftContract();
-    //     assertEq(byzNftContract.ownerOf(nftId), alice);
-
-    //     // Alice tries to transfer the StrategyVault by call the ERC721 `safeTransferFrom` function
-    //     // It's forbidden because the nft owner will change but the mapping `stakerToStratVaults` won't be updated
-    //     vm.startPrank(alice);
-    //     vm.expectRevert(bytes("ByzNft._transfer: Token transfer can only be initiated by the StrategyVaultManager, call StrategyVaultManager.transferStratVaultOwnership"));
-    //     byzNftContract.safeTransferFrom(alice, bob, nftId);
-    //     vm.stopPrank();
-
-    //     // Alice approves the StrategyVaultManager to transfer to Bob
-    //     _approveNftTransferByStratVaultManager(alice, IStrategyVaultETH(stratVaultAddrAlice).stratVaultNftId());
-
-    //     // Alice transfers the StrategyVault to Bob
-    //     vm.prank(alice);
-    //     strategyVaultManager.transferStratVaultOwnership(stratVaultAddrAlice, bob);
-    //     assertEq(strategyVaultManager.getStratVaultNumber(alice), 0);
-
-    //     // Verify if Bob is the new owner
-    //     assertEq(bob, IStrategyVaultETH(stratVaultAddrAlice).stratVaultOwner());
-    //     assertEq(strategyVaultManager.getStratVaultNumber(bob), 1);
-
-    //     // Verify if the mappings has been correctly updated
-    //     address[] memory aliceStratVaults = strategyVaultManager.getStratVaults(alice);
-    //     assertEq(aliceStratVaults.length, 0);
-    //     assertEq(aliceStratVaults, new address[](0));
-    //     address[] memory bobStratVaults = strategyVaultManager.getStratVaults(bob);
-    //     assertEq(bobStratVaults.length, 1);
-    //     assertEq(bobStratVaults[0], stratVaultAddrAlice);
-    // }
-
-    // function test_RevertWhen_NonStratVaultOwnerTransfersStratVault() public preCreateClusters(2) {
-    //     // Alice creates a StrategyVault
-    //     address stratVaultAddrAlice = _createStratVaultAndStakeNativeETH(alice, 32 ether);
-
-    //     // Alice approves the StrategyVaultManager to transfer to Bob
-    //     _approveNftTransferByStratVaultManager(alice, IStrategyVaultETH(stratVaultAddrAlice).stratVaultNftId());
-
-    //     // This smart contract transfers the StrategyVault to Bob
-    //     vm.expectRevert(IStrategyVaultManager.NotStratVaultOwner.selector);
-    //     strategyVaultManager.transferStratVaultOwnership(stratVaultAddrAlice, bob);
-    // }
-
-    // function test_RevertWhen_TransferStratVaultToItself() public preCreateClusters(2) {
-    //     // Alice creates a StrategyVault
-    //     address stratVaultAddrAlice = _createStratVaultAndStakeNativeETH(alice, 32 ether);
-
-    //     // Alice approves the StrategyVault to transfer to herself
-    //     _approveNftTransferByStratVaultManager(alice, IStrategyVaultETH(stratVaultAddrAlice).stratVaultNftId());     
-
-    //     vm.expectRevert(bytes("StrategyVaultManager.transferStratVaultOwnership: cannot transfer ownership to the same address"));
-    //     vm.prank(alice);
-    //     strategyVaultManager.transferStratVaultOwnership(stratVaultAddrAlice, alice);
-    // }
-
-    // function test_HasPod() public preCreateClusters(2) {
-    //     // Alice creates a StrategyVault
-    //     address stratVaultAddrAlice = _createStratVaultAndStakeNativeETH(alice, 32 ether);
-    //     assertTrue(strategyVaultManager.hasPod(stratVaultAddrAlice));
-    // }
-
-    // function test_callEigenPodManager() public preCreateClusters(2) {
-    //     // Alice creates a StrategyVault
-    //     address stratVaultAddr = _createStratVaultAndStakeNativeETH(alice, 32 ether);
-
-    //     // Alice wants to call EigenPodManager directly
-    //     bytes memory functionToCall = abi.encodeWithSignature("ownerToPod(address)", stratVaultAddr);
-    //     vm.prank(alice);
-    //     bytes memory ret = IStrategyVaultETH(stratVaultAddr).callEigenPodManager(functionToCall);
-    //     IEigenPod pod = abi.decode(ret, (IEigenPod));
-
-    //     assertEq(address(pod), strategyVaultManager.getPodByStratVaultAddr(stratVaultAddr));
     // }
 
     // function test_RevertWhen_Not32ETHDeposited() public preCreateClusters(2) {
