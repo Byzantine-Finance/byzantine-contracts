@@ -42,6 +42,11 @@ contract ERC7535MultiRewardVault is Initializable, ERC7535Upgradeable, OwnableUp
     /// @notice Oracle implementation
     IOracle public oracle;
 
+    address public stakerReward;
+    uint256 public lastDistributionTimestamp;
+    uint256 public distributionPeriod;
+    uint256 public totalRewardsToDistribute;
+    uint256 public distributedRewards;
 
     /* ============== CUSTOM ERRORS ============== */
 
@@ -54,6 +59,7 @@ contract ERC7535MultiRewardVault is Initializable, ERC7535Upgradeable, OwnableUp
     event AssetTokenAdded(IERC20Upgradeable indexed token, address priceFeed, uint8 decimals);
     event RewardTokenAdded(IERC20Upgradeable indexed token, address priceFeed, uint8 decimals);
     event PriceFeedUpdated(IERC20Upgradeable indexed token, address newPriceFeed);
+    event StakerRewardsDistributed(uint256 amount);
 
     /* ============== CONSTRUCTOR & INITIALIZER ============== */
 
@@ -91,7 +97,7 @@ contract ERC7535MultiRewardVault is Initializable, ERC7535Upgradeable, OwnableUp
      */
     function deposit(uint256 assets, address receiver) public override payable nonReentrant returns (uint256) {
         uint256 shares = super.deposit(assets, receiver);
-        _depositStakerRewards();
+        _distributeStakerRewards();
         return shares;
     }
 
@@ -103,7 +109,7 @@ contract ERC7535MultiRewardVault is Initializable, ERC7535Upgradeable, OwnableUp
      */
     function mint(uint256 shares, address receiver) public override payable nonReentrant returns (uint256) {
         uint256 assets = super.mint(shares, receiver);
-        _depositStakerRewards();
+        _distributeStakerRewards();
         return assets;
     }
 
@@ -130,7 +136,7 @@ contract ERC7535MultiRewardVault is Initializable, ERC7535Upgradeable, OwnableUp
      */
     function redeem(uint256 shares, address receiver, address owner) public override nonReentrant returns (uint256) {
         uint256 assets = super.redeem(shares, receiver, owner);
-        _depositStakerRewards();
+        _distributeStakerRewards();
         _distributeRewards(receiver, shares);
         return assets;
     }
@@ -200,6 +206,15 @@ contract ERC7535MultiRewardVault is Initializable, ERC7535Upgradeable, OwnableUp
     function updateOracle(address _oracle) external onlyOwner {
         
         oracle = IOracle(_oracle);
+    }
+
+    /**
+     * @notice Updates the staker reward address for the vault.
+     * @param _stakerReward The new staker reward address.
+     */
+    function updateStakerReward(address _stakerReward) external onlyOwner {
+        if (_stakerReward == address(0)) revert InvalidAddress();
+        stakerReward = _stakerReward;
     }
 
     /* ================ VIEW FUNCTIONS ================ */
@@ -273,4 +288,59 @@ contract ERC7535MultiRewardVault is Initializable, ERC7535Upgradeable, OwnableUp
         }
     }
 
+    /**
+     * @dev Distributes staker rewards to the contract from the stakerReward contract.
+     */
+    function _distributeStakerRewards() internal {
+        (bool success, ) = stakerReward.call(abi.encodeWithSignature("distributeRewards()"));
+        require(success, "Failed to claim staker rewards");
+    }
 }
+
+    // Simplified stakerReward contract:
+
+// contract StakerReward {
+//     address public vault;
+//     uint256 public lastDistributionTimestamp;
+//     uint256 public distributionPeriod;
+//     uint256 public totalRewardsToDistribute;
+//     uint256 public distributedRewards;
+
+//     constructor(address _vault, uint256 _distributionPeriod) {
+//         vault = _vault;
+//         distributionPeriod = _distributionPeriod;
+//         lastDistributionTimestamp = block.timestamp;
+//     }
+
+//     function addRewards() external payable {
+//         totalRewardsToDistribute += msg.value;
+//     }
+
+//     function calculateRewardsToDistribute() public view returns (uint256) {
+//         uint256 elapsedTime = block.timestamp - lastDistributionTimestamp;
+//         uint256 rewardsToDistribute = (totalRewardsToDistribute * elapsedTime) / distributionPeriod;
+//         if (rewardsToDistribute > totalRewardsToDistribute - distributedRewards) {
+//             rewardsToDistribute = totalRewardsToDistribute - distributedRewards;
+//         }
+//         return rewardsToDistribute;
+//     }
+
+//     function distributeRewards() external {
+//         require(msg.sender == vault, "Only vault can call this function");
+//         uint256 rewardsToDistribute = calculateRewardsToDistribute();
+//         if (rewardsToDistribute > 0) {
+//             (bool success, ) = vault.call{value: rewardsToDistribute}("");
+//             require(success, "ETH transfer failed");
+//             distributedRewards += rewardsToDistribute;
+//             lastDistributionTimestamp = block.timestamp;
+//         }
+//         if (distributedRewards >= totalRewardsToDistribute) {
+//             totalRewardsToDistribute = 0;
+//             distributedRewards = 0;
+//         }
+//     }
+
+//     receive() external payable {
+//         addRewards();
+//     }
+// }
