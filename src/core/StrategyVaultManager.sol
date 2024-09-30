@@ -7,11 +7,18 @@ import {OwnableUpgradeable} from "@openzeppelin-upgrades/contracts/access/Ownabl
 import {BeaconProxy} from "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
 import {PushSplit} from "splits-v2/splitters/push/PushSplit.sol";
 
-import {IStrategyVaultETH} from "../interfaces/IStrategyVaultETH.sol";
-import {IStrategyVaultERC20} from "../interfaces/IStrategyVaultERC20.sol";
-import {IStrategyVault} from "../interfaces/IStrategyVault.sol";
+import {IEigenPodManager} from "eigenlayer-contracts/interfaces/IEigenPodManager.sol";
+import {IStrategyManager} from "eigenlayer-contracts/interfaces/IStrategyManager.sol";
+import {IDelegationManager} from "eigenlayer-contracts/interfaces/IDelegationManager.sol";
+import {IStrategy} from "eigenlayer-contracts/interfaces/IStrategy.sol";
 
 import "./StrategyVaultManagerStorage.sol";
+
+import {IByzNft} from "../interfaces/IByzNft.sol";
+import {IAuction} from "../interfaces/IAuction.sol";
+import {IStrategyVault} from "../interfaces/IStrategyVault.sol";
+import {IStrategyVaultERC20} from "../interfaces/IStrategyVaultERC20.sol";
+import {IStrategyVaultETH} from "../interfaces/IStrategyVaultETH.sol";
 
 // TODO: Emit events to notify what happened
 
@@ -62,16 +69,18 @@ contract StrategyVaultManager is
      * @param whitelistedDeposit If false, anyone can deposit into the Strategy Vault. If true, only whitelisted addresses can deposit into the Strategy Vault.
      * @param upgradeable If true, the Strategy Vault is upgradeable. If false, the Strategy Vault is not upgradeable.
      * @param operator The address for the operator that this StrategyVault will delegate to.
+     * @param oracle The oracle implementation to use for the vault.
      * @return The address of the newly created StrategyVaultETH.
      */
     function createStratVaultETH(
         bool whitelistedDeposit,
         bool upgradeable,
-        address operator
+        address operator,
+        address oracle
     ) public returns (address) {
         // Create a Native ETH StrategyVault
-        IStrategyVaultETH newStratVault = _deployStratVaultETH(whitelistedDeposit, upgradeable);
-
+        IStrategyVaultETH newStratVault = _deployStrategyVaultETH(whitelistedDeposit, upgradeable, oracle);
+        
         // Delegate the StrategyVault towards the operator
         newStratVault.delegateTo(operator);
 
@@ -84,6 +93,7 @@ contract StrategyVaultManager is
      * @param whitelistedDeposit If false, anyone can deposit into the Strategy Vault. If true, only whitelisted addresses can deposit into the Strategy Vault.
      * @param upgradeable If true, the Strategy Vault is upgradeable. If false, the Strategy Vault is not upgradeable.
      * @param operator The address for the operator that this StrategyVault will delegate to.
+     * @param oracle The oracle implementation to use for the vault.
      * @dev This action triggers (a) new auction(s) to get (a) new Distributed Validator(s) to stake on the Beacon Chain. The number of Auction triggered depends on the number of ETH sent.
      * @dev Function will revert unless a multiple of 32 ETH are sent with the transaction.
      * @dev The caller receives Byzantine StrategyVault shares in return for the ETH staked.
@@ -92,11 +102,12 @@ contract StrategyVaultManager is
     function createStratVaultAndStakeNativeETH(
         bool whitelistedDeposit,
         bool upgradeable,
-        address operator
+        address operator,
+        address oracle
     ) external payable returns (address) {
 
         // Create a Native ETH StrategyVault
-        IStrategyVaultETH newStratVault = IStrategyVaultETH(createStratVaultETH(whitelistedDeposit, upgradeable, operator));
+        IStrategyVaultETH newStratVault = IStrategyVaultETH(createStratVaultETH(whitelistedDeposit, upgradeable, operator, oracle));
 
         // Stake the ETH on the new StrategyVault
         newStratVault.stakeNativeETH{value: msg.value}();
@@ -111,46 +122,59 @@ contract StrategyVaultManager is
      * @param whitelistedDeposit If false, anyone can deposit into the Strategy Vault. If true, only whitelisted addresses can deposit into the Strategy Vault.
      * @param upgradeable If true, the Strategy Vault is upgradeable. If false, the Strategy Vault is not upgradeable.
      * @param operator The address for the operator that this StrategyVault will delegate to.
+     * @param oracle The oracle implementation to use for the vault.
+     * @return stratVaultAddr address of the newly created StrategyVault.
      * @dev The caller receives Byzantine StrategyVault shares in return for the ERC20 tokens staked.
      */
     function createStratVaultERC20(
         IERC20 token,
         bool whitelistedDeposit,
         bool upgradeable,
-        address operator
-    ) external {
+        address operator,
+        address oracle
+    ) external returns (address stratVaultAddr) {
         // Create a ERC20 StrategyVault
-        IStrategyVaultERC20 newStratVault = _deployStratVaultERC20(address(token), whitelistedDeposit, upgradeable);
+        IStrategyVaultERC20 newStratVault = _deployStrategyVaultERC20(address(token), whitelistedDeposit, upgradeable, oracle);
 
         // Delegate the StrategyVault towards the operator
+        // TODO: Ensure StrategyVault delegating, not caller.
         newStratVault.delegateTo(operator);
+
+        return address(newStratVault);
     }
 
     /**
      * @notice Staker creates a Strategy Vault and stakes ERC20.
+     * @param strategy The EigenLayer StrategyBaseTVLLimits contract for the depositing token.
      * @param token The ERC20 token to stake.
      * @param amount The amount of token to stake.
      * @param whitelistedDeposit If false, anyone can deposit into the Strategy Vault. If true, only whitelisted addresses can deposit into the Strategy Vault.
      * @param upgradeable If true, the Strategy Vault is upgradeable. If false, the Strategy Vault is not upgradeable.
      * @param operator The address for the operator that this StrategyVault will delegate to.
+     * @param oracle The oracle implementation to use for the vault.
+     * @return stratVaultAddr address of the newly created StrategyVault.
      * @dev The caller receives Byzantine StrategyVault shares in return for the ERC20 tokens staked.
      */
     function createStratVaultAndStakeERC20(
+        IStrategy strategy,
         IERC20 token,
         uint256 amount,
         bool whitelistedDeposit,
         bool upgradeable,
-        address operator
-    ) external {
+        address operator,
+        address oracle
+    ) external returns (address stratVaultAddr) {
 
         // Create a ERC20 StrategyVault
-        IStrategyVaultERC20 newStratVault = _deployStratVaultERC20(address(token), whitelistedDeposit, upgradeable);
+        IStrategyVaultERC20 newStratVault = _deployStrategyVaultERC20(address(token), whitelistedDeposit, upgradeable, oracle);
 
         // Delegate the StrategyVault towards the operator
         newStratVault.delegateTo(operator);
 
         // Stake ERC20
-        newStratVault.stakeERC20(token, amount);
+        newStratVault.stakeERC20(strategy, token, amount);
+
+        return address(newStratVault);
     }
 
     /**
@@ -276,17 +300,20 @@ contract StrategyVaultManager is
     /**
      * @notice Deploy a new ERC20 Strategy Vault.
      * @param token The address of the token to be staked.
+     * @notice Deploy a new ERC20 Strategy Vault.
+     * @param token The address of the token to be staked.
      * @param whitelistedDeposit If false, anyone can deposit into the Strategy Vault. If true, only whitelisted addresses can deposit into the Strategy Vault.
      * @param upgradeable If true, the Strategy Vault is upgradeable. If false, the Strategy Vault is not upgradeable.
+     * @param oracle The oracle implementation to use for the vault.
      * @return The address of the newly deployed Strategy Vault.
      */
-    function _deployStratVaultERC20(address token, bool whitelistedDeposit, bool upgradeable) internal returns (IStrategyVaultERC20) {
+    function _deployStrategyVaultERC20(address token, bool whitelistedDeposit, bool upgradeable, address oracle) internal returns (IStrategyVaultERC20) {
         // mint a byzNft for the Strategy Vault's creator
         uint256 nftId = byzNft.mint(msg.sender, numStratVaults);
 
         // create the stratVault
         address stratVault = address(new BeaconProxy(address(stratVaultERC20Beacon), ""));
-        IStrategyVaultERC20(stratVault).initialize(nftId, msg.sender, token, whitelistedDeposit, upgradeable);
+        IStrategyVaultERC20(stratVault).initialize(nftId, msg.sender, token, whitelistedDeposit, upgradeable, oracle);
 
         // store the nftId in the stratVault mapping
         nftIdToStratVault[nftId] = stratVault;
@@ -301,15 +328,16 @@ contract StrategyVaultManager is
      * @notice Deploy a new ETH Strategy Vault.
      * @param whitelistedDeposit If false, anyone can deposit into the Strategy Vault. If true, only whitelisted addresses can deposit into the Strategy Vault.
      * @param upgradeable If true, the Strategy Vault is upgradeable. If false, the Strategy Vault is not upgradeable.
+     * @param oracle The oracle implementation to use for the vault.
      * @return The address of the newly deployed Strategy Vault.
      */
-    function _deployStratVaultETH(bool whitelistedDeposit, bool upgradeable) internal returns (IStrategyVaultETH) {
+    function _deployStrategyVaultETH(bool whitelistedDeposit, bool upgradeable, address oracle) internal returns (IStrategyVaultETH) {
         // mint a byzNft for the Strategy Vault's creator
         uint256 nftId = byzNft.mint(msg.sender, numStratVaults);
 
         // create the stratVault
         address stratVault = address(new BeaconProxy(address(stratVaultETHBeacon), ""));
-        IStrategyVaultETH(stratVault).initialize(nftId, msg.sender, whitelistedDeposit, upgradeable);
+        IStrategyVaultETH(stratVault).initialize(nftId, msg.sender, whitelistedDeposit, upgradeable, oracle);
 
         // Add the newly created stratVaultETH to the unordered stratVaultETH set
         _stratVaultETHSet.insert(stratVault);

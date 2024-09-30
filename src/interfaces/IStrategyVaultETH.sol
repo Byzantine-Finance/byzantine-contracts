@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+import {IStrategy} from "eigenlayer-contracts/interfaces/IStrategy.sol";
 import {BeaconChainProofs} from "eigenlayer-contracts/libraries/BeaconChainProofs.sol";
 
 import "./IStrategyVault.sol";
@@ -15,6 +16,7 @@ interface IStrategyVaultETH is IStrategyVault {
    * @param _stratVaultCreator The address of the creator of the StrategyVault.
    * @param _whitelistedDeposit Whether the deposit function is whitelisted or not.
    * @param _upgradeable Whether the StrategyVault is upgradeable or not.
+   * @param _oracle The oracle implementation to use for the vault.
    * @dev Called on construction by the StrategyVaultManager.
    * @dev StrategyVaultETH so the deposit token is 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE
    */
@@ -22,7 +24,8 @@ interface IStrategyVaultETH is IStrategyVault {
     uint256 _nftId,
     address _stratVaultCreator,
     bool _whitelistedDeposit,
-    bool _upgradeable
+    bool _upgradeable,
+    address _oracle
   ) external;
 
   /* ============== EXTERNAL FUNCTIONS ============== */
@@ -48,6 +51,7 @@ interface IStrategyVaultETH is IStrategyVault {
    * @param validatorFieldsProofs proofs against the `beaconStateRoot` for each validator in `validatorFields`
    * @param validatorFields are the fields of the "Validator Container", refer to consensus specs for details: 
    * https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/beacon-chain.md#validator
+   * @param strategy The EigenLayer StrategyBaseTVLLimits contract for the depositing token.
    * @dev That function must be called for a validator which is "INACTIVE".
    * @dev The timestamp used to generate the Beacon Block Root is `block.timestamp - FINALITY_TIME` to be sure
    * that the Beacon Block is finalized.
@@ -60,7 +64,8 @@ interface IStrategyVaultETH is IStrategyVault {
     BeaconChainProofs.StateRootProof calldata stateRootProof,
     uint40[] calldata validatorIndices,
     bytes[] calldata validatorFieldsProofs,
-    bytes32[][] calldata validatorFields
+    bytes32[][] calldata validatorFields,
+    IStrategy strategy
   )
     external;
 

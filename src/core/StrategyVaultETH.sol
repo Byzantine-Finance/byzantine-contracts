@@ -3,14 +3,17 @@ pragma solidity ^0.8.20;
 
 import {Initializable} from "@openzeppelin-upgrades/contracts/proxy/utils/Initializable.sol";
 
+import {IStrategy} from "eigenlayer-contracts/interfaces/IStrategy.sol";
+import {BeaconChainProofs} from "eigenlayer-contracts/libraries/BeaconChainProofs.sol";
 import {ISignatureUtils} from "eigenlayer-contracts/interfaces/ISignatureUtils.sol";
 
 import {ERC4626MultiRewardVault} from "../vault/ERC4626MultiRewardVault.sol";
 import "./StrategyVaultETHStorage.sol";
 
 // TODO: Finish withdrawal logic
+import "../vault/ERC4626ETHMultiRewardVault.sol";
 
-contract StrategyVaultETH is Initializable, StrategyVaultETHStorage, ERC4626MultiRewardVault {
+contract StrategyVaultETH is Initializable, StrategyVaultETHStorage, ERC4626ETHMultiRewardVault {
     using FIFOLib for FIFOLib.FIFO;
     using BeaconChainProofs for *;
 
@@ -63,18 +66,19 @@ contract StrategyVaultETH is Initializable, StrategyVaultETHStorage, ERC4626Mult
      * @param _stratVaultCreator The address of the creator of the StrategyVault.
      * @param _whitelistedDeposit Whether the deposit function is whitelisted or not.
      * @param _upgradeable Whether the StrategyVault is upgradeable or not.
+     * @param _oracle The oracle implementation to use for the vault.
      * @dev Called on construction by the StrategyVaultManager.
      * @dev StrategyVaultETH so the deposit token is 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE
      */
-    function initialize(uint256 _nftId, address _stratVaultCreator, bool _whitelistedDeposit, bool _upgradeable) external initializer {
+    function initialize(uint256 _nftId, address _stratVaultCreator, bool _whitelistedDeposit, bool _upgradeable, address _oracle) external initializer {
 
         // Set up the vault state variables
         stratVaultNftId = _nftId;
         whitelistedDeposit = _whitelistedDeposit;
         upgradeable = _upgradeable;        
 
-        // Initialize the ERC4626MultiRewardVault
-        //__ERC4626MultiRewardVault_init(depositToken);
+        // Initialize the ERC4626ETHMultiRewardVault
+        __ERC4626ETHMultiRewardVault_init(_oracle);
 
         // If whitelisted Vault, whitelist the creator
         if (_whitelistedDeposit) {
@@ -88,7 +92,7 @@ contract StrategyVaultETH is Initializable, StrategyVaultETHStorage, ERC4626Mult
      * @notice Payable fallback function that receives ether deposited to the StrategyVault contract
      * @dev Strategy Vault is the address where to send the principal ethers post exit.
      */
-    receive() external payable {
+    receive() external override payable {
         // TODO: emit an event to notify
     }
 
@@ -166,6 +170,54 @@ contract StrategyVaultETH is Initializable, StrategyVaultETHStorage, ERC4626Mult
         _mintVaultShares(msg.value, msg.sender);
     }
 
+    /**
+     * @notice Begins the withdrawal process to pull ETH out of the StrategyVault
+     * @param queuedWithdrawalParams TODO: Fill in
+     * @param strategies An array of strategy contracts for all tokens being withdrawn from EigenLayer.
+     * @dev Withdrawal is not instant - a withdrawal delay exists for removing the assets from EigenLayer
+     */
+    function startWithdrawETH(
+        IDelegationManager.QueuedWithdrawalParams[] memory queuedWithdrawalParams,
+        IStrategy[] memory strategies
+        ) external {
+        // Begins withdrawal procedure with EigenLayer.
+        delegationManager.queueWithdrawals(queuedWithdrawalParams);
+
+        // Calculate the withdrawal delay
+        uint256 withdrawalDelay = delegationManager.getWithdrawalDelay(strategies);
+
+        // Setup scheduled function call for finishWithdrawETH after withdrawal delay is finished.
+        // TODO
+    }
+
+    /**
+     * @notice Finalizes the withdrawal of ETH from the StrategyVault
+     * @param withdrawal TODO: Fill in
+     * @param tokens TODO: Fill in
+     * @param middlewareTimesIndex TODO: Fill in
+     * @param receiveAsTokens TODO: Fill in
+     * @dev Can only be called after the withdrawal delay is finished
+     */
+    // function finishWithdrawETH(
+    //     withdrawal,
+    //     tokens[],
+    //     middlewareTimesIndex,
+    //     receiveAsTokens
+    // ) external {
+    //     // Have StrategyVault unstake from the EigenLayer Strategy contract
+    //     delegationManager.completeQueuedWithdrawal(
+    //         /*
+    //         Withdrawal calldata withdrawal,
+    //         IERC20[] calldata tokens,
+    //         uint256 middlewareTimesIndex,
+    //         bool receiveAsTokens
+    //         */
+    //     );
+        
+    //     // Burn caller's shares and exchange for deposit asset (ETH) + reward tokens
+    //     super.withdraw(assetAmount, receiver, msg.sender);
+    // }
+
     /* ============== VAULT CREATOR FUNCTIONS ============== */
 
     /**
@@ -187,6 +239,7 @@ contract StrategyVaultETH is Initializable, StrategyVaultETHStorage, ERC4626Mult
      * @param validatorFieldsProofs proofs against the `beaconStateRoot` for each validator in `validatorFields`
      * @param validatorFields are the fields of the "Validator Container", refer to consensus specs for details: 
      * https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/beacon-chain.md#validator
+     * @param strategy The EigenLayer StrategyBaseTVLLimits contract for the depositing token.
      * @dev That function must be called for a validator which is "INACTIVE".
      * @dev The timestamp used to generate the Beacon Block Root is `block.timestamp - FINALITY_TIME` to be sure
      * that the Beacon Block is finalized.
@@ -199,7 +252,8 @@ contract StrategyVaultETH is Initializable, StrategyVaultETHStorage, ERC4626Mult
         BeaconChainProofs.StateRootProof calldata stateRootProof,
         uint40[] calldata validatorIndices,
         bytes[] calldata validatorFieldsProofs,
-        bytes32[][] calldata validatorFields
+        bytes32[][] calldata validatorFields,
+        IStrategy strategy
     ) external onlyNftOwner {
 
         IEigenPod myPod = eigenPodManager.ownerToPod(address(this));
@@ -238,6 +292,7 @@ contract StrategyVaultETH is Initializable, StrategyVaultETHStorage, ERC4626Mult
 
     /**
      * @notice Change the whitelistedDeposit flag.
+     * @param _whitelistedDeposit The new whitelistedDeposit flag.
      * @dev Callable only by the owner of the Strategy Vault's ByzNft.
      */
     function changeWhitelistedDeposit(bool _whitelistedDeposit) external onlyNftOwner {

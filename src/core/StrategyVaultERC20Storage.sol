@@ -5,8 +5,11 @@ import {IByzNft} from "../interfaces/IByzNft.sol";
 import {IStrategyVaultManager} from "../interfaces/IStrategyVaultManager.sol";
 import {IStrategyManager} from "eigenlayer-contracts/interfaces/IStrategyManager.sol";
 import {IDelegationManager} from "eigenlayer-contracts/interfaces/IDelegationManager.sol";
+import {IStrategy} from "eigenlayer-contracts/interfaces/IStrategy.sol";
 
-import "../interfaces/IStrategyVaultERC20.sol";
+import {IStrategyVaultERC20} from "../interfaces/IStrategyVaultERC20.sol";
+import {IByzNft} from "../interfaces/IByzNft.sol";
+import {IStrategyVaultManager} from "../interfaces/IStrategyVaultManager.sol";
 
 abstract contract StrategyVaultERC20Storage is IStrategyVaultERC20 {
 
@@ -24,6 +27,9 @@ abstract contract StrategyVaultERC20Storage is IStrategyVaultERC20 {
     /// @notice EigenLayer's DelegationManager contract
     IDelegationManager public immutable delegationManager;
 
+    /// @notice The token to be staked. 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE if staking ETH.
+    address public immutable depositToken;
+
     /* ============== STATE VARIABLES ============== */
 
     /// @notice The ByzNft associated to this StrategyVault.
@@ -33,9 +39,6 @@ abstract contract StrategyVaultERC20Storage is IStrategyVaultERC20 {
 
     /// @notice Whitelisted addresses that are allowed to deposit into the StrategyVault (activated only the whitelistedDeposit == true)
     mapping (address => bool) public isWhitelisted;
-
-    /// @notice The token to be staked
-    address public depositToken;
 
     /// @notice Whether the deposit function is whitelisted or not.
     bool public whitelistedDeposit;

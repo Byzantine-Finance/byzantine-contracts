@@ -7,7 +7,6 @@ interface IStrategyVault {
 
     /// @notice Returns the StrategyVault's ByzNft id
     function stratVaultNftId() external view returns (uint256);
-
     
     /// @notice Returns StrategyVault's creator address
     function stratVaultOwner() external view returns (address);

@@ -79,6 +79,7 @@ contract Deploy_Holesky_From_Scratch is ExistingDeploymentParser {
             delegation,
             strategyManager
         );
+
         // StrategyVaultERC20 beacon contract. The Beacon Proxy contract is deployed in the StrategyVaultManager
         // This contract points to the implementation contract.
         strategyVaultERC20Beacon = new UpgradeableBeacon(address(strategyVaultERC20Implementation));

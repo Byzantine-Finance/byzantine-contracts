@@ -120,6 +120,7 @@ contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
             delegation,
             strategyManager
         );
+        
         // StrategyVaultERC20 beacon contract. The Beacon Proxy contract is deployed in the StrategyVaultManager
         // This contract points to the implementation contract.
         strategyVaultERC20Beacon = new UpgradeableBeacon(address(strategyVaultERC20Implementation));

@@ -142,6 +142,10 @@ contract ExistingDeploymentParser is Script, Test {
             strategyVaultManager.delegationManager() == delegation,
             "strategyVaultManager: delegationManager address not set correctly"
         );
+        // require(
+        //     strategyVaultManager.strategyManager() == strategyManager,
+        //     "strategyVaultManager: strategyManager address not set correctly"
+        // );
         require(
             strategyVaultManager.strategyManager() == strategyManager,
             "strategyVaultManager: strategyManager address not set correctly"
@@ -176,6 +180,11 @@ contract ExistingDeploymentParser is Script, Test {
             strategyVaultERC20Implementation.byzNft() == byzNft,
             "strategyVaultERC20Implementation: byzNft address not set correctly"
         );
+        // TODO: Can remove? No auction on ERC20 vaults
+        // require(
+        //     strategyVaultERC20Implementation.auction() == auction,
+        //     "strategyVaultERC20Implementation: auction address not set correctly"
+        // );
         require(
             strategyVaultERC20Implementation.delegationManager() == delegation,
             "strategyVaultERC20Implementation: delegationManager address not set correctly"
