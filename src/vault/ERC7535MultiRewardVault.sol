@@ -47,7 +47,7 @@ contract ERC7535MultiRewardVault is Initializable, ERC7535Upgradeable, OwnableUp
 
     error ETHTransferFailedOnWithdrawal();
     error TokenAlreadyAdded();
-    error InvalidToken();
+    error InvalidAddress();
 
     /* ============== EVENTS ============== */
 
@@ -90,11 +90,8 @@ contract ERC7535MultiRewardVault is Initializable, ERC7535Upgradeable, OwnableUp
      * @return The amount of shares minted.
      */
     function deposit(uint256 assets, address receiver) public override payable nonReentrant returns (uint256) {
-        uint256 maxAssets = maxDeposit(receiver);
-        if (assets > maxAssets) revert ERC7535ExceededMaxDeposit(receiver, assets, maxAssets);
-        if (assets != msg.value) revert AssetsShouldBeEqualToMsgVaule();
-        uint256 shares = previewDeposit(assets);
-        _deposit(msg.sender, receiver, assets, shares);
+        uint256 shares = super.deposit(assets, receiver);
+        _depositStakerRewards();
         return shares;
     }
 
@@ -105,11 +102,8 @@ contract ERC7535MultiRewardVault is Initializable, ERC7535Upgradeable, OwnableUp
      * @return The amount of ETH deposited.
      */
     function mint(uint256 shares, address receiver) public override payable nonReentrant returns (uint256) {
-        uint256 maxShares = maxMint(receiver);
-        if (shares > maxShares) revert ERC7535ExceededMaxMint(receiver, shares, maxShares);
-        uint256 assets = previewMint(shares);
-        if (assets != msg.value) revert AssetsShouldBeEqualToMsgVaule();
-        _deposit(_msgSender(), receiver, assets, shares);
+        uint256 assets = super.mint(shares, receiver);
+        _depositStakerRewards();
         return assets;
     }
 
@@ -121,10 +115,8 @@ contract ERC7535MultiRewardVault is Initializable, ERC7535Upgradeable, OwnableUp
      * @return The amount of shares burned.
      */
     function withdraw(uint256 assets, address receiver, address owner) public override nonReentrant returns (uint256) {
-        uint256 maxAssets = maxWithdraw(owner);
-        if (assets > maxAssets) revert ERC7535ExceededMaxWithdraw(owner, assets, maxAssets);
-        uint256 shares = previewWithdraw(assets);
-        _withdraw(msg.sender, receiver, owner, assets, shares);
+        uint256 shares = super.withdraw(assets, receiver, owner);
+        _distributeStakerRewards();
         _distributeRewards(receiver, shares);
         return shares;
     }
@@ -137,10 +129,8 @@ contract ERC7535MultiRewardVault is Initializable, ERC7535Upgradeable, OwnableUp
      * return The amount of ETH withdrawn.
      */
     function redeem(uint256 shares, address receiver, address owner) public override nonReentrant returns (uint256) {
-        uint256 maxShares = maxRedeem(owner);
-        if (shares > maxShares) revert ERC7535ExceededMaxRedeem(owner, shares, maxShares);
-        uint256 assets = previewRedeem(shares);
-        _withdraw(_msgSender(), receiver, owner, assets, shares);
+        uint256 assets = super.redeem(shares, receiver, owner);
+        _depositStakerRewards();
         _distributeRewards(receiver, shares);
         return assets;
     }
@@ -187,7 +177,7 @@ contract ERC7535MultiRewardVault is Initializable, ERC7535Upgradeable, OwnableUp
      * @param _newPriceFeed The new price feed address for the token.
      */
     function updateAssetPriceFeed(IERC20Upgradeable _token, address _newPriceFeed) external onlyOwner {
-        if (assetInfo[_token].priceFeed == address(0)) revert InvalidToken();
+        if (assetInfo[_token].priceFeed == address(0)) revert InvalidAddress();
         assetInfo[_token].priceFeed = _newPriceFeed;
         emit PriceFeedUpdated(_token, _newPriceFeed);
     }
@@ -198,7 +188,7 @@ contract ERC7535MultiRewardVault is Initializable, ERC7535Upgradeable, OwnableUp
      * @param _newPriceFeed The new price feed address for the token.
      */
     function updateRewardPriceFeed(IERC20Upgradeable _token, address _newPriceFeed) external onlyOwner {
-        if (rewardInfo[_token].priceFeed == address(0)) revert InvalidToken();
+        if (rewardInfo[_token].priceFeed == address(0)) revert InvalidAddress();
         rewardInfo[_token].priceFeed = _newPriceFeed;
         emit PriceFeedUpdated(_token, _newPriceFeed);
     }
@@ -208,6 +198,7 @@ contract ERC7535MultiRewardVault is Initializable, ERC7535Upgradeable, OwnableUp
      * @param _oracle The new oracle implementation address.
      */
     function updateOracle(address _oracle) external onlyOwner {
+        
         oracle = IOracle(_oracle);
     }
 
