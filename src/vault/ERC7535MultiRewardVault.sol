@@ -90,21 +90,25 @@ contract ERC7535MultiRewardVault is Initializable, ERC7535Upgradeable, OwnableUp
      * @return The amount of shares minted.
      */
     function deposit(uint256 assets, address receiver) public override payable nonReentrant returns (uint256) {
-        require(msg.value == assets, "Incorrect ETH amount");
+        uint256 maxAssets = maxDeposit(receiver);
+        if (assets > maxAssets) revert ERC7535ExceededMaxDeposit(receiver, assets, maxAssets);
+        if (assets != msg.value) revert AssetsShouldBeEqualToMsgVaule();
         uint256 shares = previewDeposit(assets);
         _deposit(msg.sender, receiver, assets, shares);
         return shares;
     }
 
-        /**
+    /**
      * @notice Deposits ETH into the vault. Amount is determined by number of shares minting.
      * @param shares The amount of vault shares to mint.
      * @param receiver The address to receive the Byzantine vault shares.
      * @return The amount of ETH deposited.
      */
     function mint(uint256 shares, address receiver) public override payable nonReentrant returns (uint256) {
-        require(shares <= maxMint(receiver), "ERC4626: mint more than max");
+        uint256 maxShares = maxMint(receiver);
+        if (shares > maxShares) revert ERC7535ExceededMaxMint(receiver, shares, maxShares);
         uint256 assets = previewMint(shares);
+        if (assets != msg.value) revert AssetsShouldBeEqualToMsgVaule();
         _deposit(_msgSender(), receiver, assets, shares);
         return assets;
     }
@@ -117,7 +121,8 @@ contract ERC7535MultiRewardVault is Initializable, ERC7535Upgradeable, OwnableUp
      * @return The amount of shares burned.
      */
     function withdraw(uint256 assets, address receiver, address owner) public override nonReentrant returns (uint256) {
-        require(assets <= maxWithdraw(owner), "ERC4626: withdraw more than max");
+        uint256 maxAssets = maxWithdraw(owner);
+        if (assets > maxAssets) revert ERC7535ExceededMaxWithdraw(owner, assets, maxAssets);
         uint256 shares = previewWithdraw(assets);
         _withdraw(msg.sender, receiver, owner, assets, shares);
         _distributeRewards(receiver, shares);
@@ -132,7 +137,8 @@ contract ERC7535MultiRewardVault is Initializable, ERC7535Upgradeable, OwnableUp
      * return The amount of ETH withdrawn.
      */
     function redeem(uint256 shares, address receiver, address owner) public override nonReentrant returns (uint256) {
-        require(shares <= maxRedeem(owner), "ERC4626: redeem more than max");
+        uint256 maxShares = maxRedeem(owner);
+        if (shares > maxShares) revert ERC7535ExceededMaxRedeem(owner, shares, maxShares);
         uint256 assets = previewRedeem(shares);
         _withdraw(_msgSender(), receiver, owner, assets, shares);
         _distributeRewards(receiver, shares);
