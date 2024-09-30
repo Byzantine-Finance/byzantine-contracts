@@ -67,6 +67,9 @@ contract Auction is
         _clusterDetails[winningClusterId].status = ClusterStatus.IN_CREATION;
         ClusterDetails memory winningClusterDetails = getClusterDetails(winningClusterId);
 
+        // Transfer the winning bids price to the StakerReward contract
+        _transferBidToStakerReward(winningClusterDetails.nodes);
+
         // Remove the winning cluster from the main auction tree
         _mainAuctionTree.remove(winningClusterId, winningAvgAuctionScore);
 
@@ -592,6 +595,20 @@ contract Auction is
     function _transferToEscrow(uint256 _priceToPay) private {
         (bool success,) = address(escrow).call{value: _priceToPay}("");
         if (!success) revert EscrowTransferFailed();
+    }
+
+    /// @notice Transfer the bid price to the StakerRewards contract
+    function _transferBidToStakerReward(NodeDetails[] memory _nodes) private {
+
+        uint256 bidToTransfer;
+        for (uint256 i = 0; i < _nodes.length;) {
+            bidToTransfer = _bidDetails[_nodes[i].bidId].bidPrice;
+            escrow.releaseFunds(bidToTransfer);
+            unchecked {
+                ++i;
+            }
+        }
+        
     }
 
     /// @notice Create the split parameters depending on the winning nodes

@@ -21,30 +21,32 @@ library FIFOLib {
     function push(FIFO storage self, bytes32 _id) internal {
         FIFOElement memory head = self.head;
         ++self.count;
-        if (head.id != 0) { // head exists
+        if (head.id != bytes32(0)) { // head exists
             FIFOElement memory tail = self.tail;
-            if (tail.id != 0) { // tail exists
+            if (tail.id != bytes32(0)) { // tail exists
                 self.element[tail.id].nextId = _id; // set old tail next id
             } else { // tail does not exist
                 self.head.nextId = _id;
+                self.element[head.id] = FIFOElement(head.id, _id);
             }
-            FIFOElement memory newTail = FIFOElement(_id, 0);
+            FIFOElement memory newTail = FIFOElement(_id, bytes32(0));
             self.element[_id] = newTail;
             self.tail = newTail;
             return;
         } // else head.id == 0, so just set head
         self.head.id = _id;
+        self.element[_id] = FIFOElement(_id, bytes32(0));
     }
 
     function pop(FIFO storage self) internal returns (bytes32) {
         FIFOElement memory head = self.head;
-        require(head.id != 0, "FIFO: pop from empty FIFO");
+        require(head.id != bytes32(0), "FIFO: pop from empty FIFO");
         --self.count;
         bytes32 id = head.id;
-        if (head.nextId != 0) { // verify if other elements
+        if (head.nextId != bytes32(0)) { // verify if other elements
             self.head = self.element[head.nextId];
             // if next element if null, head is also the tail
-            if (self.head.nextId == 0) delete self.tail;
+            if (self.head.nextId == bytes32(0)) delete self.tail;
             return id;
         } // else only head in fifo
         delete self.head;

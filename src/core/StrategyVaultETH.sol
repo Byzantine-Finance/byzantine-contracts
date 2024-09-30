@@ -27,7 +27,9 @@ contract StrategyVaultETH is Initializable, StrategyVaultETHStorage, ERC4626ETHM
     }
 
     modifier checkWhitelist() {
-        if (whitelistedDeposit && !isWhitelisted[msg.sender]) revert OnlyWhitelistedDeposit();
+        if (msg.sender != address(stratVaultManager)) { // deposit during the vault creation
+            if (whitelistedDeposit && !isWhitelisted[msg.sender]) revert OnlyWhitelistedDeposit();
+        }
         _;
     }
 
@@ -164,7 +166,7 @@ contract StrategyVaultETH is Initializable, StrategyVaultETHStorage, ERC4626ETHM
         }
         
         // Mint vault shares to the staker in return for the ETH staked
-        _mintVaultShares(msg.value, msg.sender);
+        // _mintVaultShares(msg.value, msg.sender);
     }
 
     /**
@@ -215,15 +217,17 @@ contract StrategyVaultETH is Initializable, StrategyVaultETHStorage, ERC4626ETHM
     //     super.withdraw(assetAmount, receiver, msg.sender);
     // }
 
-    /* ============== VAULT CREATOR FUNCTIONS ============== */
+    /* ============== STRATEGY VAULT MANAGER FUNCTIONS ============== */
 
     /**
-     * @notice Call the EigenPodManager contract
-     * @param data to call contract 
+     * @notice Create an EigenPod for the StrategyVault.
+     * @dev Can only be called by the StrategyVaultManager during the vault creation.
      */
-    function callEigenPodManager(bytes calldata data) external payable onlyNftOwner returns (bytes memory) {
-        return _executeCall(payable(address(eigenPodManager)), msg.value, data);
+    function createEigenPod() external onlyStratVaultManager {
+        eigenPodManager.createPod();
     }
+
+    /* ============== VAULT CREATOR FUNCTIONS ============== */
 
     /**
      * @notice This function verifies that the withdrawal credentials of the Distributed Validator(s) owned by
@@ -294,6 +298,17 @@ contract StrategyVaultETH is Initializable, StrategyVaultETHStorage, ERC4626ETHM
         whitelistedDeposit = _whitelistedDeposit;
     }
 
+    /**
+     * @notice Whitelist a staker.
+     * @param staker The address to whitelist.
+     * @dev Callable only by the owner of the Strategy Vault's ByzNft.
+     */
+    function whitelistStaker(address staker) external onlyNftOwner {
+        if (!whitelistedDeposit) revert WhitelistedDepositDisabled();
+        if (isWhitelisted[staker]) revert StakerAlreadyWhitelisted();
+        isWhitelisted[staker] = true;
+    }
+
     /* ================ VIEW FUNCTIONS ================ */
 
     /**
@@ -301,6 +316,13 @@ contract StrategyVaultETH is Initializable, StrategyVaultETHStorage, ERC4626ETHM
      */
     function stratVaultOwner() public view returns (address) {
         return byzNft.ownerOf(stratVaultNftId);
+    }
+
+    /**
+     * @notice Returns the Eigen Layer operator that the Strategy Vault is delegated to
+     */
+    function hasDelegatedTo() public view returns (address) {
+        return delegationManager.delegatedTo(address(this));
     }
 
     /**
@@ -325,22 +347,6 @@ contract StrategyVaultETH is Initializable, StrategyVaultETHStorage, ERC4626ETHM
         } else {
             deposit(amount, stratVaultOwner());
         }
-    }
-
-    /**
-     * @notice Execute a low level call
-     * @param to address to execute call
-     * @param value amount of ETH to send with call
-     * @param data bytes array to execute
-     */
-    function _executeCall(
-        address payable to,
-        uint256 value,
-        bytes memory data
-    ) private returns (bytes memory) {
-        (bool success, bytes memory retData) = address(to).call{value: value}(data);
-        if (!success) revert CallFailed(data);
-        return retData;
     }
 
 }

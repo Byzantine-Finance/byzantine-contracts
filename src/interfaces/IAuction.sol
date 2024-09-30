@@ -16,7 +16,8 @@ interface IAuction {
         INACTIVE,
         IN_CREATION,
         DEPOSITED_NOT_VERIFIED,
-        DEPOSITED_VERIFIED
+        DEPOSITED_VERIFIED,
+        EXITED
     }
 
     /* ===================== STRUCTS ===================== */
