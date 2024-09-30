@@ -15,6 +15,7 @@ interface IStrategyVaultETH is IStrategyVault {
    * @param _stratVaultCreator The address of the creator of the StrategyVault.
    * @param _whitelistedDeposit Whether the deposit function is whitelisted or not.
    * @param _upgradeable Whether the StrategyVault is upgradeable or not.
+   * @param _oracle The oracle implementation to use for the vault.
    * @dev Called on construction by the StrategyVaultManager.
    * @dev StrategyVaultETH so the deposit token is 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE
    */
@@ -22,7 +23,8 @@ interface IStrategyVaultETH is IStrategyVault {
     uint256 _nftId,
     address _stratVaultCreator,
     bool _whitelistedDeposit,
-    bool _upgradeable
+    bool _upgradeable,
+    address _oracle
   ) external;
 
   /* ============== EXTERNAL FUNCTIONS ============== */

@@ -2,13 +2,13 @@
 pragma solidity ^0.8.20;
 
 import {Initializable} from "@openzeppelin-upgrades/contracts/proxy/utils/Initializable.sol";
-import {AccessControlUpgradeable} from "@openzeppelin-upgrades/contracts/access/AccessControlUpgradeable.sol";
 import {ISignatureUtils} from "eigenlayer-contracts/interfaces/ISignatureUtils.sol";
+import {IERC20MetadataUpgradeable} from "@openzeppelin-upgrades/contracts/token/ERC20/extensions/IERC20MetadataUpgradeable.sol";
 
 import {ERC4626MultiRewardVault} from "../vault/ERC4626MultiRewardVault.sol";
 import "./StrategyVaultERC20Storage.sol";
 
-contract StrategyVaultERC20 is Initializable, StrategyVaultERC20Storage, AccessControlUpgradeable, ERC4626MultiRewardVault {
+contract StrategyVaultERC20 is Initializable, StrategyVaultERC20Storage, ERC4626MultiRewardVault {
 
     /* ============== MODIFIERS ============== */
 
@@ -42,30 +42,21 @@ contract StrategyVaultERC20 is Initializable, StrategyVaultERC20Storage, AccessC
     /**
      * @notice Used to initialize the StrategyVault given it's setup parameters.
      * @param _nftId The id of the ByzNft associated to this StrategyVault.
-     * @param _initialOwner The initial owner of the ByzNft.
      * @param _token The address of the token to be staked. 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE if staking ETH.
      * @param _whitelistedDeposit Whether the deposit function is whitelisted or not.
      * @param _upgradeable Whether the StrategyVault is upgradeable or not.
+     * @param _oracle The oracle implementation to use for the vault.
      * @dev Called on construction by the StrategyVaultManager.
      */
-    function initialize(uint256 _nftId, address _initialOwner, address _token, bool _whitelistedDeposit, bool _upgradeable) external initializer {
-        try byzNft.ownerOf(_nftId) returns (address nftOwner) {
-            require(nftOwner == _initialOwner, "Only NFT owner can initialize the StrategyVault");
-            stratVaultNftId = _nftId;
-        } catch Error(string memory reason) {
-            revert(string.concat("Cannot initialize StrategyVault: ", reason));
-        }
-
-        // Define the token to be staked
-        depositToken = _token;
+    function initialize(uint256 _nftId, address _token, bool _whitelistedDeposit, bool _upgradeable, address _oracle) external initializer {
 
         // Setup whitelist
+        stratVaultNftId = _nftId;
         whitelistedDeposit = _whitelistedDeposit;
-        __AccessControl_init();
-        _grantRole(DEFAULT_ADMIN_ROLE, _initialOwner);
+        upgradeable = _upgradeable;
 
         // Initialize the ERC4626MultiRewardVault
-        //ERC4626MultiRewardVault.initialize(_token);
+        ERC4626MultiRewardVault.initialize(IERC20MetadataUpgradeable(_token), _oracle);
 
         // If contract is not upgradeable, disable initialization (removing ability to upgrade contract)
         if (!_upgradeable) {
@@ -87,19 +78,20 @@ contract StrategyVaultERC20 is Initializable, StrategyVaultERC20Storage, AccessC
 
     /**
      * @notice Deposit ERC20 tokens into the StrategyVault.
+     * @param strategy The EigenLayer StrategyBaseTVLLimits contract for the depositing token.
      * @param token The address of the ERC20 token to deposit.
      * @param amount The amount of tokens to deposit.
      * @dev The caller receives Byzantine StrategyVault shares in return for the ERC20 tokens staked.
      */
-    function stakeERC20(IERC20 token, uint256 amount) external {
+    function stakeERC20(IStrategy strategy, IERC20 token, uint256 amount) external {
         // If whitelistedDeposit is true, then only users with the whitelisted role can call this function.
         //if (whitelistedDeposit && !hasRole(whitelisted, msg.sender)) revert OnlyWhitelistedDeposit();
 
         // Check the correct token is being deposited
-        //if (token != depositToken) revert IncorrectToken();
+        if (address(token) != asset()) revert IncorrectToken();
 
         // Stake the ERC20 tokens into StrategyVault
-        //ERC4626MultiRewardVault.deposit(amount, msg.sender);
+        super.deposit(amount, msg.sender);
 
         // Deposit the ERC20 tokens into the EigenLayer StrategyManager
         //strategyManager.depositIntoStrategy(strategy, token, amount);
@@ -175,6 +167,7 @@ contract StrategyVaultERC20 is Initializable, StrategyVaultERC20Storage, AccessC
 
     /**
      * @notice Change the whitelistedDeposit flag.
+     * @param _whitelistedDeposit The new whitelistedDeposit flag.
      * @dev Callable only by the owner of the Strategy Vault's ByzNft.
      */
     function changeWhitelistedDeposit(bool _whitelistedDeposit) external onlyNftOwner {

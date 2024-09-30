@@ -34,9 +34,6 @@ abstract contract StrategyVaultERC20Storage is IStrategyVaultERC20 {
     /// @notice Whitelisted addresses that are allowed to deposit into the StrategyVault (activated only the whitelistedDeposit == true)
     mapping (address => bool) public isWhitelisted;
 
-    /// @notice The token to be staked
-    address public depositToken;
-
     /// @notice Whether the deposit function is whitelisted or not.
     bool public whitelistedDeposit;
 

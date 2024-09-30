@@ -12,9 +12,6 @@ interface IStrategyVault {
     /// @notice Returns StrategyVault's creator address
     function stratVaultOwner() external view returns (address);
 
-    /// @notice Returns the token that the StrategyVault is staking
-    function depositToken() external view returns (address);
-
     /// @notice Returns whether a staker needs to be whitelisted to deposit in the vault
     function whitelistedDeposit() external view returns (bool);
 

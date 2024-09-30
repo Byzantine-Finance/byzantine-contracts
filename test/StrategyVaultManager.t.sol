@@ -14,6 +14,7 @@ import "./ByzantineDeployer.t.sol";
 import "../src/tokens/ByzNft.sol";
 import "../src/core/Auction.sol";
 
+import "../src/interfaces/IStrategyVaultERC20.sol";
 import "../src/interfaces/IStrategyVaultETH.sol";
 import "../src/interfaces/IStrategyVaultManager.sol";
 

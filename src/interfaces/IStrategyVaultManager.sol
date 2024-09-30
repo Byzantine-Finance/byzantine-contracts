@@ -20,12 +20,14 @@ interface IStrategyVaultManager {
      * @param whitelistedDeposit If false, anyone can deposit into the Strategy Vault. If true, only whitelisted addresses can deposit into the Strategy Vault.
      * @param upgradeable If true, the Strategy Vault is upgradeable. If false, the Strategy Vault is not upgradeable.
      * @param operator The address for the operator that this StrategyVault will delegate to.
+     * @param oracle The oracle implementation to use for the vault.
      * @return The address of the newly created StrategyVaultETH.
      */
     function createStratVaultETH(
         bool whitelistedDeposit,
         bool upgradeable,
-        address operator
+        address operator,
+        address oracle
     ) 
         external returns (address);
 
@@ -35,6 +37,7 @@ interface IStrategyVaultManager {
      * @param whitelistedDeposit If false, anyone can deposit into the Strategy Vault. If true, only whitelisted addresses can deposit into the Strategy Vault.
      * @param upgradeable If true, the Strategy Vault is upgradeable. If false, the Strategy Vault is not upgradeable.
      * @param operator The address for the operator that this StrategyVault will delegate to.
+     * @param oracle The oracle implementation to use for the vault.
      * @dev This action triggers (a) new auction(s) to get (a) new Distributed Validator(s) to stake on the Beacon Chain. The number of Auction triggered depends on the number of ETH sent.
      * @dev Function will revert unless a multiple of 32 ETH are sent with the transaction.
      * @dev The caller receives Byzantine StrategyVault shares in return for the ETH staked.
@@ -43,7 +46,8 @@ interface IStrategyVaultManager {
     function createStratVaultAndStakeNativeETH(
         bool whitelistedDeposit,
         bool upgradeable,
-        address operator
+        address operator,
+        address oracle
     ) 
         external payable returns (address);
 
@@ -53,31 +57,39 @@ interface IStrategyVaultManager {
      * @param whitelistedDeposit If false, anyone can deposit into the Strategy Vault. If true, only whitelisted addresses can deposit into the Strategy Vault.
      * @param upgradeable If true, the Strategy Vault is upgradeable. If false, the Strategy Vault is not upgradeable.
      * @param operator The address for the operator that this StrategyVault will delegate to.
+     * @param oracle The oracle implementation to use for the vault.
+     * @return stratVaultAddr address of the newly created StrategyVault.
      * @dev The caller receives Byzantine StrategyVault shares in return for the ERC20 tokens staked.
      */
     function createStratVaultERC20(
         IERC20 token,
         bool whitelistedDeposit,
         bool upgradeable,
-        address operator
-    ) external;
+        address operator,
+        address oracle
+    ) external returns (address);
 
     /**
      * @notice Staker creates a Strategy Vault and stakes ERC20.
+     * @param strategy The EigenLayer StrategyBaseTVLLimits contract for the depositing token.
      * @param token The ERC20 token to stake.
      * @param amount The amount of token to stake.
      * @param whitelistedDeposit If false, anyone can deposit into the Strategy Vault. If true, only whitelisted addresses can deposit into the Strategy Vault.
      * @param upgradeable If true, the Strategy Vault is upgradeable. If false, the Strategy Vault is not upgradeable.
      * @param operator The address for the operator that this StrategyVault will delegate to.
+     * @param oracle The oracle implementation to use for the vault.
+     * @return stratVaultAddr address of the newly created StrategyVault.
      * @dev The caller receives Byzantine StrategyVault shares in return for the ERC20 tokens staked.
      */
     function createStratVaultAndStakeERC20(
+        IStrategy strategy,
         IERC20 token,
         uint256 amount,
         bool whitelistedDeposit,
         bool upgradeable,
-        address operator
-    ) external;
+        address operator,
+        address oracle
+    ) external returns (address);
 
     /**
      * @notice Distributes the tokens issued from the PoS rewards evenly between the node operators of a specific cluster.

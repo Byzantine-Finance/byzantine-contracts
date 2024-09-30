@@ -46,8 +46,8 @@ contract ByzNft is
      */
     function _beforeTokenTransfer(
         address from,
-        address to,
-        uint256 tokenId
+        address /*to*/,
+        uint256 /*tokenId*/
     ) internal override view {
         // Allow transfers only during minting
         if (from != address(0)) revert("ByzNft is non-transferable");
