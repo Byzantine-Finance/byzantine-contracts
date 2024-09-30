@@ -82,6 +82,33 @@ interface IERC7535 is IERC20Upgradeable, IERC20MetadataUpgradeable {
     function maxDeposit(address receiver) external view returns (uint256 maxAssets);
 
     /**
+     * @dev Returns the maximum amount of the Vault shares that can be minted for the receiver, through a mint call.
+     * - MUST return a limited value if receiver is subject to some mint limit.
+     * - MUST return 2 ** 256 - 1 if there is no limit on the maximum amount of shares that may be minted.
+     * - MUST NOT revert.
+     */
+    function maxMint(address receiver) external view returns (uint256 maxShares);
+
+    /**
+     * @dev Returns the maximum amount of the underlying asset that can be withdrawn from the owner balance in the
+     * Vault, through a withdraw call.
+     *
+     * - MUST return a limited value if owner is subject to some withdrawal limit or timelock.
+     * - MUST NOT revert.
+     */
+    function maxWithdraw(address owner) external view returns (uint256 maxAssets);
+
+    /**
+     * @dev Returns the maximum amount of Vault shares that can be redeemed from the owner balance in the Vault,
+     * through a redeem call.
+     *
+     * - MUST return a limited value if owner is subject to some withdrawal limit or timelock.
+     * - MUST return balanceOf(owner) if owner is not subject to any withdrawal limit or timelock.
+     * - MUST NOT revert.
+     */
+    function maxRedeem(address owner) external view returns (uint256 maxShares);
+
+    /**
      * @dev Allows an on-chain or off-chain user to simulate the effects of their deposit at the current block, given
      * current on-chain conditions.
      *
@@ -99,27 +126,6 @@ interface IERC7535 is IERC20Upgradeable, IERC20MetadataUpgradeable {
     function previewDeposit(uint256 assets) external view returns (uint256 shares);
 
     /**
-     * @dev Mints shares Vault shares to receiver by depositing exactly amount of underlying tokens.
-     *
-     * - MUST emit the Deposit event.
-     * - MAY support an additional flow in which the underlying tokens are owned by the Vault contract before the
-     *   deposit execution, and are accounted for during deposit.
-     * - MUST revert if all of assets cannot be deposited (due to deposit limit being reached, slippage, the user not
-     *   approving enough underlying tokens to the Vault contract, etc).
-     *
-     * NOTE: most implementations will require pre-approval of the Vault with the Vault’s underlying asset token.
-     */
-    function deposit(uint256 assets, address receiver) external payable returns (uint256 shares);
-
-    /**
-     * @dev Returns the maximum amount of the Vault shares that can be minted for the receiver, through a mint call.
-     * - MUST return a limited value if receiver is subject to some mint limit.
-     * - MUST return 2 ** 256 - 1 if there is no limit on the maximum amount of shares that may be minted.
-     * - MUST NOT revert.
-     */
-    function maxMint(address receiver) external view returns (uint256 maxShares);
-
-    /**
      * @dev Allows an on-chain or off-chain user to simulate the effects of their mint at the current block, given
      * current on-chain conditions.
      *
@@ -135,28 +141,6 @@ interface IERC7535 is IERC20Upgradeable, IERC20MetadataUpgradeable {
      * share price or some other type of condition, meaning the depositor will lose assets by minting.
      */
     function previewMint(uint256 shares) external view returns (uint256 assets);
-
-    /**
-     * @dev Mints exactly shares Vault shares to receiver by depositing amount of underlying tokens.
-     *
-     * - MUST emit the Deposit event.
-     * - MAY support an additional flow in which the underlying tokens are owned by the Vault contract before the mint
-     *   execution, and are accounted for during mint.
-     * - MUST revert if all of shares cannot be minted (due to deposit limit being reached, slippage, the user not
-     *   approving enough underlying tokens to the Vault contract, etc).
-     *
-     * NOTE: most implementations will require pre-approval of the Vault with the Vault’s underlying asset token.
-     */
-    function mint(uint256 shares, address receiver) external payable returns (uint256 assets);
-
-    /**
-     * @dev Returns the maximum amount of the underlying asset that can be withdrawn from the owner balance in the
-     * Vault, through a withdraw call.
-     *
-     * - MUST return a limited value if owner is subject to some withdrawal limit or timelock.
-     * - MUST NOT revert.
-     */
-    function maxWithdraw(address owner) external view returns (uint256 maxAssets);
 
     /**
      * @dev Allows an on-chain or off-chain user to simulate the effects of their withdrawal at the current block,
@@ -177,30 +161,6 @@ interface IERC7535 is IERC20Upgradeable, IERC20MetadataUpgradeable {
     function previewWithdraw(uint256 assets) external view returns (uint256 shares);
 
     /**
-     * @dev Burns shares from owner and sends exactly assets of underlying tokens to receiver.
-     *
-     * - MUST emit the Withdraw event.
-     * - MAY support an additional flow in which the underlying tokens are owned by the Vault contract before the
-     *   withdraw execution, and are accounted for during withdraw.
-     * - MUST revert if all of assets cannot be withdrawn (due to withdrawal limit being reached, slippage, the owner
-     *   not having enough shares, etc).
-     *
-     * Note that some implementations will require pre-requesting to the Vault before a withdrawal may be performed.
-     * Those methods should be performed separately.
-     */
-    function withdraw(uint256 assets, address receiver, address owner) external returns (uint256 shares);
-
-    /**
-     * @dev Returns the maximum amount of Vault shares that can be redeemed from the owner balance in the Vault,
-     * through a redeem call.
-     *
-     * - MUST return a limited value if owner is subject to some withdrawal limit or timelock.
-     * - MUST return balanceOf(owner) if owner is not subject to any withdrawal limit or timelock.
-     * - MUST NOT revert.
-     */
-    function maxRedeem(address owner) external view returns (uint256 maxShares);
-
-    /**
      * @dev Allows an on-chain or off-chain user to simulate the effects of their redeemption at the current block,
      * given current on-chain conditions.
      *
@@ -216,6 +176,46 @@ interface IERC7535 is IERC20Upgradeable, IERC20MetadataUpgradeable {
      * share price or some other type of condition, meaning the depositor will lose assets by redeeming.
      */
     function previewRedeem(uint256 shares) external view returns (uint256 assets);
+
+    /**
+     * @dev Mints shares Vault shares to receiver by depositing exactly amount of underlying tokens.
+     *
+     * - MUST emit the Deposit event.
+     * - MAY support an additional flow in which the underlying tokens are owned by the Vault contract before the
+     *   deposit execution, and are accounted for during deposit.
+     * - MUST revert if all of assets cannot be deposited (due to deposit limit being reached, slippage, the user not
+     *   approving enough underlying tokens to the Vault contract, etc).
+     *
+     * NOTE: most implementations will require pre-approval of the Vault with the Vault’s underlying asset token.
+     */
+    function deposit(uint256 assets, address receiver) external payable returns (uint256 shares);
+
+    /**
+     * @dev Mints exactly shares Vault shares to receiver by depositing amount of underlying tokens.
+     *
+     * - MUST emit the Deposit event.
+     * - MAY support an additional flow in which the underlying tokens are owned by the Vault contract before the mint
+     *   execution, and are accounted for during mint.
+     * - MUST revert if all of shares cannot be minted (due to deposit limit being reached, slippage, the user not
+     *   approving enough underlying tokens to the Vault contract, etc).
+     *
+     * NOTE: most implementations will require pre-approval of the Vault with the Vault’s underlying asset token.
+     */
+    function mint(uint256 shares, address receiver) external payable returns (uint256 assets);
+
+    /**
+     * @dev Burns shares from owner and sends exactly assets of underlying tokens to receiver.
+     *
+     * - MUST emit the Withdraw event.
+     * - MAY support an additional flow in which the underlying tokens are owned by the Vault contract before the
+     *   withdraw execution, and are accounted for during withdraw.
+     * - MUST revert if all of assets cannot be withdrawn (due to withdrawal limit being reached, slippage, the owner
+     *   not having enough shares, etc).
+     *
+     * Note that some implementations will require pre-requesting to the Vault before a withdrawal may be performed.
+     * Those methods should be performed separately.
+     */
+    function withdraw(uint256 assets, address receiver, address owner) external returns (uint256 shares);
 
     /**
      * @dev Burns exactly shares from owner and sends assets of underlying tokens to receiver.

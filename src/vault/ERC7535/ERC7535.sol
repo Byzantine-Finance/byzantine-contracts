@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import {IERC20Upgradeable, IERC20MetadataUpgradeable} from "@openzeppelin-upgrades/contracts/token/ERC20/extensions/IERC20MetadataUpgradeable.sol";
 import {Initializable} from "@openzeppelin-upgrades/contracts/proxy/utils/Initializable.sol";
 import {ERC20Upgradeable} from "@openzeppelin-upgrades/contracts/token/ERC20/ERC20Upgradeable.sol";
 import {MathUpgradeable} from "@openzeppelin-upgrades/contracts/utils/math/MathUpgradeable.sol";
@@ -40,7 +39,7 @@ abstract contract ERC7535Upgradeable is Initializable, ERC20Upgradeable, IERC753
      * @param name The name of the token.
      * @param symbol The symbol of the token.
      */
-    function __ERC7535_init(string memory name, string memory symbol) internal initializer {
+    function __ERC7535_init(string memory name, string memory symbol) internal onlyInitializing {
         __ERC20_init(name, symbol);
         __ERC7535_init_unchained();
     }
@@ -48,18 +47,7 @@ abstract contract ERC7535Upgradeable is Initializable, ERC20Upgradeable, IERC753
     /**
      * @dev Contains initialization logic specific to this contract.
      */
-    function __ERC7535_init_unchained() internal initializer {
-    }
-
-    /**
-     * @dev Decimals are computed by adding the decimal offset on top of the underlying asset's decimals. This
-     * "original" value is cached during construction of the vault contract. If this read operation fails (e.g., the
-     * asset has not been created yet), a default of 18 is used to represent the underlying asset's decimals.
-     *
-     * See {IERC20Metadata-decimals}.
-     */
-    function decimals() public view virtual override(IERC20MetadataUpgradeable, ERC20Upgradeable) returns (uint8) {
-        return 18 + _decimalsOffset();
+    function __ERC7535_init_unchained() internal onlyInitializing {
     }
 
     /**
@@ -219,14 +207,14 @@ abstract contract ERC7535Upgradeable is Initializable, ERC20Upgradeable, IERC753
      * @dev Internal conversion function (from assets to shares) with support for rounding direction.
      */
     function _convertToShares(uint256 assets, MathUpgradeable.Rounding rounding) internal view virtual returns (uint256) {
-        return assets.mulDiv(totalSupply() + 10 ** _decimalsOffset(), totalAssets() + 1, rounding);
+        return assets.mulDiv(totalSupply(), totalAssets() + 1, rounding);
     }
 
     /**
      * @dev Internal conversion function (from shares to assets) with support for rounding direction.
      */
     function _convertToAssets(uint256 shares, MathUpgradeable.Rounding rounding) internal view virtual returns (uint256) {
-        return shares.mulDiv(totalAssets() + 1, totalSupply() + 10 ** _decimalsOffset(), rounding);
+        return shares.mulDiv(totalAssets() + 1, totalSupply(), rounding);
     }
 
     /**
@@ -256,9 +244,10 @@ abstract contract ERC7535Upgradeable is Initializable, ERC20Upgradeable, IERC753
         emit Withdraw(caller, receiver, owner, assets, shares);
     }
 
-    function _decimalsOffset() internal view virtual returns (uint8) {
-        return 0;
-    }
+    /**
+     * @dev Receive ether from the caller, allowing vault to earn yield in the native asset.
+     */
+    receive() external payable virtual {}
 
     uint256[50] private __gap;
 }
