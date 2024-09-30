@@ -2,15 +2,13 @@
 pragma solidity ^0.8.20;
 
 import {Initializable} from "@openzeppelin-upgrades/contracts/proxy/utils/Initializable.sol";
-
 import {ISignatureUtils} from "eigenlayer-contracts/interfaces/ISignatureUtils.sol";
-
-import {ERC4626ETHMultiRewardVault} from "../vault/ERC4626ETHMultiRewardVault.sol";
+import {ERC7535MultiRewardVault} from "../vault/ERC7535MultiRewardVault.sol";
 import "./StrategyVaultETHStorage.sol";
 
 // TODO: Finish withdrawal logic
 
-contract StrategyVaultETH is Initializable, StrategyVaultETHStorage, ERC4626ETHMultiRewardVault {
+contract StrategyVaultETH is Initializable, StrategyVaultETHStorage, ERC7535MultiRewardVault {
     using FIFOLib for FIFOLib.FIFO;
     using BeaconChainProofs for *;
 
@@ -74,8 +72,8 @@ contract StrategyVaultETH is Initializable, StrategyVaultETHStorage, ERC4626ETHM
         whitelistedDeposit = _whitelistedDeposit;
         upgradeable = _upgradeable;        
 
-        // Initialize the ERC4626ETHMultiRewardVault
-        __ERC4626ETHMultiRewardVault_init(_oracle);
+        // Initialize the ERC7535MultiRewardVault
+        __ERC7535MultiRewardVault_init(_oracle);
 
         // If whitelisted Vault, whitelist the creator
         if (_whitelistedDeposit) {

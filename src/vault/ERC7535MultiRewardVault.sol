@@ -61,7 +61,7 @@ contract ERC7535MultiRewardVault is Initializable, ERC7535Upgradeable, OwnableUp
      * @notice Used to initialize the ERC7535MultiRewardVault given it's setup parameters.
      * @param _oracle The oracle implementation address to use for the vault.
      */
-    function __ERC7535_init(address _oracle) public onlyInitializing {
+    function __ERC7535MultiRewardVault_init(address _oracle) internal onlyInitializing {
         __ERC7535_init();
         __ERC20_init("ETH Byzantine StrategyVault Token", "byzETH");
         __Ownable_init();
@@ -69,7 +69,7 @@ contract ERC7535MultiRewardVault is Initializable, ERC7535Upgradeable, OwnableUp
         __ERC7535MultiRewardVault_init_unchained(_oracle);
     }
 
-    function __ERC7535_init_unchained(address _oracle) internal onlyInitializing {
+    function __ERC7535MultiRewardVault_init_unchained(address _oracle) internal onlyInitializing {
         oracle = IOracle(_oracle);
     }
 
@@ -77,7 +77,7 @@ contract ERC7535MultiRewardVault is Initializable, ERC7535Upgradeable, OwnableUp
     /**
      * @notice Payable fallback function that receives ether deposited to the StrategyVault contract
      */
-    receive() external payable override {
+    receive() external payable virtual override {
         // TODO: emit an event to notify
     }
 
@@ -135,6 +135,7 @@ contract ERC7535MultiRewardVault is Initializable, ERC7535Upgradeable, OwnableUp
         require(shares <= maxRedeem(owner), "ERC4626: redeem more than max");
         uint256 assets = previewRedeem(shares);
         _withdraw(_msgSender(), receiver, owner, assets, shares);
+        _distributeRewards(receiver, shares);
         return assets;
     }
 
@@ -248,27 +249,6 @@ contract ERC7535MultiRewardVault is Initializable, ERC7535Upgradeable, OwnableUp
         return (supply == 0)
             ? shares
             : shares.mulDiv(totalAssets(), supply, rounding);
-    }
-
-    /**
-     * @dev Override's ERC4626's _withdraw function to transfer ETH instead of tokens.
-     */
-    function _withdraw(
-        address caller,
-        address receiver,
-        address owner,
-        uint256 assets,
-        uint256 shares
-    ) internal virtual override {
-        if (caller != owner) {
-            _spendAllowance(owner, caller, shares);
-        }
-        _burn(owner, shares);
-        (bool success, ) = receiver.call{value: assets}("");
-        if (!success) {
-            revert ETHTransferFailedOnWithdrawal();
-        }
-        emit Withdraw(caller, receiver, owner, assets, shares);
     }
 
     /**
