@@ -24,18 +24,24 @@ abstract contract StrategyVaultERC20Storage is IStrategyVaultERC20 {
     /// @notice EigenLayer's DelegationManager contract
     IDelegationManager public immutable delegationManager;
 
-    /// @notice The token to be staked. 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE if staking ETH.
-    uint256 public immutable depositToken;
-
     /* ============== STATE VARIABLES ============== */
 
     /// @notice The ByzNft associated to this StrategyVault.
-    /// @notice The owner of the ByzNft is the StrategyVault owner.
+    /// @notice The owner of the ByzNft is the StrategyVault creator.
     /// TODO When non-upgradeable put that variable immutable and set it in the constructor
     uint256 public stratVaultNftId;
 
+    /// @notice Whitelisted addresses that are allowed to deposit into the StrategyVault (activated only the whitelistedDeposit == true)
+    mapping (address => bool) public isWhitelisted;
+
+    /// @notice The token to be staked
+    address public depositToken;
+
     /// @notice Whether the deposit function is whitelisted or not.
     bool public whitelistedDeposit;
+
+    /// @notice Whether the strategy is upgradeable (i.e can delegate to a different operator)
+    bool public upgradeable;
 
     /**
      * @dev This empty reserved space is put in place to allow future versions to add new

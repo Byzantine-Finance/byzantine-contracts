@@ -74,7 +74,7 @@ contract StrategyVaultETH is Initializable, StrategyVaultETHStorage, ERC4626Mult
         upgradeable = _upgradeable;        
 
         // Initialize the ERC4626MultiRewardVault
-        __ERC4626MultiRewardVault_init(depositToken);
+        //__ERC4626MultiRewardVault_init(depositToken);
 
         // If whitelisted Vault, whitelist the creator
         if (_whitelistedDeposit) {
@@ -93,6 +93,49 @@ contract StrategyVaultETH is Initializable, StrategyVaultETHStorage, ERC4626Mult
     }
 
     /* ============== EXTERNAL FUNCTIONS ============== */
+
+    // /**
+    //  * @notice Deposit 32ETH in the beacon chain to activate a Distributed Validator and start validating on the consensus layer.
+    //  * Also creates an EigenPod for the StrategyVault.
+    //  * @param pubkey The 48 bytes public key of the beacon chain DV.
+    //  * @param signature The DV's signature of the deposit data.
+    //  * @param depositDataRoot The root/hash of the deposit data for the DV's deposit.
+    //  * @dev If whitelistedDeposit is true, then only users with the whitelisted role can call this function.
+    //  * @dev The first call to this function is done by the StrategyVaultManager and creates the StrategyVault's EigenPod.
+    //  * @dev The caller receives Byzantine StrategyVault shares in return for the ETH staked.
+    //  */
+    // function stakeNativeETH(
+    //     bytes calldata pubkey, 
+    //     bytes calldata signature,
+    //     bytes32 depositDataRoot
+    // ) external payable {
+    //     /// TODO Check the whitelist --> creator is whitelisted in initialize function
+    //     /// TODO Put these checks in a modifier
+    //     /// TODO Remove the roles
+    //     /// if (whitelistedDeposit && !hasRole(whitelisted, msg.sender)) revert OnlyWhitelistedDeposit();
+
+    //     // Check that the deposit is a multiple of 32 ETH
+    //     if (msg.value % 32 ether != 0) revert CanOnlyDepositMultipleOf32ETH();
+
+    //     // Calculate how many bundles of 32 ETH were sent
+    //     uint256 num32ETHBundles = msg.value / 32 ether;
+
+    //     // Trigger an auction for each bundle of 32 ETH
+    //     for (uint256 i = 0; i < num32ETHBundles;) {
+    //         bytes32 winningClusterId = auction.triggerAuction();
+    //         clusterIdsFIFO.push(winningClusterId);
+    //         unchecked {
+    //             ++i;
+    //         }
+    //     }
+        
+    //     // Mint vault shares to the staker in return for the ETH staked
+    //     _mintVaultShares(msg.value, msg.sender);
+
+    //     // Create Eigen Pod (if not already has one) and stake the native ETH
+    //     // eigenPodManager.stake{value: msg.value}(pubkey, signature, depositDataRoot);
+
+    // }
 
     /**
      * @notice Deposit ETH to the StrategyVault and get Vault shares in return.
@@ -170,10 +213,10 @@ contract StrategyVaultETH is Initializable, StrategyVaultETHStorage, ERC4626Mult
         );
 
         // Update DV Status to ACTIVE_AND_VERIFIED
-        clusterDetails.dvStatus = DVStatus.ACTIVE_AND_VERIFIED;
+        // clusterDetails.dvStatus = DVStatus.ACTIVE_AND_VERIFIED;
 
         // Update the amount of tokens that the StrategyVault is delegating.
-        delegationManager.increaseDelegatedShares(address(this), strategy, amount);
+        // delegationManager.increaseDelegatedShares(address(this), strategy, amount);
     }
 
     /**

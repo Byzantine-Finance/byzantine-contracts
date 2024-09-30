@@ -219,17 +219,17 @@ contract StrategyVaultManager is
      * @dev Revert if the `staker` doesn't have any StrategyVault.
      */
     function isDelegated(address staker) public view returns (bool[] memory) {
-        if (!hasStratVaults(staker)) revert DoNotHaveStratVault(staker);
+        // if (!hasStratVaults(staker)) revert DoNotHaveStratVault(staker);
 
-        address[] memory stratVaults = getStratVaults(staker);
-        bool[] memory stratVaultsDelegated = new bool[](stratVaults.length);
-        for (uint256 i = 0; i < stratVaults.length;) {
-            stratVaultsDelegated[i] = delegationManager.isDelegated(stratVaults[i]);
-            unchecked {
-                ++i;
-            }
-        }
-        return stratVaultsDelegated;
+        // address[] memory stratVaults = getStratVaults(staker);
+        // bool[] memory stratVaultsDelegated = new bool[](stratVaults.length);
+        // for (uint256 i = 0; i < stratVaults.length;) {
+        //     stratVaultsDelegated[i] = delegationManager.isDelegated(stratVaults[i]);
+        //     unchecked {
+        //         ++i;
+        //     }
+        // }
+        // return stratVaultsDelegated;
     }
 
     /**
@@ -238,17 +238,17 @@ contract StrategyVaultManager is
      * @dev Revert if the `staker` doesn't have any StrategyVault.
      */
     function hasDelegatedTo(address staker) public view returns (address[] memory) {
-        if (!hasStratVaults(staker)) revert DoNotHaveStratVault(staker);
+        // if (!hasStratVaults(staker)) revert DoNotHaveStratVault(staker);
 
-        address[] memory stratVaults = getStratVaults(staker);
-        address[] memory stratVaultsDelegateTo = new address[](stratVaults.length);
-        for (uint256 i = 0; i < stratVaults.length;) {
-            stratVaultsDelegateTo[i] = delegationManager.delegatedTo(stratVaults[i]);
-            unchecked {
-                ++i;
-            }
-        }
-        return stratVaultsDelegateTo;
+        // address[] memory stratVaults = getStratVaults(staker);
+        // address[] memory stratVaultsDelegateTo = new address[](stratVaults.length);
+        // for (uint256 i = 0; i < stratVaults.length;) {
+        //     stratVaultsDelegateTo[i] = delegationManager.delegatedTo(stratVaults[i]);
+        //     unchecked {
+        //         ++i;
+        //     }
+        // }
+        // return stratVaultsDelegateTo;
     }
 
     /**

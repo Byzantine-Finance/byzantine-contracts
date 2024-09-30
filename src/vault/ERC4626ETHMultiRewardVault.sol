@@ -65,8 +65,8 @@ contract ERC4626MultiRewardVault is Initializable, ERC4626Upgradeable, OwnableUp
      * @param receiver The address to receive the Byzantine vault shares.
      * @return The amount of shares minted.
      */
-    function deposit(uint256 assets, address receiver) public virtual override payable nonReentrant returns (uint256) {
-        require(msg.value == assets, "Incorrect ETH amount");
+    function deposit(uint256 assets, address receiver) public virtual override nonReentrant returns (uint256) {
+        //require(msg.value == assets, "Incorrect ETH amount");
         uint256 shares = previewDeposit(assets);
         _deposit(msg.sender, receiver, assets, shares);
         return shares;
@@ -78,7 +78,7 @@ contract ERC4626MultiRewardVault is Initializable, ERC4626Upgradeable, OwnableUp
      * @param receiver The address to receive the Byzantine vault shares.
      * @return The amount of ETH deposited.
      */
-    function mint(uint256 shares, address receiver) public virtual override payable nonReentrant returns (uint256) {
+    function mint(uint256 shares, address receiver) public virtual override nonReentrant returns (uint256) {
     require(shares <= maxMint(receiver), "ERC4626: mint more than max");
     uint256 assets = previewMint(shares);
     _deposit(_msgSender(), receiver, assets, shares);
