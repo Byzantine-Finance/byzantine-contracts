@@ -28,10 +28,10 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
     /// @notice Canonical, virtual beacon chain ETH strategy
     IStrategy public constant beaconChainETHStrategy = IStrategy(0xbeaC0eeEeeeeEEeEeEEEEeeEEeEeeeEeeEEBEaC0);
 
-    // /// @notice Random validator deposit data to be able to call `createStratVaultAndStakeNativeETH` function
-    // bytes pubkey;
-    // bytes signature;
-    // bytes32 depositDataRoot;
+    /// @notice Random validator deposit data to be able to call `createStratVaultAndStakeNativeETH` function
+    bytes private pubkey;
+    bytes private signature;
+    bytes32 private depositDataRoot;
 
     /// @notice address of the native token in the Split contract
     address public constant SPLIT_NATIVE_TOKEN_ADDR = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
@@ -61,7 +61,7 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
         bidId = _createMultipleBids();
 
         // Get deposit data of a random validator
-        // _getDepositData(abi.encodePacked("./test/test-data/deposit-data-DV0-noPod.json"));
+        _getDepositData(abi.encodePacked("./test/test-data/deposit-data-DV0-noPod.json"));
     }
 
     function test_byzantineContractsOwnership() public view {
@@ -254,6 +254,43 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
         strategyVaultManager.distributeSplitBalance(bytes32(0), split, SPLIT_NATIVE_TOKEN_ADDR);
     }
 
+    function test_activateCluster() public {
+
+        // Alice creates a StrategyVault and stakes 32 ETH in it
+        vm.prank(alice);
+        IStrategyVaultETH aliceStratVault1 = IStrategyVaultETH(strategyVaultManager.createStratVaultAndStakeNativeETH{value: 32 ether}(true, true, ELOperator1, address(0)));
+
+        // Get the DV cluster ID
+        bytes32[] memory clusterIds = aliceStratVault1.getAllDVIds();
+
+        // Verify the DV status
+        assertEq(uint256(auction.getClusterDetails(clusterIds[0]).status), uint256(IAuction.ClusterStatus.IN_CREATION));
+
+        // The node operators create the DV off-chain
+        // As soon as the DV is created and its deposit data available, it possible to activate it
+
+        // DV activation fails because Alice is not the BeaconChainAdmin
+        vm.prank(alice);
+        vm.expectRevert(IStrategyVaultETH.OnlyBeaconChainAdmin.selector);
+        aliceStratVault1.activateCluster(pubkey, signature, depositDataRoot, clusterIds[0]);
+
+        // DV activation fails because the cluster is not in the vault
+        vm.prank(beaconChainAdmin);
+        vm.expectRevert(IStrategyVaultETH.ClusterNotInVault.selector);
+        aliceStratVault1.activateCluster(pubkey, signature, depositDataRoot, bytes32(0));
+
+        // BeaconChainAdmin activates the DV
+        vm.prank(beaconChainAdmin);
+        aliceStratVault1.activateCluster(pubkey, signature, depositDataRoot, clusterIds[0]);
+
+        // Verify the DV status has been updated
+        assertEq(uint256(auction.getClusterDetails(clusterIds[0]).status), uint256(IAuction.ClusterStatus.DEPOSITED_NOT_VERIFIED));
+
+        // Verify the balance of the StratVaultETH
+        assertEq(address(aliceStratVault1).balance, 0 ether);
+
+    }
+
     // // That test reverts because the `withdrawal_credential_proof` file generated with the Byzantine API
     // // doesn't point to the correct EigenPod (alice's EigenPod which is locally deployed)
     // function test_RevertWhen_WrongWithdrawalCredentials() public preCreateClusters(2) {
@@ -338,30 +375,6 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
     // //------------------------------  INTERNAL FUNCTIONS  ----------------------------------
     // //--------------------------------------------------------------------------------------
 
-    // function _createStratVaultAndStakeNativeETH(address _staker, uint256 _stake) internal returns (address) {
-    //     vm.prank(_staker);
-    //     strategyVaultManager.createStratVaultAndStakeNativeETH{value: _stake}(pubkey, signature, depositDataRoot);
-    //     uint256 stratVaultNumber = strategyVaultManager.getStratVaultNumber(_staker);
-    //     if (stratVaultNumber == 0) {
-    //         return address(0);
-    //     }
-    //     return strategyVaultManager.getStratVaults(_staker)[stratVaultNumber - 1];
-    // }
-
-    // function _getDepositData(
-    //     bytes memory depositFilePath
-    // ) internal {
-    //     // File generated with the Obol LaunchPad
-    //     setJSON(string(depositFilePath));
-
-    //     pubkey = getDVPubKeyDeposit();
-    //     signature = getDVSignature();
-    //     depositDataRoot = getDVDepositDataRoot();
-    //     //console.logBytes(pubkey);
-    //     //console.logBytes(signature);
-    //     //console.logBytes32(depositDataRoot);
-    // }
-
     // function _getValidatorFieldsProof(
     //     bytes memory proofFilePath
     // ) internal returns (
@@ -401,16 +414,6 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
     //     bytes32 latestBlockRoot = getLatestBlockRoot();
     //     //set beaconStateRoot
     //     beaconChainOracle.setOracleBlockRootAtTimestamp(latestBlockRoot);
-    // }
-
-    // function _nodeOpsBid(
-    //     NodeOpBid[] memory nodeOpsBids
-    // ) internal returns (uint256[][] memory) {
-    //     uint256[][] memory nodeOpsAuctionScores = new uint256[][](nodeOpsBids.length);
-    //     for (uint i = 0; i < nodeOpsBids.length; i++) {
-    //         nodeOpsAuctionScores[i] = _nodeOpBid(nodeOpsBids[i]);
-    //     }
-    //     return nodeOpsAuctionScores;
     // }
 
     /* ===================== HELPER FUNCTIONS ===================== */
@@ -496,6 +499,20 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
             totalAllocation: auction.SPLIT_TOTAL_ALLOCATION(),
             distributionIncentive: auction.SPLIT_DISTRIBUTION_INCENTIVE()
         });
+    }
+
+    function _getDepositData(
+        bytes memory depositFilePath
+    ) internal {
+        // File generated with the Obol LaunchPad
+        setJSON(string(depositFilePath));
+
+        pubkey = getDVPubKeyDeposit();
+        signature = getDVSignature();
+        depositDataRoot = getDVDepositDataRoot();
+        //console.logBytes(pubkey);
+        //console.logBytes(signature);
+        //console.logBytes32(depositDataRoot);
     }
 
 }

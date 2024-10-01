@@ -365,6 +365,17 @@ contract Auction is
         emit BidWithdrawn(msg.sender, _auctionScore);
     }*/
 
+    /**
+     * @notice Update the status of a cluster
+     * @param _clusterId The id of the cluster to update the status
+     * @param _newStatus The new status
+     * @dev Callable only by a StrategyVaultETH contract
+     * @dev The check to know if the cluster is in the calling vault is done in the StrategyVaultETH contract
+     */
+    function updateClusterStatus(bytes32 _clusterId, IAuction.ClusterStatus _newStatus) external onlyStratVaultETH {
+        _clusterDetails[_clusterId].status = _newStatus;
+    }
+
     /* ===================== VIEW FUNCTIONS ===================== */
 
     /// @notice Returns true if `_nodeOpAddr` is whitelisted, false otherwise.

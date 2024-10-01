@@ -42,7 +42,26 @@ interface IStrategyVaultETH is IStrategyVault {
    * @dev Revert if the amount deposited is not a multiple of 32 ETH.
    * @dev Trigger auction(s) for each bundle of 32 ETH deposited to get Distributed Validator(s)
    */
-  function stakeNativeETH() external payable; 
+  function stakeNativeETH() external payable;
+
+  /* ============== BEACON CHAIN ADMIN FUNCTIONS ============== */
+
+  /**
+   * @notice Deposit 32ETH in the beacon chain to activate a Distributed Validator and start validating on the consensus layer.
+   * @dev Function callable only by BeaconChainAdmin to be sure the deposit data are the ones of a DV created within the Byzantine protocol. 
+   * @param pubkey The 48 bytes public key of the beacon chain DV.
+   * @param signature The DV's signature of the deposit data.
+   * @param depositDataRoot The root/hash of the deposit data for the DV's deposit.
+   * @param clusterId The ID of the cluster associated to these deposit data.
+   * @dev Reverts if not exactly 32 ETH are sent.
+   * @dev Reverts if the cluster is not in the vault.
+   */
+  function activateCluster(
+      bytes calldata pubkey, 
+      bytes calldata signature,
+      bytes32 depositDataRoot,
+      bytes32 clusterId
+  ) external;
 
   /**
    * @notice This function verifies that the withdrawal credentials of the Distributed Validator(s) owned by
@@ -99,5 +118,11 @@ interface IStrategyVaultETH is IStrategyVault {
 
   /// @dev Returned when trying to access DV data but no ETH has been deposited
   error NativeRestakingNotActivated();
+
+  /// @dev Returned when trying to trigger Beacon Chain transactions from an unauthorized address
+  error OnlyBeaconChainAdmin();
+
+  /// @dev Returned when trying to interact with a cluster ID not in the vault
+  error ClusterNotInVault();
 
 }
