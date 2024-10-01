@@ -53,14 +53,17 @@ contract ERC7535MultiRewardVault is Initializable, ERC7535Upgradeable, OwnableUp
     error ETHTransferFailedOnWithdrawal();
     error TokenAlreadyAdded();
     error InvalidAddress();
-
+    error FailedToDistributeStakerRewards();
     /* ============== EVENTS ============== */
 
-    event AssetTokenAdded(IERC20Upgradeable indexed token, address priceFeed, uint8 decimals);
+    //event AssetTokenAdded(IERC20Upgradeable indexed token, address priceFeed, uint8 decimals);
     event RewardTokenAdded(IERC20Upgradeable indexed token, address priceFeed, uint8 decimals);
     event PriceFeedUpdated(IERC20Upgradeable indexed token, address newPriceFeed);
+    event OracleUpdated(address newOracle);
+    event StakerRewardUpdated(address newStakerReward);
     event StakerRewardsDistributed(uint256 amount);
-
+    event RewardTokenWithdrawn(address indexed receiver, IERC20Upgradeable indexed rewardToken, uint256 amount);
+    
     /* ============== CONSTRUCTOR & INITIALIZER ============== */
 
     /**
@@ -204,8 +207,9 @@ contract ERC7535MultiRewardVault is Initializable, ERC7535Upgradeable, OwnableUp
      * @param _oracle The new oracle implementation address.
      */
     function updateOracle(address _oracle) external onlyOwner {
-        
+        if (_oracle == address(0)) revert InvalidAddress();
         oracle = IOracle(_oracle);
+        emit OracleUpdated(_oracle);
     }
 
     /**
@@ -215,6 +219,7 @@ contract ERC7535MultiRewardVault is Initializable, ERC7535Upgradeable, OwnableUp
     function updateStakerReward(address _stakerReward) external onlyOwner {
         if (_stakerReward == address(0)) revert InvalidAddress();
         stakerReward = _stakerReward;
+        emit StakerRewardUpdated(_stakerReward);
     }
 
     /* ================ VIEW FUNCTIONS ================ */
@@ -284,6 +289,7 @@ contract ERC7535MultiRewardVault is Initializable, ERC7535Upgradeable, OwnableUp
             uint256 rewardAmount = (rewardBalance * sharesBurned) / totalShares;
             if (rewardAmount > 0) {
                 rewardToken.safeTransfer(receiver, rewardAmount);
+                emit RewardTokenWithdrawn(receiver, rewardToken, rewardAmount);
             }
         }
     }
@@ -292,8 +298,12 @@ contract ERC7535MultiRewardVault is Initializable, ERC7535Upgradeable, OwnableUp
      * @dev Distributes staker rewards to the contract from the stakerReward contract.
      */
     function _distributeStakerRewards() internal {
+        uint256 balanceBefore = address(this).balance;
         (bool success, ) = stakerReward.call(abi.encodeWithSignature("distributeRewards()"));
-        require(success, "Failed to claim staker rewards");
+        if (!success) revert FailedToDistributeStakerRewards();
+        uint256 balanceAfter = address(this).balance;
+        uint256 rewardsDistributed = balanceAfter - balanceBefore;
+        emit StakerRewardsDistributed(rewardsDistributed);
     }
 }
 
