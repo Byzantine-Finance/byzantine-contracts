@@ -66,7 +66,8 @@ contract StrategyVaultETH is Initializable, StrategyVaultETHStorage, ERC7535Mult
      * @dev Called on construction by the StrategyVaultManager.
      * @dev StrategyVaultETH so the deposit token is 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE
      */
-    function __StrategyVaultETH_init(uint256 _nftId, address _stratVaultCreator, bool _whitelistedDeposit, bool _upgradeable, address _oracle, address _stakerReward) internal onlyInitializing {
+    //TODO: Rename to __StrategyVaultETH_init?
+    function initialize(uint256 _nftId, address _stratVaultCreator, bool _whitelistedDeposit, bool _upgradeable, address _oracle, address _stakerReward) public onlyInitializing {
 
         // Initialize parent contracts (ERC7535MultiRewardVault)
         __ERC7535MultiRewardVault_init(_oracle);
@@ -97,6 +98,11 @@ contract StrategyVaultETH is Initializable, StrategyVaultETHStorage, ERC7535Mult
     receive() external override payable {
         // TODO: emit an event to notify
     }
+
+    /* ============== EVENTS ============== */
+
+    /// @notice Emitted when StakerReward contract distributes rewards
+    event StakerRewardsDistributed(uint256 amount);
 
     /* ============== EXTERNAL FUNCTIONS ============== */
 
@@ -299,16 +305,6 @@ contract StrategyVaultETH is Initializable, StrategyVaultETHStorage, ERC7535Mult
         whitelistedDeposit = _whitelistedDeposit;
     }
 
-    /**
-     * @notice Updates the staker reward address for the vault.
-     * @param _stakerReward The new staker reward address.
-     */
-    function updateStakerReward(address _stakerReward) external onlyNftOwner {
-        if (_stakerReward == address(0)) revert InvalidAddress();
-        stakerReward = _stakerReward;
-        emit StakerRewardUpdated(_stakerReward);
-    }
-
     /* ================ VIEW FUNCTIONS ================ */
 
     /**
@@ -367,6 +363,7 @@ contract StrategyVaultETH is Initializable, StrategyVaultETHStorage, ERC7535Mult
 
     /**
      * @dev Distributes staker rewards to the contract from the stakerReward contract.
+     //TODO: Integrate with the stakerReward contract
      */
     function _distributeStakerRewards() internal {
         uint256 balanceBefore = address(this).balance;
