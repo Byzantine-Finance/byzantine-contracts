@@ -98,12 +98,7 @@ contract StrategyVaultETH is Initializable, StrategyVaultETHStorage, ERC7535Mult
     receive() external override payable {
         // TODO: emit an event to notify
     }
-
-    /* ============== EVENTS ============== */
-
-    /// @notice Emitted when StakerReward contract distributes rewards
-    event StakerRewardsDistributed(uint256 amount);
-
+    
     /* ============== EXTERNAL FUNCTIONS ============== */
 
     // /**

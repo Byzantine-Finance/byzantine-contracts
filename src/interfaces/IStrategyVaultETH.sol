@@ -135,4 +135,9 @@ interface IStrategyVaultETH is IStrategyVault {
     /// @dev Returned when the staker rewards distribution fails
     error FailedToDistributeStakerRewards();
 
+    /* ============== EVENTS ============== */
+
+    /// @notice Emitted when StakerReward contract distributes rewards
+    event StakerRewardsDistributed(uint256 amount);
+
 }
