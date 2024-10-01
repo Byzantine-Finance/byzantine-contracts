@@ -6,3 +6,5 @@ splits-v2/=lib/splits-contracts-v2/packages/splits-v2/src/
 ds-test/=lib/ds-test/src/
 forge-std/=lib/forge-std/src/
 ds-math/=lib/ds-math/src/
+chainlink-brownie-contracts/=lib/chainlink-brownie-contracts/contracts/src/v0.6/vendor/@arbitrum/nitro-contracts/src/
+chainlink/=lib/chainlink-brownie-contracts/contracts/src/

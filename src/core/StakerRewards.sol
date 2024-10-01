@@ -37,8 +37,8 @@ contract StakerRewards is
     /// @notice Auction contract
     IAuction public immutable auction;
 
-    /// @notice Time in seconds for a day
     uint32 internal constant _ONE_DAY = 1 days;
+    uint256 private constant _WAD = 1e18;
 
     /* ============== STATE VARIABLES ============== */
 
@@ -140,8 +140,7 @@ contract StakerRewards is
     /* ============== EXTERNAL FUNCTIONS ============== */
 
     /**
-     * @notice Fallback function which receives the paid bid prices from the Escrow contract when the node operator wins the auction
-     * @dev The funds are locked in the StakerRewards contract and are distributed to the stakers on a daily basis
+     * @notice Fallback function which receives the paid bid prices from the Escrow contract 
      */
     receive() external payable {}
 
@@ -165,10 +164,8 @@ contract StakerRewards is
             _subtractConsumedVCsFromTotalVCs();
             _updateTotalNotClaimedRewards(0);
         }
-        _updateCheckpoint();
-
-        // Update DV counters
         clusterSize == 4 ? ++numberDV4 : ++numberDV7;
+        _updateCheckpoint();
 
         // Update ClusterData
         ClusterData storage cluster = clusters[_clusterId];
@@ -195,7 +192,7 @@ contract StakerRewards is
      * 4. Update the strategy module data
      * @dev Revert if last claim was within the last 4 days or the strategy module was deployed less than 4 days ago
      */
-    function claimRewards(
+    function sendPOSRewards(
         address _staker
     ) public {
         StakerData storage staker = stakers[_staker];
@@ -324,6 +321,8 @@ contract StakerRewards is
         for (uint256 i; i < stratVaults.length; ) {
             bytes32[] memory clusterIds = IStrategyVaultETH(stratVaults[i]).getAllDVIds();
 
+            if (clusterIds.length == 0) continue;
+
             for (uint256 j; j < clusterIds.length; ) {  
                 ClusterData memory clusterData = clusters[clusterIds[j]];
                 if (clusterData.exitTimestamp < block.timestamp) {
@@ -340,10 +339,12 @@ contract StakerRewards is
             }
         }
 
-        // Initialize array of addresses of strategy modules at the size of counter
+        // Array of addresses of strategy modules at the size of counter
         bytes32[] memory listClusterIds = new bytes32[](counter);
-        // Initialize array of VC numbers of each strategy module at the size of counter
+        // Array of VC numbers of each strategy module at the size of counter
         uint256[] memory clusterTotalVCs = new uint256[](counter);
+        // Array of remaining bid prices of each cluster to send back to Escrow contract
+        uint256[] memory remainingBidPrices = new uint256[](counter);
 
         upkeepNeeded = false;
         uint256 indexCounter;
@@ -361,10 +362,25 @@ contract StakerRewards is
                     upkeepNeeded = true;
                     // Store the address of the strategy module to the array
                     listClusterIds[indexCounter] = clusterIds[j];
-                    // Store the VC number of the strategy module to the array
+                    // Update the VC number of each node
                     IAuction.NodeDetails[] memory nodes = auction.getClusterDetails(clusterIds[j]).nodes;
-                    (uint256 totalClusterVCs, uint256 smallestVC, uint8 clusterSize) = _getTotalAndSmallestVCs(nodes);
+                    (uint256 totalClusterVCs, uint32 smallestVC, ) = _getTotalAndSmallestVCs(nodes);
+                    // Store the VC number of the strategy module to the array
                     clusterTotalVCs[indexCounter] = totalClusterVCs;
+                    // Calculate the total remaining bid prices of each node
+                    uint256 bidPriceToSendBack;
+                    for (uint8 k; k < nodes.length; ) {
+                        IAuction.BidDetails memory bidDetails = auction.getBidDetails(nodes[k].bidId);
+                        uint256 dailyVcPrice = _getDailyVcPrice(bidDetails.bidPrice, bidDetails.vcNumber);
+                        uint256 leftVCs = bidDetails.vcNumber - smallestVC;
+                        bidPriceToSendBack += (dailyVcPrice * leftVCs);
+
+                        unchecked {
+                            ++k;
+                        }
+                    }
+                    remainingBidPrices[indexCounter] = bidPriceToSendBack;
+
                     ++indexCounter;
                 }
 
@@ -378,7 +394,7 @@ contract StakerRewards is
             }
         }
 
-        performData = abi.encode(listClusterIds, clusterTotalVCs);
+        performData = abi.encode(listClusterIds, clusterTotalVCs, remainingBidPrices);
         return (upkeepNeeded, performData);
     }
 
@@ -406,12 +422,14 @@ contract StakerRewards is
         // Decode `performData` to get the strategy module addresses and their total VC number
         (
             bytes32[] memory clusterIds,
-            uint256[] memory clusterTotalVCs
-        ) = abi.decode(performData, (bytes32[], uint256[]));
+            uint256[] memory clusterTotalVCs,
+            uint256[] memory remainingBidPrices
+        ) = abi.decode(performData, (bytes32[], uint256[], uint256[])); // TODO: work till here: quesiton: list of bidprices or just one bidprice?
 
         uint256 remainingVCsToSubtract;
         uint256 numberDV4ToExit;
         uint256 numberDV7ToExit;
+        
         for (uint256 i; i < clusterIds.length; ) {
             ClusterData storage cluster = clusters[clusterIds[i]];
             uint32 consumedVCs = cluster.smallestVC;
@@ -424,11 +442,10 @@ contract StakerRewards is
             // Add up the number of active DVs to exit
             cluster.clusterSize == 4 ? ++numberDV4ToExit : ++numberDV7ToExit;
 
-            // Record the remaining rewards available for claim
             // TODO: assume that there is always new DV to replace the exited DV 
-            // cluster.remainingRewardsAtExit =
-            //     checkpoint.dailyRewardsPer32ETH *
-            //     ((stratMod.exitTimestamp - stratMod.lastUpdateTime) / _ONE_DAY);
+            uint256 bidPrice = remainingBidPrices[i];
+            (bool success, ) = payable(address(escrow)).call{value: bidPrice}("");
+            if (!success) revert FailedToSendBackBidPrice();
 
             unchecked {
                 ++i;
@@ -496,7 +513,7 @@ contract StakerRewards is
         IAuction.NodeDetails[] memory nodes = auction.getClusterDetails(_clusterId).nodes;
 
         for (uint8 i; i < nodes.length;) {
-            nodes[i].currentVCNumber = uint32(uint256(nodes[i].currentVCNumber)) - _smallestVC;
+            nodes[i].currentVCNumber = nodes[i].currentVCNumber - _smallestVC;
             unchecked {
                 ++i;
             }
@@ -518,9 +535,7 @@ contract StakerRewards is
      * @dev This function is only called if totalActiveDVs is not 0.
      * @dev Rewards that were claimed by a staker should be subtracted from totalNotYetClaimedRewards.
      */
-    function _updateTotalNotClaimedRewards(
-        uint256 _rewardsClaimed
-    ) internal nonReentrant {
+    function _updateTotalNotClaimedRewards(uint256 _rewardsClaimed) internal nonReentrant {
         uint256 elapsedDays = _getElapsedDays(checkpoint.updateTime);
         uint256 rewardsDistributed = checkpoint.dailyRewardsPer32ETH * elapsedDays * (numberDV4 + numberDV7);
 
@@ -535,8 +550,9 @@ contract StakerRewards is
      * @notice Update the checkpoint struct including calculating and updating dailyRewardsPer32ETH
      */
     function _updateCheckpoint() internal nonReentrant {
-        uint256 consumedVCsPerDayPerValidator = (numberDV4 * 4 + numberDV7 * 7) / (numberDV4 + numberDV7);
-        checkpoint.dailyRewardsPer32ETH = (getAllocatableRewards() / totalVCs) * consumedVCsPerDayPerValidator;
+        uint256 consumedVCsPerDayPerValidator = ((numberDV4 * 4 + numberDV7 * 7) * _WAD) / (numberDV4 + numberDV7);
+        uint256 dailyRewardsPer32ETH = (getAllocatableRewards() / totalVCs) * consumedVCsPerDayPerValidator / _WAD;
+        checkpoint.dailyRewardsPer32ETH = dailyRewardsPer32ETH;
         checkpoint.updateTime = block.timestamp;
     }
 
@@ -544,9 +560,7 @@ contract StakerRewards is
      * @notice Get the number of days that have elapsed between the last checkpoint and the current one
      * @param _lastTimestamp can be the last update time of Checkpoint or StratModData
      */
-    function _getElapsedDays(
-        uint256 _lastTimestamp
-    ) internal view returns (uint256) {
+    function _getElapsedDays(uint256 _lastTimestamp) internal view returns (uint256) {
         return (block.timestamp - _lastTimestamp) / _ONE_DAY;
     }
 

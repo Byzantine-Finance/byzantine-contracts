@@ -40,4 +40,7 @@ interface IStakerRewards {
 
     /// @dev Error when unauthorized call to a function callable only by the StrategyVaultManager.
     error OnlyStrategyVaultManager();
+
+    /// @dev Error when the bid price cannot be sent back to the escrow
+    error FailedToSendBackBidPrice();
 }
