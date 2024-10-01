@@ -17,6 +17,7 @@ import "../src/core/StrategyVaultERC20.sol";
 import "../src/tokens/ByzNft.sol";
 import "../src/core/Auction.sol";
 import "../src/vault/Escrow.sol";
+import "../src/core/StakerRewards.sol";
 
 contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
 
@@ -28,6 +29,7 @@ contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
     ByzNft public byzNft;
     Auction public auction;
     Escrow public escrow;
+    StakerRewards public stakerRewards;
 
     // Byzantine Admin
     address public byzantineAdmin = address(this);
@@ -107,7 +109,8 @@ contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
             auction,
             byzNft,
             eigenPodManager,
-            delegation
+            delegation,
+            stakerRewards
         );
         // StrategyVaultETH beacon contract. The Beacon Proxy contract is deployed in the StrategyVaultManager
         // This contract points to the implementation contract.

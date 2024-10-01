@@ -43,7 +43,8 @@ contract StrategyVaultsETHUpgrade is ExistingDeploymentParser {
             auction,
             byzNft,
             eigenPodManager,
-            delegation
+            delegation,
+            stakerRewards
         );
         // Upgrade UpgradeableBeacon
         strategyVaultETHBeacon.upgradeTo(address(strategyVaultETHImplementation));

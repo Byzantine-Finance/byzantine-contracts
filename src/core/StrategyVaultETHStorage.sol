@@ -7,6 +7,7 @@ import {IAuction} from "../interfaces/IAuction.sol";
 import {IEigenPodManager} from "eigenlayer-contracts/interfaces/IEigenPodManager.sol";
 import {IEigenPod} from "eigenlayer-contracts/interfaces/IEigenPod.sol";
 import {IDelegationManager} from "eigenlayer-contracts/interfaces/IDelegationManager.sol";
+import {IStakerRewards} from "../interfaces/IStakerRewards.sol";
 
 import {FIFOLib} from "../libraries/FIFOLib.sol";
 
@@ -31,6 +32,9 @@ abstract contract StrategyVaultETHStorage is IStrategyVaultETH {
 
     /// @notice EigenLayer's DelegationManager contract
     IDelegationManager public immutable delegationManager;
+
+    /// @notice StakerRewards contract
+    IStakerRewards public immutable stakerRewards;
 
     /// @notice Average time for block finality in the Beacon Chain
     uint16 internal constant FINALITY_TIME = 16 minutes;
