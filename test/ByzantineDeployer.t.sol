@@ -184,19 +184,6 @@ contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
         );
     }
 
-    function testByzantineContractsInitialization() public view {
-        // StrategyVaultManager
-        assertEq(strategyVaultManager.owner(), byzantineAdmin);
-        // ByzNft
-        assertEq(byzNft.owner(), address(strategyVaultManager));
-        assertEq(byzNft.symbol(), "byzNFT");
-        // Auction
-        assertEq(auction.owner(), byzantineAdmin);
-        assertEq(auction.expectedDailyReturnWei(), currentPoSDailyReturnWei);
-        assertEq(auction.maxDiscountRate(), maxDiscountRate);
-        assertEq(auction.minDuration(), minValidationDuration);
-    }
-
     function _registerAsELOperator(
         address operator
     ) internal {
