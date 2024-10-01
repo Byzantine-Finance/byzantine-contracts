@@ -7,6 +7,11 @@ import "./IStrategyVault.sol";
 
 interface IStrategyVaultETH is IStrategyVault {
 
+  /* ============== GETTERS ============== */
+
+  /// @notice Get the address of the beacon chain admin
+  function beaconChainAdmin() external view returns (address);
+
   /* ============== INITIALIZER ============== */
 
   /**
@@ -38,12 +43,6 @@ interface IStrategyVaultETH is IStrategyVault {
    * @dev Trigger auction(s) for each bundle of 32 ETH deposited to get Distributed Validator(s)
    */
   function stakeNativeETH() external payable; 
-
-  /**
-   * @notice Create an EigenPod for the StrategyVault.
-   * @dev Can only be called by the StrategyVaultManager during the vault creation.
-   */
-  function createEigenPod() external;
 
   /**
    * @notice This function verifies that the withdrawal credentials of the Distributed Validator(s) owned by
@@ -81,6 +80,16 @@ interface IStrategyVaultETH is IStrategyVault {
    * @notice Returns the IDs of the active DVs staked by the Strategy Vault.
    */
   function getAllDVIds() external view returns (bytes32[] memory);
+
+  /* ============== STRATEGY VAULT MANAGER FUNCTIONS ============== */
+
+  /**
+   * @notice Create an EigenPod for the StrategyVault.
+   * @dev Can only be called by the StrategyVaultManager during the vault creation.
+   */
+  function createEigenPod() external;
+
+  /* ============== ERRORS ============== */
 
   /// @dev Returned when not privided the right number of nodes 
   error InvalidClusterSize();

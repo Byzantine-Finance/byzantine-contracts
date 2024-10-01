@@ -35,6 +35,8 @@ contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
     address public byzantineAdmin = address(this);
     // Address which receives the bid of the winners (will be a smart contract in the future to distribute the rewards)
     address public bidReceiver = makeAddr("bidReceiver");
+    // Address of the Beacon Chain Admin (allowed to activate DVs and submit Beacon Merkle Proofs)
+    address public beaconChainAdmin = makeAddr("beaconChainAdmin");
     // Initial Auction parameters
     uint256 public currentPoSDailyReturnWei = (uint256(32 ether) * 37) / (1000 * 365); // 3.7% APY --> 3243835616438356 WEI
     uint16 public maxDiscountRate = 15e2; // 15%
@@ -110,7 +112,8 @@ contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
             byzNft,
             eigenPodManager,
             delegation,
-            stakerRewards
+            stakerRewards,
+            beaconChainAdmin
         );
         // StrategyVaultETH beacon contract. The Beacon Proxy contract is deployed in the StrategyVaultManager
         // This contract points to the implementation contract.

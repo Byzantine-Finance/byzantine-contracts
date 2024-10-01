@@ -42,6 +42,9 @@ contract ExistingDeploymentParser is Script, Test {
     StakerRewards public stakerRewards;
     StakerRewards public stakerRewardsImplementation;
 
+    // Beacon Chain Admin address
+    address public beaconChainAdmin;
+
     // EigenLayer contracts
     DelegationManager public delegation;
     EigenPodManager public eigenPodManager;
@@ -81,6 +84,8 @@ contract ExistingDeploymentParser is Script, Test {
 
         // read bidReceiver address
         bidReceiver = stdJson.readAddress(initialDeploymentData, ".bidReceiver");
+        // read beaconChainAdmin address
+        beaconChainAdmin = stdJson.readAddress(initialDeploymentData, ".beaconChainAdmin");
 
         // read eigen layer contract addresses
         eigenPodManager = EigenPodManager(stdJson.readAddress(initialDeploymentData, ".eigenLayerContractAddr.eigenPodManager"));
@@ -169,6 +174,14 @@ contract ExistingDeploymentParser is Script, Test {
         require(
             strategyVaultETHImplementation.delegationManager() == delegation,
             "strategyVaultETHImplementation: delegationManager address not set correctly"
+        );
+        require(
+            strategyVaultETHImplementation.stakerRewards() == stakerRewards,
+            "strategyVaultETHImplementation: stakerRewards address not set correctly"
+        );
+        require(
+            strategyVaultETHImplementation.beaconChainAdmin() == beaconChainAdmin,
+            "strategyVaultETHImplementation: beaconChainAdmin address not set correctly"
         );
         // StrategyVaultERC20Implementation
         require(
@@ -317,6 +330,7 @@ contract ExistingDeploymentParser is Script, Test {
 
         string memory parameters = "parameters";
         vm.serializeAddress(parameters, "byzantineAdmin", byzantineAdmin);
+        vm.serializeAddress(parameters, "beaconChainAdmin", beaconChainAdmin);
         string memory parameters_output = vm.serializeAddress(parameters, "bidReceiver", bidReceiver);
 
         string memory chain_info = "chainInfo";

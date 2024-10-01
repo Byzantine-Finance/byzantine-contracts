@@ -49,7 +49,8 @@ contract StrategyVaultETH is Initializable, StrategyVaultETHStorage, ERC4626ETHM
         IByzNft _byzNft,
         IEigenPodManager _eigenPodManager,
         IDelegationManager _delegationManager,
-        IStakerRewards _stakerRewards
+        IStakerRewards _stakerRewards,
+        address _beaconChainAdmin
     ) {
         stratVaultManager = _stratVaultManager;
         auction = _auction;
@@ -57,6 +58,7 @@ contract StrategyVaultETH is Initializable, StrategyVaultETHStorage, ERC4626ETHM
         eigenPodManager = _eigenPodManager;
         delegationManager = _delegationManager;
         stakerRewards = _stakerRewards;
+        beaconChainAdmin = _beaconChainAdmin;
         // Disable initializer in the context of the implementation contract
         _disableInitializers();
     }
