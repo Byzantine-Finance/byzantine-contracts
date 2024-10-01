@@ -38,6 +38,9 @@ abstract contract StrategyVaultETHStorage is IStrategyVaultETH {
     /// @notice The token to be staked. 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE if staking Native ETH.
     address public constant depositToken = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
     
+    /// @notice The address of the StakerReward contract
+    address public immutable stakerReward;
+
     /* ============== STATE VARIABLES ============== */
 
     /// @notice The ByzNft associated to this StrategyVault.
@@ -63,5 +66,13 @@ abstract contract StrategyVaultETHStorage is IStrategyVaultETH {
      * See https://docs.openzeppelin.com/upgrades-plugins/1.x/writing-upgradeable#modifying-your-contracts
      */
     uint256[44] private __gap;
+
+    /* ============== EVENTS ============== */
+
+    /// @notice Emitted when the StakerReward contract is updated
+    event StakerRewardUpdated(address newStakerReward);
+
+    /// @notice Emitted when StakerReward contract distributes rewards
+    event StakerRewardsDistributed(uint256 amount);
 
 }

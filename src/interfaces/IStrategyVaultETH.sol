@@ -67,6 +67,12 @@ interface IStrategyVaultETH is IStrategyVault {
     external;
 
   /**
+    * @notice Updates the staker reward address for the vault.
+    * @param _stakerReward The new staker reward address.
+    */
+  function updateStakerReward(address _stakerReward) external;
+
+  /**
    * @notice Call the EigenPodManager contract
    * @param data to call contract 
    */
@@ -90,5 +96,8 @@ interface IStrategyVaultETH is IStrategyVault {
 
   /// @dev Returned when trying to access DV data but no ETH has been deposited
   error NativeRestakingNotActivated();
+
+  /// @dev Returned when the staker rewards distribution fails
+  error FailedToDistributeStakerRewards();
 
 }

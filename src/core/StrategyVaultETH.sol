@@ -62,18 +62,25 @@ contract StrategyVaultETH is Initializable, StrategyVaultETHStorage, ERC7535Mult
      * @param _whitelistedDeposit Whether the deposit function is whitelisted or not.
      * @param _upgradeable Whether the StrategyVault is upgradeable or not.
      * @param _oracle The oracle implementation to use for the vault.
+     * @param _stakerReward The address of the StakerReward contract.
      * @dev Called on construction by the StrategyVaultManager.
      * @dev StrategyVaultETH so the deposit token is 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE
      */
-    function initialize(uint256 _nftId, address _stratVaultCreator, bool _whitelistedDeposit, bool _upgradeable, address _oracle) external initializer {
+    function __StrategyVaultETH_init(uint256 _nftId, address _stratVaultCreator, bool _whitelistedDeposit, bool _upgradeable, address _oracle, address _stakerReward) internal onlyInitializing {
 
+        // Initialize parent contracts (ERC7535MultiRewardVault)
+        __ERC7535MultiRewardVault_init(_oracle);
+
+        // Initialize the contract
+        __StrategyVaultETH_init_unchained(_nftId, _stratVaultCreator, _whitelistedDeposit, _upgradeable, _stakerReward);
+    }
+
+    function __StrategyVaultETH_init_unchained(uint256 _nftId, address _stratVaultCreator, bool _whitelistedDeposit, bool _upgradeable, address _stakerReward) internal onlyInitializing {
         // Set up the vault state variables
         stratVaultNftId = _nftId;
         whitelistedDeposit = _whitelistedDeposit;
-        upgradeable = _upgradeable;        
-
-        // Initialize the ERC7535MultiRewardVault
-        __ERC7535MultiRewardVault_init(_oracle);
+        upgradeable = _upgradeable;     
+        stakerReward = _stakerReward;
 
         // If whitelisted Vault, whitelist the creator
         if (_whitelistedDeposit) {
@@ -210,7 +217,7 @@ contract StrategyVaultETH is Initializable, StrategyVaultETHStorage, ERC7535Mult
     //     );
         
     //     // Burn caller's shares and exchange for deposit asset (ETH) + reward tokens
-    //     super.withdraw(assetAmount, receiver, msg.sender);
+    //     _burnVaultShares(assetAmount, receiver);
     // }
 
     /* ============== VAULT CREATOR FUNCTIONS ============== */
@@ -284,12 +291,22 @@ contract StrategyVaultETH is Initializable, StrategyVaultETHStorage, ERC7535Mult
     }
 
     /**
-     * @notice Change the whitelistedDeposit flag.
+     * @notice Updates the whitelistedDeposit flag.
      * @param _whitelistedDeposit The new whitelistedDeposit flag.
      * @dev Callable only by the owner of the Strategy Vault's ByzNft.
      */
-    function changeWhitelistedDeposit(bool _whitelistedDeposit) external onlyNftOwner {
+    function updateWhitelistedDeposit(bool _whitelistedDeposit) external onlyNftOwner {
         whitelistedDeposit = _whitelistedDeposit;
+    }
+
+    /**
+     * @notice Updates the staker reward address for the vault.
+     * @param _stakerReward The new staker reward address.
+     */
+    function updateStakerReward(address _stakerReward) external onlyNftOwner {
+        if (_stakerReward == address(0)) revert InvalidAddress();
+        stakerReward = _stakerReward;
+        emit StakerRewardUpdated(_stakerReward);
     }
 
     /* ================ VIEW FUNCTIONS ================ */
@@ -319,10 +336,17 @@ contract StrategyVaultETH is Initializable, StrategyVaultETHStorage, ERC7535Mult
 
     function _mintVaultShares(uint256 amount, address receiver) internal {
         if (receiver != address(stratVaultManager)) {
-            deposit(amount, receiver);
+            super.deposit(amount, receiver);
+            _distributeStakerRewards();
         } else {
-            deposit(amount, stratVaultOwner());
+            super.deposit(amount, stratVaultOwner());
+            _distributeStakerRewards();
         }
+    }
+
+    function _burnVaultShares(uint256 amount, address receiver) internal {
+        super.withdraw(amount, receiver, msg.sender);
+        _distributeStakerRewards();
     }
 
     /**
@@ -339,6 +363,18 @@ contract StrategyVaultETH is Initializable, StrategyVaultETHStorage, ERC7535Mult
         (bool success, bytes memory retData) = address(to).call{value: value}(data);
         if (!success) revert CallFailed(data);
         return retData;
+    }
+
+    /**
+     * @dev Distributes staker rewards to the contract from the stakerReward contract.
+     */
+    function _distributeStakerRewards() internal {
+        uint256 balanceBefore = address(this).balance;
+        (bool success, ) = stakerReward.call(abi.encodeWithSignature("distributeRewards()"));
+        if (!success) revert FailedToDistributeStakerRewards();
+        uint256 balanceAfter = address(this).balance;
+        uint256 rewardsDistributed = balanceAfter - balanceBefore;
+        emit StakerRewardsDistributed(rewardsDistributed);
     }
 
 }
