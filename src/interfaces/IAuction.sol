@@ -84,28 +84,45 @@ interface IAuction {
 
     /* ===================== EVENTS ===================== */
 
+    /// @notice Emitted when a bid is placed. Track all the bids done on Byzantine.
     event BidPlaced(
         address indexed nodeOpAddr,
-        uint32 reputationScore,
+        bytes32 bidId,
         uint16 discountRate,
         uint32 duration,
         uint256 bidPrice,
         uint256 auctionScore
     );
     
+    /// @notice Emitted when a bid is updated
     event BidUpdated(
         address indexed nodeOpAddr,
-        uint32 reputationScore,
-        uint256 oldAuctionScore,
-        uint32 newDuration,
+        bytes32 indexed oldBidId,
+        bytes32 newBidId,
         uint16 newDiscountRate,
+        uint32 newDuration,
         uint256 newBidPrice,
         uint256 newAuctionScore
     );
 
-    event BidWithdrawn(address indexed nodeOpAddr, uint256 auctionScore); 
+    /// @notice Emitted when a bid is withdrawn
+    event BidWithdrawn(
+        address indexed nodeOpAddr,
+        bytes32 indexed bidId
+    );
 
-    event WinnerJoinedDV(address indexed nodeOpAddr, uint256 auctionScore);
+    /// @notice Emitted when a node operator joins a cluster. Track node operators' clusters.
+    event WinnerJoinedCluster(
+        address indexed nodeOpAddr,
+        bytes32 indexed clusterJoined
+    );
+
+    /// @notice Emitted when a cluster is created. Track all the Byzantines' clusters.
+    event ClusterCreated(
+        bytes32 indexed clusterId,
+        uint256 averageAuctionScore,
+        address splitAddr
+    );
 
     /* ====================== GETTERS ====================== */
 

@@ -82,8 +82,10 @@ contract Auction is
 
         // If winning cluster is a newly created DV4, update dv4 sub-auction tree
         if (_bidDetails[winningClusterDetails.nodes[0].bidId].auctionType == AuctionType.JOIN_CLUSTER_4) {
-            _mainUdateDv4SubAuction(winningClusterDetails.nodes);
+            _mainUdateDv4SubAuction(winningClusterDetails.nodes, winningClusterId);
         }
+
+        emit ClusterCreated(winningClusterId, winningAvgAuctionScore, splitAddr);
 
         return winningClusterId;
     }
@@ -176,9 +178,6 @@ contract Auction is
         if (auctionScore > _dv4LatestWinningInfo.lastestWinningScore && dv4AuctionNumNodeOps >= _CLUSTER_SIZE_4) {
             _dv4UpdateMainAuction();
         }
-        
-        /// TODO Events
-        /// emit BidPlaced(msg.sender, reputationScore, _discountRate[i], _timeInDays[i], bidPrice, auctionScores[i]);
 
         // Calculate the total price to pay, verify it and send it to the escrow contract
         uint256 priceToPay;
@@ -190,6 +189,8 @@ contract Auction is
         }
         _verifyEthSent(msg.value, priceToPay);
         _transferToEscrow(priceToPay);
+
+        emit BidPlaced(msg.sender, bidId, _discountRate, _timeInDays, bidPrice, auctionScore);
     }
 
     /**
@@ -547,22 +548,26 @@ contract Auction is
     }
 
     /// @notice Called if a winning DV comes from the dv4 sub-auction
-    function _mainUdateDv4SubAuction(NodeDetails[] memory _nodesToRemove) private {
+    function _mainUdateDv4SubAuction(NodeDetails[] memory _nodesToRemove, bytes32 _winningClusterId) private {
 
         // Reset the latest winning info
         _dv4LatestWinningInfo.lastestWinningScore = 0;
         _dv4LatestWinningInfo.latestWinningClusterId = bytes32(0);
 
         for (uint256 i = 0; i < _nodesToRemove.length;) {
+            // Node op address
+            address nodeOpAddr = _bidDetails[_nodesToRemove[i].bidId].nodeOp;
             // Remove the winning node operator bid from the dv4 sub-auction tree
             _dv4AuctionTree.remove(_nodesToRemove[i].bidId, _bidDetails[_nodesToRemove[i].bidId].auctionScore);
             // Update the bids number of the node op in dv4 sub-auction
-            _nodeOpsDetails[_bidDetails[_nodesToRemove[i].bidId].nodeOp].numBidsCluster4 -= 1;
+            _nodeOpsDetails[nodeOpAddr].numBidsCluster4 -= 1;
             // Update the number of node ops in dv4 sub-auction if necessary
-            if (_nodeOpsDetails[_bidDetails[_nodesToRemove[i].bidId].nodeOp].numBidsCluster4 == 0) dv4AuctionNumNodeOps -= 1;
+            if (_nodeOpsDetails[nodeOpAddr].numBidsCluster4 == 0) dv4AuctionNumNodeOps -= 1;
             unchecked {
                 ++i;
             }
+
+            emit WinnerJoinedCluster(nodeOpAddr, _winningClusterId);
         }
         
         // If enough operators in dv4 sub-auction, update main tree
