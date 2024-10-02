@@ -73,9 +73,8 @@ interface IAuction {
         ClusterStatus status;
     }
 
-    /// @notice Stores a node operator DV details
-    /// @dev Only store the latest won bidId and a potential new pending bidId as the bids stores all the necessary details
-    /// @dev When rebuying VCs, take the discount rate of the latest won bid
+    /// @notice Stores a node operator DV details through its winning bidId
+    /// @dev When rebuying VCs, take the discount rate of the bidId
     struct NodeDetails {
         // Bid Id which allows the node op to join that DV
         bytes32 bidId;
