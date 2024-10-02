@@ -166,11 +166,11 @@ contract StrategyVaultERC20 is Initializable, StrategyVaultERC20Storage, ERC4626
     }
 
     /**
-     * @notice Change the whitelistedDeposit flag.
+     * @notice Updates the whitelistedDeposit flag.
      * @param _whitelistedDeposit The new whitelistedDeposit flag.
      * @dev Callable only by the owner of the Strategy Vault's ByzNft.
      */
-    function changeWhitelistedDeposit(bool _whitelistedDeposit) external onlyNftOwner {
+    function updateWhitelistedDeposit(bool _whitelistedDeposit) external onlyNftOwner {
         whitelistedDeposit = _whitelistedDeposit;
     }
 

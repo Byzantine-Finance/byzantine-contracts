@@ -2,16 +2,14 @@
 pragma solidity ^0.8.20;
 
 import {Initializable} from "@openzeppelin-upgrades/contracts/proxy/utils/Initializable.sol";
-
 import {ISignatureUtils} from "eigenlayer-contracts/interfaces/ISignatureUtils.sol";
-
-import {ERC4626ETHMultiRewardVault} from "../vault/ERC4626ETHMultiRewardVault.sol";
+import {ERC7535MultiRewardVault} from "../vault/ERC7535MultiRewardVault.sol";
 import "./StrategyVaultETHStorage.sol";
 
 // TODO: Finish withdrawal logic
 // TODO: Distribute or give access to rewards only when ETH are staked on the Beacon Chain
 
-contract StrategyVaultETH is Initializable, StrategyVaultETHStorage, ERC4626ETHMultiRewardVault {
+contract StrategyVaultETH is Initializable, StrategyVaultETHStorage, ERC7535MultiRewardVault {
     using FIFOLib for FIFOLib.FIFO;
     using BeaconChainProofs for *;
 
@@ -87,13 +85,18 @@ contract StrategyVaultETH is Initializable, StrategyVaultETHStorage, ERC4626ETHM
        address _oracle
     ) external initializer {
 
+        // Initialize parent contracts (ERC7535MultiRewardVault)
+        __ERC7535MultiRewardVault_init(_oracle);
+
+        // Initialize the contract
+        __StrategyVaultETH_init_unchained(_nftId, _stratVaultCreator, _whitelistedDeposit, _upgradeable);
+    }
+
+    function __StrategyVaultETH_init_unchained(uint256 _nftId, address _stratVaultCreator, bool _whitelistedDeposit, bool _upgradeable) internal onlyInitializing {
         // Set up the vault state variables
         stratVaultNftId = _nftId;
         whitelistedDeposit = _whitelistedDeposit;
         upgradeable = _upgradeable;        
-
-        // Initialize the ERC4626ETHMultiRewardVault
-        __ERC4626ETHMultiRewardVault_init(_oracle);
 
         // If whitelisted Vault, whitelist the creator
         if (_whitelistedDeposit) {
@@ -110,7 +113,7 @@ contract StrategyVaultETH is Initializable, StrategyVaultETHStorage, ERC4626ETHM
     receive() external override payable {
         // TODO: emit an event to notify
     }
-
+    
     /* ============== EXTERNAL FUNCTIONS ============== */
 
     /**
@@ -187,7 +190,7 @@ contract StrategyVaultETH is Initializable, StrategyVaultETHStorage, ERC4626ETHM
     //     );
         
     //     // Burn caller's shares and exchange for deposit asset (ETH) + reward tokens
-    //     super.withdraw(assetAmount, receiver, msg.sender);
+    //     _burnVaultShares(assetAmount, receiver);
     // }
 
     /* ============== STRATEGY VAULT MANAGER FUNCTIONS ============== */
@@ -290,11 +293,11 @@ contract StrategyVaultETH is Initializable, StrategyVaultETHStorage, ERC4626ETHM
     /* ============== VAULT CREATOR FUNCTIONS ============== */
 
     /**
-     * @notice Change the whitelistedDeposit flag.
+     * @notice Updates the whitelistedDeposit flag.
      * @param _whitelistedDeposit The new whitelistedDeposit flag.
      * @dev Callable only by the owner of the Strategy Vault's ByzNft.
      */
-    function changeWhitelistedDeposit(bool _whitelistedDeposit) external onlyNftOwner {
+    function updateWhitelistedDeposit(bool _whitelistedDeposit) external onlyNftOwner {
         whitelistedDeposit = _whitelistedDeposit;
     }
 
@@ -343,10 +346,13 @@ contract StrategyVaultETH is Initializable, StrategyVaultETHStorage, ERC4626ETHM
 
     function _mintVaultShares(uint256 amount, address receiver) internal {
         if (receiver != address(stratVaultManager)) {
-            deposit(amount, receiver);
+            super.deposit(amount, receiver);
         } else {
-            deposit(amount, stratVaultOwner());
+            super.deposit(amount, stratVaultOwner());
         }
     }
 
+    function _burnVaultShares(uint256 amount, address receiver) internal {
+        super.withdraw(amount, receiver, msg.sender);
+    }
 }

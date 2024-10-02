@@ -37,11 +37,11 @@ interface IStrategyVault {
     function hasDelegatedTo() external view returns (address);
 
     /**
-     * @notice Change the whitelistedDeposit flag.
+     * @notice Updates the whitelistedDeposit flag.
      * @param _whitelistedDeposit The new whitelistedDeposit flag.
      * @dev Callable only by the owner of the Strategy Vault's ByzNft.
      */
-    function changeWhitelistedDeposit(bool _whitelistedDeposit) external;
+    function updateWhitelistedDeposit(bool _whitelistedDeposit) external;
 
     /**
      * @notice Whitelist a staker.

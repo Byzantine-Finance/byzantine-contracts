@@ -12,27 +12,25 @@ interface IStrategyVaultETH is IStrategyVault {
   /// @notice Get the address of the beacon chain admin
   function beaconChainAdmin() external view returns (address);
 
-  /* ============== INITIALIZER ============== */
+    /* ============== EXTERNAL FUNCTIONS ============== */
 
-  /**
-   * @notice Used to initialize the StrategyVaultETH given it's setup parameters.
-   * @param _nftId The id of the ByzNft associated to this StrategyVault.
-   * @param _stratVaultCreator The address of the creator of the StrategyVault.
-   * @param _whitelistedDeposit Whether the deposit function is whitelisted or not.
-   * @param _upgradeable Whether the StrategyVault is upgradeable or not.
-   * @param _oracle The oracle implementation to use for the vault.
-   * @dev Called on construction by the StrategyVaultManager.
-   * @dev StrategyVaultETH so the deposit token is 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE
-   */
-  function initialize(
-    uint256 _nftId,
-    address _stratVaultCreator,
-    bool _whitelistedDeposit,
-    bool _upgradeable,
-    address _oracle
-  ) external;
-
-  /* ============== EXTERNAL FUNCTIONS ============== */
+    /**
+     * @notice Used to initialize the StrategyVaultETH given it's setup parameters.
+     * @param _nftId The id of the ByzNft associated to this StrategyVault.
+     * @param _stratVaultCreator The address of the creator of the StrategyVault.
+     * @param _whitelistedDeposit Whether the deposit function is whitelisted or not.
+     * @param _upgradeable Whether the StrategyVault is upgradeable or not.
+     * @param _oracle The oracle implementation to use for the vault.
+     * @dev Called on construction by the StrategyVaultManager.
+     * @dev StrategyVaultETH so the deposit token is 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE
+     */
+    function initialize(
+        uint256 _nftId,
+        address _stratVaultCreator,
+        bool _whitelistedDeposit,
+        bool _upgradeable,
+        address _oracle
+    ) external;
 
   /**
    * @notice Deposit ETH to the StrategyVault and get Vault shares in return.
@@ -42,7 +40,7 @@ interface IStrategyVaultETH is IStrategyVault {
    * @dev Revert if the amount deposited is not a multiple of 32 ETH.
    * @dev Trigger auction(s) for each bundle of 32 ETH deposited to get Distributed Validator(s)
    */
-  function stakeNativeETH() external payable;
+  function stakeNativeETH() external payable; 
 
   /* ============== BEACON CHAIN ADMIN FUNCTIONS ============== */
 
@@ -108,21 +106,15 @@ interface IStrategyVaultETH is IStrategyVault {
    */
   function createEigenPod() external;
 
-  /* ============== ERRORS ============== */
+    /* ============== ERRORS ============== */
 
-  /// @dev Returned when not privided the right number of nodes 
-  error InvalidClusterSize();
+    /// @dev Returned when trying to deposit an incorrect amount of ETH. Can only deposit a multiple of 32 ETH. (32, 64, 96, 128, etc.)
+    error CanOnlyDepositMultipleOf32ETH();
 
-  /// @dev Returned when trying to deposit an incorrect amount of ETH. Can only deposit a multiple of 32 ETH. (32, 64, 96, 128, etc.)
-  error CanOnlyDepositMultipleOf32ETH();
+    /// @dev Returned when trying to trigger Beacon Chain transactions from an unauthorized address
+    error OnlyBeaconChainAdmin();
 
-  /// @dev Returned when trying to access DV data but no ETH has been deposited
-  error NativeRestakingNotActivated();
-
-  /// @dev Returned when trying to trigger Beacon Chain transactions from an unauthorized address
-  error OnlyBeaconChainAdmin();
-
-  /// @dev Returned when trying to interact with a cluster ID not in the vault
-  error ClusterNotInVault();
+    /// @dev Returned when trying to interact with a cluster ID not in the vault
+    error ClusterNotInVault();
 
 }
