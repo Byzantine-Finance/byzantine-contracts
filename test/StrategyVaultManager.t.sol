@@ -325,9 +325,6 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
     //     uint64 timestamp = uint64(block.timestamp + 16 hours);
     //     cheats.warp(timestamp);
 
-    //     //set the oracle block root
-    //     _setOracleBlockRoot(abi.encodePacked("./test/test-data/withdrawal_credential_proof_1634654.json"));
-
     //     // Verify the proof
     //     vm.prank(alice);
     //     cheats.expectRevert(
@@ -420,13 +417,6 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
 
     // function _getStateRootProof() internal returns (BeaconChainProofs.StateRootProof memory) {
     //     return BeaconChainProofs.StateRootProof(getBeaconStateRoot(), abi.encodePacked(getStateRootProof()));
-    // }
-
-    // function _setOracleBlockRoot(bytes memory proofFilePath) internal {
-    //     setJSON(string(proofFilePath));
-    //     bytes32 latestBlockRoot = getLatestBlockRoot();
-    //     //set beaconStateRoot
-    //     beaconChainOracle.setOracleBlockRootAtTimestamp(latestBlockRoot);
     // }
 
     /* ===================== HELPER FUNCTIONS ===================== */
