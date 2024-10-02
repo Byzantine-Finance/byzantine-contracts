@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import {Initializable} from "@openzeppelin-upgrades/contracts/proxy/utils/Initializable.sol";
 import {ISignatureUtils} from "eigenlayer-contracts/interfaces/ISignatureUtils.sol";
 import {ERC7535MultiRewardVault} from "../vault/ERC7535MultiRewardVault.sol";
 import "./StrategyVaultETHStorage.sol";
@@ -9,7 +8,7 @@ import "./StrategyVaultETHStorage.sol";
 // TODO: Finish withdrawal logic
 // TODO: Distribute or give access to rewards only when ETH are staked on the Beacon Chain
 
-contract StrategyVaultETH is Initializable, StrategyVaultETHStorage, ERC7535MultiRewardVault {
+contract StrategyVaultETH is StrategyVaultETHStorage, ERC7535MultiRewardVault {
     using FIFOLib for FIFOLib.FIFO;
     using BeaconChainProofs for *;
 

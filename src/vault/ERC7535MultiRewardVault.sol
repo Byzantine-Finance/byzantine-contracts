@@ -15,7 +15,7 @@ import "../interfaces/IOracle.sol";
  * @author Byzantine-Finance
  * @notice ERC-7535: Native Asset ERC-4626 Tokenized Vault with support for multiple reward tokens
  */
-contract ERC7535MultiRewardVault is Initializable, ERC7535Upgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
+contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
     using SafeERC20Upgradeable for IERC20Upgradeable;
     using MathUpgradeable for uint256;
 
