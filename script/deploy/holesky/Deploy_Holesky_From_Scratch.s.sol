@@ -59,6 +59,9 @@ contract Deploy_Holesky_From_Scratch is ExistingDeploymentParser {
         escrow = Escrow(
             payable(address(new TransparentUpgradeableProxy(address(emptyContract), address(byzantineProxyAdmin), "")))
         );
+        stakerRewards = StakerRewards(
+            payable(address(new TransparentUpgradeableProxy(address(emptyContract), address(byzantineProxyAdmin), "")))
+        );
 
         // StrategyVaultETH implementation contract
         strategyVaultETHImplementation = new StrategyVaultETH(
@@ -66,7 +69,8 @@ contract Deploy_Holesky_From_Scratch is ExistingDeploymentParser {
             auction,
             byzNft,
             eigenPodManager,
-            delegation
+            delegation,
+            stakerRewards
         );
         // StrategyVaultETH beacon contract. The Beacon Proxy contract is deployed in the StrategyVaultManager
         // This contract points to the implementation contract.
@@ -101,10 +105,16 @@ contract Deploy_Holesky_From_Scratch is ExistingDeploymentParser {
             stakerRewards
         );
         escrowImplementation = new Escrow(
-            bidReceiver,
+            address(stakerRewards),
+            auction
+        );
+        stakerRewardsImplementation = new StakerRewards(
+            strategyVaultManager,
+            escrow,
             auction
         );
 
+        // Third, upgrade the proxy contracts to use the correct implementation contracts and initialize them.
         // Third, upgrade the proxy contracts to use the correct implementation contracts and initialize them.
         // Upgrade StrategyVaultManager
         byzantineProxyAdmin.upgradeAndCall(
@@ -141,6 +151,15 @@ contract Deploy_Holesky_From_Scratch is ExistingDeploymentParser {
             TransparentUpgradeableProxy(payable(address(escrow))),
             address(escrowImplementation),
             ""
+        );
+        // Upgrade StakerRewards
+        byzantineProxyAdmin.upgradeAndCall(
+            TransparentUpgradeableProxy(payable(address(stakerRewards))),
+            address(stakerRewardsImplementation),
+            abi.encodeWithSelector(
+                StakerRewards.initialize.selector,
+                UPKEEP_INTERVAL
+            )
         );
     }
 }
