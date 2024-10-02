@@ -2,12 +2,18 @@
 pragma solidity ^0.8.20;
 
 import {BeaconChainProofs} from "eigenlayer-contracts/libraries/BeaconChainProofs.sol";
+import {IERC7535Upgradeable} from "../vault/ERC7535/IERC7535Upgradeable.sol";
 
 import "./IStrategyVault.sol";
 
-interface IStrategyVaultETH is IStrategyVault {
+interface IStrategyVaultETH is IStrategyVault, IERC7535Upgradeable {
 
-  /* ============== INITIALIZER ============== */
+  /* ============== GETTERS ============== */
+
+  /// @notice Get the address of the beacon chain admin
+  function beaconChainAdmin() external view returns (address);
+
+  /* ============== EXTERNAL FUNCTIONS ============== */
 
   /**
    * @notice Used to initialize the StrategyVaultETH given it's setup parameters.
@@ -20,30 +26,31 @@ interface IStrategyVaultETH is IStrategyVault {
    * @dev StrategyVaultETH so the deposit token is 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE
    */
   function initialize(
-    uint256 _nftId,
-    address _stratVaultCreator,
-    bool _whitelistedDeposit,
-    bool _upgradeable,
-    address _oracle
+      uint256 _nftId,
+      address _stratVaultCreator,
+      bool _whitelistedDeposit,
+      bool _upgradeable,
+      address _oracle
   ) external;
 
-  /* ============== EXTERNAL FUNCTIONS ============== */
+  /* ============== BEACON CHAIN ADMIN FUNCTIONS ============== */
 
   /**
-   * @notice Deposit ETH to the StrategyVault and get Vault shares in return.
-   * @dev If first deposit, create an Eigen Pod for the StrategyVault.
-   * @dev If whitelistedDeposit is true, then only users with the whitelisted role can call this function.
-   * @dev The caller receives Byzantine StrategyVault shares in return for the ETH staked.
-   * @dev Revert if the amount deposited is not a multiple of 32 ETH.
-   * @dev Trigger auction(s) for each bundle of 32 ETH deposited to get Distributed Validator(s)
+   * @notice Deposit 32ETH in the beacon chain to activate a Distributed Validator and start validating on the consensus layer.
+   * @dev Function callable only by BeaconChainAdmin to be sure the deposit data are the ones of a DV created within the Byzantine protocol. 
+   * @param pubkey The 48 bytes public key of the beacon chain DV.
+   * @param signature The DV's signature of the deposit data.
+   * @param depositDataRoot The root/hash of the deposit data for the DV's deposit.
+   * @param clusterId The ID of the cluster associated to these deposit data.
+   * @dev Reverts if not exactly 32 ETH are sent.
+   * @dev Reverts if the cluster is not in the vault.
    */
-  function stakeNativeETH() external payable; 
-
-  /**
-   * @notice Create an EigenPod for the StrategyVault.
-   * @dev Can only be called by the StrategyVaultManager during the vault creation.
-   */
-  function createEigenPod() external;
+  function activateCluster(
+      bytes calldata pubkey, 
+      bytes calldata signature,
+      bytes32 depositDataRoot,
+      bytes32 clusterId
+  ) external;
 
   /**
    * @notice This function verifies that the withdrawal credentials of the Distributed Validator(s) owned by
@@ -82,13 +89,23 @@ interface IStrategyVaultETH is IStrategyVault {
    */
   function getAllDVIds() external view returns (bytes32[] memory);
 
-  /// @dev Returned when not privided the right number of nodes 
-  error InvalidClusterSize();
+  /* ============== STRATEGY VAULT MANAGER FUNCTIONS ============== */
 
-  /// @dev Returned when trying to deposit an incorrect amount of ETH. Can only deposit a multiple of 32 ETH. (32, 64, 96, 128, etc.)
-  error CanOnlyDepositMultipleOf32ETH();
+  /**
+   * @notice Create an EigenPod for the StrategyVault.
+   * @dev Can only be called by the StrategyVaultManager during the vault creation.
+   */
+  function createEigenPod() external;
 
-  /// @dev Returned when trying to access DV data but no ETH has been deposited
-  error NativeRestakingNotActivated();
+    /* ============== ERRORS ============== */
+
+    /// @dev Returned when trying to deposit an incorrect amount of ETH. Can only deposit a multiple of 32 ETH. (32, 64, 96, 128, etc.)
+    error CanOnlyDepositMultipleOf32ETH();
+
+    /// @dev Returned when trying to trigger Beacon Chain transactions from an unauthorized address
+    error OnlyBeaconChainAdmin();
+
+    /// @dev Returned when trying to interact with a cluster ID not in the vault
+    error ClusterNotInVault();
 
 }

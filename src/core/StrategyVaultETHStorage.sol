@@ -7,6 +7,7 @@ import {IAuction} from "../interfaces/IAuction.sol";
 import {IEigenPodManager} from "eigenlayer-contracts/interfaces/IEigenPodManager.sol";
 import {IEigenPod} from "eigenlayer-contracts/interfaces/IEigenPod.sol";
 import {IDelegationManager} from "eigenlayer-contracts/interfaces/IDelegationManager.sol";
+import {IStakerRewards} from "../interfaces/IStakerRewards.sol";
 
 import {FIFOLib} from "../libraries/FIFOLib.sol";
 
@@ -32,12 +33,18 @@ abstract contract StrategyVaultETHStorage is IStrategyVaultETH {
     /// @notice EigenLayer's DelegationManager contract
     IDelegationManager public immutable delegationManager;
 
+    /// @notice StakerRewards contract
+    IStakerRewards public immutable stakerRewards;
+
     /// @notice Average time for block finality in the Beacon Chain
     uint16 internal constant FINALITY_TIME = 16 minutes;
 
     /// @notice The token to be staked. 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE if staking Native ETH.
     address public constant depositToken = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
-    
+
+    /// @notice The address allowed to activate a DV and submit Beacon Merkle Proofs
+    address public immutable beaconChainAdmin;
+
     /* ============== STATE VARIABLES ============== */
 
     /// @notice The ByzNft associated to this StrategyVault.
@@ -48,7 +55,7 @@ abstract contract StrategyVaultETHStorage is IStrategyVaultETH {
     /// @notice Whitelisted addresses that are allowed to deposit into the StrategyVault (activated only the whitelistedDeposit == true)
     mapping (address => bool) public isWhitelisted;
 
-    // FIFO of all the cluster IDs of the StrategyVault
+    /// @notice FIFO of all the cluster IDs of the StrategyVault
     FIFOLib.FIFO public clusterIdsFIFO;
 
     /// @notice Whether the deposit function is whitelisted or not.

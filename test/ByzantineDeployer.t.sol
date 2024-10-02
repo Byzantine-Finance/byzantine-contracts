@@ -18,6 +18,7 @@ import "../src/tokens/ByzNft.sol";
 import "../src/core/Auction.sol";
 import "../src/vault/Escrow.sol";
 import "../src/core/StakerRewards.sol";
+import "../src/core/StakerRewards.sol";
 
 contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
 
@@ -30,11 +31,14 @@ contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
     Auction public auction;
     Escrow public escrow;
     StakerRewards public stakerRewards;
+    StakerRewards public stakerRewards;
 
     // Byzantine Admin
     address public byzantineAdmin = address(this);
     // Address which receives the bid of the winners (will be a smart contract in the future to distribute the rewards)
     address public bidReceiver = makeAddr("bidReceiver");
+    // Address of the Beacon Chain Admin (allowed to activate DVs and submit Beacon Merkle Proofs)
+    address public beaconChainAdmin = makeAddr("beaconChainAdmin");
     // Initial Auction parameters
     uint256 public currentPoSDailyReturnWei = (uint256(32 ether) * 37) / (1000 * 365); // 3.7% APY --> 3243835616438356 WEI
     uint16 public maxDiscountRate = 15e2; // 15%
@@ -115,7 +119,8 @@ contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
             byzNft,
             eigenPodManager,
             delegation,
-            stakerRewards
+            stakerRewards,
+            beaconChainAdmin
         );
         // StrategyVaultETH beacon contract. The Beacon Proxy contract is deployed in the StrategyVaultManager
         // This contract points to the implementation contract.
@@ -205,22 +210,6 @@ contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
                 upkeepInterval
             )
         );
-    }
-
-    function testByzantineContractsInitialization() public view {
-        // StrategyVaultManager
-        assertEq(strategyVaultManager.owner(), byzantineAdmin);
-        // ByzNft
-        assertEq(byzNft.owner(), address(strategyVaultManager));
-        assertEq(byzNft.symbol(), "byzNFT");
-        // Auction
-        assertEq(auction.owner(), byzantineAdmin);
-        assertEq(auction.expectedDailyReturnWei(), currentPoSDailyReturnWei);
-        assertEq(auction.maxDiscountRate(), maxDiscountRate);
-        assertEq(auction.minDuration(), minValidationDuration);
-        // StakerRewards
-        assertEq(stakerRewards.totalVCs(), 0);
-        assertEq(stakerRewards.upkeepInterval(), upkeepInterval);
     }
 
     function _registerAsELOperator(

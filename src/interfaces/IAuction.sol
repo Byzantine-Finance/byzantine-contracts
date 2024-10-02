@@ -73,9 +73,8 @@ interface IAuction {
         ClusterStatus status;
     }
 
-    /// @notice Stores a node operator DV details
-    /// @dev Only store the latest won bidId and a potential new pending bidId as the bids stores all the necessary details
-    /// @dev When rebuying VCs, take the discount rate of the latest won bid
+    /// @notice Stores a node operator DV details through its winning bidId
+    /// @dev When rebuying VCs, take the discount rate of the bidId
     struct NodeDetails {
         // Bid Id which allows the node op to join that DV
         bytes32 bidId;
@@ -85,28 +84,45 @@ interface IAuction {
 
     /* ===================== EVENTS ===================== */
 
+    /// @notice Emitted when a bid is placed. Track all the bids done on Byzantine.
     event BidPlaced(
         address indexed nodeOpAddr,
-        uint32 reputationScore,
+        bytes32 bidId,
         uint16 discountRate,
         uint32 duration,
         uint256 bidPrice,
         uint256 auctionScore
     );
     
+    /// @notice Emitted when a bid is updated
     event BidUpdated(
         address indexed nodeOpAddr,
-        uint32 reputationScore,
-        uint256 oldAuctionScore,
-        uint32 newDuration,
+        bytes32 indexed oldBidId,
+        bytes32 newBidId,
         uint16 newDiscountRate,
+        uint32 newDuration,
         uint256 newBidPrice,
         uint256 newAuctionScore
     );
 
-    event BidWithdrawn(address indexed nodeOpAddr, uint256 auctionScore); 
+    /// @notice Emitted when a bid is withdrawn
+    event BidWithdrawn(
+        address indexed nodeOpAddr,
+        bytes32 indexed bidId
+    );
 
-    event WinnerJoinedDV(address indexed nodeOpAddr, uint256 auctionScore);
+    /// @notice Emitted when a node operator joins a cluster. Track node operators' clusters.
+    event WinnerJoinedCluster(
+        address indexed nodeOpAddr,
+        bytes32 indexed clusterJoined
+    );
+
+    /// @notice Emitted when a cluster is created. Track all the Byzantines' clusters.
+    event ClusterCreated(
+        bytes32 indexed clusterId,
+        uint256 averageAuctionScore,
+        address splitAddr
+    );
 
     /* ====================== GETTERS ====================== */
 
@@ -232,6 +248,15 @@ interface IAuction {
      * @param _auctionScore: auction score of the bid to withdraw. Will withdraw the last bid with this score.
      */
     // function withdrawBid(uint256 _auctionScore) external;
+
+    /**
+     * @notice Update the status of a cluster
+     * @param _clusterId The id of the cluster to update the status
+     * @param _newStatus The new status
+     * @dev Callable only by a StrategyVaultETH contract
+     * @dev The check to know if the cluster is in the calling vault is done in the StrategyVaultETH contract
+     */
+    function updateClusterStatus(bytes32 _clusterId, IAuction.ClusterStatus _newStatus) external;
 
     /* ===================== OWNER FUNCTIONS ===================== */
 

@@ -72,4 +72,8 @@ library FIFOLib {
         return ids;
     }
 
+    function exists(FIFO storage self, bytes32 _id) internal view returns (bool) {
+        return self.element[_id].id != bytes32(0);
+    }
+
 }

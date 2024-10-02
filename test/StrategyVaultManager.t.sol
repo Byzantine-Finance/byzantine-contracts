@@ -28,10 +28,10 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
     /// @notice Canonical, virtual beacon chain ETH strategy
     IStrategy public constant beaconChainETHStrategy = IStrategy(0xbeaC0eeEeeeeEEeEeEEEEeeEEeEeeeEeeEEBEaC0);
 
-    // /// @notice Random validator deposit data to be able to call `createStratVaultAndStakeNativeETH` function
-    // bytes pubkey;
-    // bytes signature;
-    // bytes32 depositDataRoot;
+    /// @notice Random validator deposit data (simulates a Byzantine DV)
+    bytes private pubkey;
+    bytes private signature;
+    bytes32 private depositDataRoot;
 
     /// @notice address of the native token in the Split contract
     address public constant SPLIT_NATIVE_TOKEN_ADDR = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
@@ -61,7 +61,7 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
         bidId = _createMultipleBids();
 
         // Get deposit data of a random validator
-        // _getDepositData(abi.encodePacked("./test/test-data/deposit-data-DV0-noPod.json"));
+        _getDepositData(abi.encodePacked("./test/test-data/deposit-data-DV0-noPod.json"));
     }
 
     function test_byzantineContractsOwnership() public view {
@@ -117,22 +117,25 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
         /* ===================== STRATVAULTETH CREATION FAILS BECAUSE NOT MULTIPLE OF 32ETH STAKED ===================== */
         vm.prank(alice);
         vm.expectRevert(IStrategyVaultETH.CanOnlyDepositMultipleOf32ETH.selector);
-        strategyVaultManager.createStratVaultAndStakeNativeETH{value: 58 ether}(true, true, ELOperator1, address(0));
+        strategyVaultManager.createStratVaultAndStakeNativeETH{value: 58 ether}(true, true, ELOperator1, address(0), alice);
 
         /* ===================== STRATVAULTETH CREATION FAILS BECAUSE NOT NODE OPS IN AUCTION ===================== */
         vm.prank(alice);
         vm.expectRevert(IAuction.MainAuctionEmpty.selector);
-        strategyVaultManager.createStratVaultAndStakeNativeETH{value: 320 ether}(true, true, ELOperator1, address(0));
+        strategyVaultManager.createStratVaultAndStakeNativeETH{value: 320 ether}(true, true, ELOperator1, address(0), alice);
 
-        /* ===================== ALICE CREATES A STRATVAULTETH AND STAKES 96ETH ===================== */
+        /* ===================== ALICE CREATES A STRATVAULTETH AND STAKES 64ETH ===================== */
         // whitelistedDeposit = true, upgradeable = true, EL Operator = ELOperator1, oracle = 0x0
         vm.prank(alice);
-        IStrategyVaultETH aliceStratVault1 = IStrategyVaultETH(strategyVaultManager.createStratVaultAndStakeNativeETH{value: 96 ether}(true, true, ELOperator1, address(0)));
+        IStrategyVaultETH aliceStratVault1 = IStrategyVaultETH(strategyVaultManager.createStratVaultAndStakeNativeETH{value: 64 ether}(true, true, ELOperator1, address(0), alice));
+
+        // Verify the StratVaultETH has received the 64 ETH
+        assertEq(address(aliceStratVault1).balance, 64 ether);
 
         // Verify the StratVaultETH clusters
-        assertEq(aliceStratVault1.getVaultDVNumber(), 3);
+        assertEq(aliceStratVault1.getVaultDVNumber(), 2);
         bytes32[] memory clusterIds = aliceStratVault1.getAllDVIds();
-        assertEq(clusterIds.length, 3);
+        assertEq(clusterIds.length, 2);
         // Verify DV1 node ops addresses
         address[] memory nodeOpsDV1 = _getClusterIdNodeOp(clusterIds[0]);
         assertEq(nodeOpsDV1.length, 4);
@@ -147,6 +150,27 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
         assertEq(nodeOpsDV2[1], nodeOps[0]);
         assertEq(nodeOpsDV2[2], nodeOps[2]);
         assertEq(nodeOpsDV2[3], nodeOps[4]);
+
+        /* ===================== BOB TRIES TO STAKE IN ALICE'S STRATVAULTETH ===================== */
+        vm.prank(bob);
+        vm.expectRevert(IStrategyVault.OnlyWhitelistedDeposit.selector);
+        aliceStratVault1.deposit{value: 32 ether}(32 ether, bob);
+
+        // alice whitelists bob
+        vm.prank(alice);
+        aliceStratVault1.whitelistStaker(bob);
+
+        // bob stakes in alice's stratvault
+        vm.prank(bob);
+        aliceStratVault1.deposit{value: 32 ether}(32 ether, bob);
+
+        // Verify the StratVaultETH has received the 32 ETH
+        assertEq(address(aliceStratVault1).balance, 64 ether + 32 ether);
+
+        // Verify the StratVaultETH clusters
+        assertEq(aliceStratVault1.getVaultDVNumber(), 3);
+        clusterIds = aliceStratVault1.getAllDVIds();
+        assertEq(clusterIds.length, 3);
         // Verify DV3 node ops addresses
         address[] memory nodeOpsDV3 = _getClusterIdNodeOp(clusterIds[2]);
         assertEq(nodeOpsDV3.length, 4);
@@ -155,18 +179,13 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
         assertEq(nodeOpsDV3[2], nodeOps[6]);
         assertEq(nodeOpsDV3[3], nodeOps[7]);
 
-        /* ===================== BOB TRIES TO STAKE IN ALICE'S STRATVAULTETH ===================== */
-        vm.prank(bob);
-        vm.expectRevert(IStrategyVault.OnlyWhitelistedDeposit.selector);
-        aliceStratVault1.stakeNativeETH{value: 32 ether}();
+        /* ===================== BOB STAKES AGAIN IN ALICE'S STRATVAULTETH ===================== */
 
-        // alice whitelists bob
-        vm.prank(alice);
-        aliceStratVault1.whitelistStaker(bob);
-
-        // bob stakes in alice's stratvault
         vm.prank(bob);
-        aliceStratVault1.stakeNativeETH{value: 32 ether}();
+        aliceStratVault1.mint{value: 32 ether}(32 ether, bob);
+
+        // Verify the StratVaultETH has received the 32 ETH
+        assertEq(address(aliceStratVault1).balance, 64 ether + 32 ether + 32 ether);
 
         // Verify the StratVaultETH clusters
         assertEq(aliceStratVault1.getVaultDVNumber(), 4);
@@ -200,54 +219,90 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
 
     }
 
-    // function testSplitDistribution() public preCreateClusters(2) {
-    //     // Alice creates a StrategyVault
-    //     IStrategyVaultETH stratVaultAlice = IStrategyVaultETH(_createStratVaultAndStakeNativeETH(alice, 32 ether));
-    //     address stratVaultAliceSplit = stratVaultAlice.getSplitAddress();
+    function test_SplitDistribution() public {
 
-    //     // Create the recipients array
-    //     IStrategyVaultETH.Node[4] memory nodesDVAlice = stratVaultAlice.getDVNodesDetails();
-    //     address[] memory recipients = new address[](nodesDVAlice.length);
-    //     for (uint i = 0; i < nodesDVAlice.length; i++) {
-    //         recipients[i] = nodesDVAlice[i].eth1Addr;
-    //     }
+        // Alice creates a StrategyVault and stakes 32 ETH in it
+        vm.prank(alice);
+        IStrategyVaultETH aliceStratVault1 = IStrategyVaultETH(strategyVaultManager.createStratVaultAndStakeNativeETH{value: 32 ether}(true, true, ELOperator1, address(0), alice));
 
-    //     // Get DV's node ops' balances
-    //     uint256[] memory nodeOpsInitialBalances = new uint256[](nodesDVAlice.length);
-    //     for (uint i = 0; i < nodesDVAlice.length; i++) {
-    //         nodeOpsInitialBalances[i] = recipients[i].balance;
-    //     }
-    //     // Get distributor's balance
-    //     uint256 distributorBalance = bob.balance;
+        // Get the DV cluster ID
+        bytes32[] memory clusterIds = aliceStratVault1.getAllDVIds();
 
-    //     // Fake the PoS rewards and add 100ETH in stratVaultAliceSplit contract
-    //     vm.deal(stratVaultAliceSplit, 100 ether);
-    //     assertEq(stratVaultAliceSplit.balance, 100 ether);
+        // Get the DV Split address
+        address dvSplitAddr = auction.getClusterDetails(clusterIds[0]).splitAddr;
 
-    //     SplitV2Lib.Split memory split = _createSplit(recipients);
-    //     // Bob distributes the Split balance to DV's node ops
-    //     vm.prank(bob);
-    //     stratVaultAlice.distributeSplitBalance(split, SPLIT_NATIVE_TOKEN_ADDR);
+        // Get the DV recipients
+        address[] memory recipients = _getClusterIdNodeOp(clusterIds[0]);
 
-    //     // Verify the Split contract balance has been drained
-    //     assertEq(stratVaultAliceSplit.balance, 1); // 0xSplits decided to left 1 wei to save gas. Only impact the distributor rewards
+        // Get DV recipients' balances
+        uint256[] memory recipientsInitialBalances = new uint256[](recipients.length);
+        for (uint i = 0; i < recipients.length; i++) {
+            recipientsInitialBalances[i] = recipients[i].balance;
+        }
+        // Get distributor's balance
+        uint256 distributorBalance = bob.balance;
 
-    //     // Verify the new balances of the DV's node ops
-    //     for (uint i = 0; i < nodesDVAlice.length; i++) {
-    //         assertEq(recipients[i].balance, nodeOpsInitialBalances[i] + 24.5 ether);
-    //     }
+        // Fake the PoS rewards and add 100ETH in DV Split contract
+        vm.deal(dvSplitAddr, 100 ether);
 
-    //     // Verify the distributor balance
-    //     assertEq(bob.balance, distributorBalance + 2 ether - 1);
-    // }
+        SplitV2Lib.Split memory split = _createSplit(recipients);
+        // Bob distributes the Split balance to DV's node ops
+        vm.prank(bob);
+        strategyVaultManager.distributeSplitBalance(clusterIds[0], split, SPLIT_NATIVE_TOKEN_ADDR);
 
-    // function test_RevertWhen_Not32ETHDeposited() public preCreateClusters(2) {
+        // Verify the Split contract balance has been drained
+        assertEq(dvSplitAddr.balance, 1); // 0xSplits decided to left 1 wei to save gas. Only impact the distributor rewards
 
-    //     // Alice create StrategyVault and stake 31 ETH in the contract
-    //     vm.expectRevert(bytes("StrategyVaultManager.createStratVaultAndStakeNativeETH: must initially stake for any validator with 32 ether"));
-    //     _createStratVaultAndStakeNativeETH(alice, 31 ether);
+        // Verify the new balances of the DV's node ops
+        for (uint256 i = 0; i < recipients.length; i++) {
+            assertEq(recipients[i].balance, recipientsInitialBalances[i] + 24.5 ether);
+        }
 
-    // }
+        // Verify the distributor balance
+        assertEq(bob.balance, distributorBalance + 2 ether - 1);
+
+        // Bob distributes the Split balance of a non-existing cluster id
+        vm.prank(bob);
+        vm.expectRevert(IStrategyVaultManager.SplitAddressNotSet.selector);
+        strategyVaultManager.distributeSplitBalance(bytes32(0), split, SPLIT_NATIVE_TOKEN_ADDR);
+    }
+
+    function test_activateCluster() public {
+
+        // Alice creates a StrategyVault and stakes 32 ETH in it
+        vm.prank(alice);
+        IStrategyVaultETH aliceStratVault1 = IStrategyVaultETH(strategyVaultManager.createStratVaultAndStakeNativeETH{value: 32 ether}(true, true, ELOperator1, address(0), alice));
+
+        // Get the DV cluster ID
+        bytes32[] memory clusterIds = aliceStratVault1.getAllDVIds();
+
+        // Verify the DV status
+        assertEq(uint256(auction.getClusterDetails(clusterIds[0]).status), uint256(IAuction.ClusterStatus.IN_CREATION));
+
+        // The node operators create the DV off-chain
+        // As soon as the DV is created and its deposit data available, it possible to activate it
+
+        // DV activation fails because Alice is not the BeaconChainAdmin
+        vm.prank(alice);
+        vm.expectRevert(IStrategyVaultETH.OnlyBeaconChainAdmin.selector);
+        aliceStratVault1.activateCluster(pubkey, signature, depositDataRoot, clusterIds[0]);
+
+        // DV activation fails because the cluster is not in the vault
+        vm.prank(beaconChainAdmin);
+        vm.expectRevert(IStrategyVaultETH.ClusterNotInVault.selector);
+        aliceStratVault1.activateCluster(pubkey, signature, depositDataRoot, bytes32(0));
+
+        // BeaconChainAdmin activates the DV
+        vm.prank(beaconChainAdmin);
+        aliceStratVault1.activateCluster(pubkey, signature, depositDataRoot, clusterIds[0]);
+
+        // Verify the DV status has been updated
+        assertEq(uint256(auction.getClusterDetails(clusterIds[0]).status), uint256(IAuction.ClusterStatus.DEPOSITED_NOT_VERIFIED));
+
+        // Verify the balance of the StratVaultETH
+        assertEq(address(aliceStratVault1).balance, 0 ether);
+
+    }
 
     // // That test reverts because the `withdrawal_credential_proof` file generated with the Byzantine API
     // // doesn't point to the correct EigenPod (alice's EigenPod which is locally deployed)
@@ -333,36 +388,6 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
     // //------------------------------  INTERNAL FUNCTIONS  ----------------------------------
     // //--------------------------------------------------------------------------------------
 
-    // function _createStratVaultAndStakeNativeETH(address _staker, uint256 _stake) internal returns (address) {
-    //     vm.prank(_staker);
-    //     strategyVaultManager.createStratVaultAndStakeNativeETH{value: _stake}(pubkey, signature, depositDataRoot);
-    //     uint256 stratVaultNumber = strategyVaultManager.getStratVaultNumber(_staker);
-    //     if (stratVaultNumber == 0) {
-    //         return address(0);
-    //     }
-    //     return strategyVaultManager.getStratVaults(_staker)[stratVaultNumber - 1];
-    // }
-
-    // function _approveNftTransferByStratVaultManager(address approver, uint256 nftId) internal {
-    //     ByzNft byzNftContract = _getByzNftContract();
-    //     vm.prank(approver);
-    //     byzNftContract.approve(address(strategyVaultManager), nftId);
-    // }
-
-    // function _getDepositData(
-    //     bytes memory depositFilePath
-    // ) internal {
-    //     // File generated with the Obol LaunchPad
-    //     setJSON(string(depositFilePath));
-
-    //     pubkey = getDVPubKeyDeposit();
-    //     signature = getDVSignature();
-    //     depositDataRoot = getDVDepositDataRoot();
-    //     //console.logBytes(pubkey);
-    //     //console.logBytes(signature);
-    //     //console.logBytes32(depositDataRoot);
-    // }
-
     // function _getValidatorFieldsProof(
     //     bytes memory proofFilePath
     // ) internal returns (
@@ -402,73 +427,6 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
     //     bytes32 latestBlockRoot = getLatestBlockRoot();
     //     //set beaconStateRoot
     //     beaconChainOracle.setOracleBlockRootAtTimestamp(latestBlockRoot);
-    // }
-
-    // function _registerAsELOperator(
-    //     address operator,
-    //     IDelegationManager.OperatorDetails memory operatorDetails
-    // ) internal {
-    //     string memory emptyStringForMetadataURI;
-
-    //     vm.startPrank(operator);
-    //     delegation.registerAsOperator(operatorDetails, emptyStringForMetadataURI);
-    //     vm.stopPrank();
-
-    //     assertTrue(delegation.isOperator(operator), "_registerAsELOperator: failed to resgister `operator` as an EL operator");
-    //     assertTrue(
-    //         keccak256(abi.encode(delegation.operatorDetails(operator))) == keccak256(abi.encode(operatorDetails)),
-    //         "_registerAsELOperator: operatorDetails not set appropriately"
-    //     );
-    //     assertTrue(delegation.isDelegated(operator), "_registerAsELOperator: operator doesn't delegate itself");
-    // }
-
-    // function _createSplit(
-    //     address[] memory recipients
-    // ) internal view returns (SplitV2Lib.Split memory split) {
-
-    //     uint256[] memory allocations = new uint256[](recipients.length);
-    //     for (uint256 i = 0; i < recipients.length; i++) {
-    //         allocations[i] = strategyVaultManager.NODE_OP_SPLIT_ALLOCATION();
-    //     }
-
-    //     split = SplitV2Lib.Split({
-    //         recipients: recipients,
-    //         allocations: allocations,
-    //         totalAllocation: strategyVaultManager.SPLIT_TOTAL_ALLOCATION(),
-    //         distributionIncentive: strategyVaultManager.SPLIT_DISTRIBUTION_INCENTIVE()
-    //     });
-    // }
-
-    // function _createOneBidParamArray(
-    //     uint16 _discountRate,
-    //     uint32 _timeInDays
-    // ) internal pure returns (uint16[] memory, uint32[] memory) {
-    //     uint16[] memory discountRateArray = new uint16[](1);
-    //     discountRateArray[0] = _discountRate;
-
-    //     uint32[] memory timeInDaysArray = new uint32[](1);
-    //     timeInDaysArray[0] = _timeInDays;
-        
-    //     return (discountRateArray, timeInDaysArray);
-    // }
-
-    // function _nodeOpBid(
-    //     NodeOpBid memory nodeOpBid
-    // ) internal returns (uint256[] memory) {
-    //     // Get price to pay
-    //     uint256 priceToPay = auction.getPriceToPay(nodeOpBid.nodeOp, nodeOpBid.discountRates, nodeOpBid.timesInDays);
-    //     vm.prank(nodeOpBid.nodeOp);
-    //     return auction.bid{value: priceToPay}(nodeOpBid.discountRates, nodeOpBid.timesInDays);
-    // }
-
-    // function _nodeOpsBid(
-    //     NodeOpBid[] memory nodeOpsBids
-    // ) internal returns (uint256[][] memory) {
-    //     uint256[][] memory nodeOpsAuctionScores = new uint256[][](nodeOpsBids.length);
-    //     for (uint i = 0; i < nodeOpsBids.length; i++) {
-    //         nodeOpsAuctionScores[i] = _nodeOpBid(nodeOpsBids[i]);
-    //     }
-    //     return nodeOpsAuctionScores;
     // }
 
     /* ===================== HELPER FUNCTIONS ===================== */
@@ -537,6 +495,37 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
             nodeOps[i] = auction.getBidDetails(nodeDetails[i].bidId).nodeOp;
         }
         return nodeOps;
+    }
+
+    function _createSplit(
+        address[] memory recipients
+    ) internal view returns (SplitV2Lib.Split memory split) {
+
+        uint256[] memory allocations = new uint256[](recipients.length);
+        for (uint256 i = 0; i < recipients.length; i++) {
+            allocations[i] = auction.NODE_OP_SPLIT_ALLOCATION();
+        }
+
+        split = SplitV2Lib.Split({
+            recipients: recipients,
+            allocations: allocations,
+            totalAllocation: auction.SPLIT_TOTAL_ALLOCATION(),
+            distributionIncentive: auction.SPLIT_DISTRIBUTION_INCENTIVE()
+        });
+    }
+
+    function _getDepositData(
+        bytes memory depositFilePath
+    ) internal {
+        // File generated with the Obol LaunchPad
+        setJSON(string(depositFilePath));
+
+        pubkey = getDVPubKeyDeposit();
+        signature = getDVSignature();
+        depositDataRoot = getDVDepositDataRoot();
+        //console.logBytes(pubkey);
+        //console.logBytes(signature);
+        //console.logBytes32(depositDataRoot);
     }
 
 }
