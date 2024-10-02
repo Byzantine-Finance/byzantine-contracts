@@ -17,18 +17,19 @@ import "../src/core/StrategyVaultERC20.sol";
 import "../src/tokens/ByzNft.sol";
 import "../src/core/Auction.sol";
 import "../src/vault/Escrow.sol";
+import "../src/core/StakerRewards.sol";
 
 contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
 
     // Byzantine contracts
     ProxyAdmin public byzantineProxyAdmin;
     StrategyVaultManager public strategyVaultManager;
-    StakerRewards public stakerRewards;
     UpgradeableBeacon public strategyVaultETHBeacon;
     UpgradeableBeacon public strategyVaultERC20Beacon;
     ByzNft public byzNft;
     Auction public auction;
     Escrow public escrow;
+    StakerRewards public stakerRewards;
 
     // Byzantine Admin
     address public byzantineAdmin = address(this);
@@ -38,6 +39,8 @@ contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
     uint256 public currentPoSDailyReturnWei = (uint256(32 ether) * 37) / (1000 * 365); // 3.7% APY --> 3243835616438356 WEI
     uint16 public maxDiscountRate = 15e2; // 15%
     uint160 public minValidationDuration = 30; // 30 days
+    // Initial StakerRewards parameters
+    uint256 public upkeepInterval = 60;
 
     /* =============== TEST VARIABLES AND STRUCT =============== */
    
@@ -101,6 +104,9 @@ contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
         escrow = Escrow(
             payable(address(new TransparentUpgradeableProxy(address(emptyContract), address(byzantineProxyAdmin), "")))
         );
+        stakerRewards = StakerRewards(
+            payable(address(new TransparentUpgradeableProxy(address(emptyContract), address(byzantineProxyAdmin), "")))
+        );
 
         // StrategyVaultETH implementation contract
         IStrategyVault strategyVaultETHImplementation = new StrategyVaultETH(
@@ -108,7 +114,8 @@ contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
             auction,
             byzNft,
             eigenPodManager,
-            delegation
+            delegation,
+            stakerRewards
         );
         // StrategyVaultETH beacon contract. The Beacon Proxy contract is deployed in the StrategyVaultManager
         // This contract points to the implementation contract.
@@ -143,7 +150,12 @@ contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
             stakerRewards
         );
         Escrow escrowImplementation = new Escrow(
-            bidReceiver,
+            address(stakerRewards),
+            auction
+        );
+        StakerRewards stakerRewardsImplementation = new StakerRewards(
+            strategyVaultManager,
+            escrow,
             auction
         );
 
@@ -184,6 +196,15 @@ contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
             address(escrowImplementation),
             ""
         );
+        // Upgrade StakerRewards
+        byzantineProxyAdmin.upgradeAndCall(
+            TransparentUpgradeableProxy(payable(address(stakerRewards))),
+            address(stakerRewardsImplementation),
+            abi.encodeWithSelector(
+                StakerRewards.initialize.selector,
+                upkeepInterval
+            )
+        );
     }
 
     function testByzantineContractsInitialization() public view {
@@ -197,6 +218,9 @@ contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
         assertEq(auction.expectedDailyReturnWei(), currentPoSDailyReturnWei);
         assertEq(auction.maxDiscountRate(), maxDiscountRate);
         assertEq(auction.minDuration(), minValidationDuration);
+        // StakerRewards
+        assertEq(stakerRewards.totalVCs(), 0);
+        assertEq(stakerRewards.upkeepInterval(), upkeepInterval);
     }
 
     function _registerAsELOperator(
