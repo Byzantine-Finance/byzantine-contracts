@@ -23,6 +23,7 @@ contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
     // Byzantine contracts
     ProxyAdmin public byzantineProxyAdmin;
     StrategyVaultManager public strategyVaultManager;
+    StakerRewards public stakerRewards;
     UpgradeableBeacon public strategyVaultETHBeacon;
     UpgradeableBeacon public strategyVaultERC20Beacon;
     ByzNft public byzNft;
@@ -138,7 +139,8 @@ contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
         Auction auctionImplementation = new Auction(
             escrow,
             strategyVaultManager,
-            pushSplitFactory
+            pushSplitFactory,
+            stakerRewards
         );
         Escrow escrowImplementation = new Escrow(
             bidReceiver,

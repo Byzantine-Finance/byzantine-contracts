@@ -11,6 +11,7 @@ import {StrategyVaultERC20} from "../../src/core/StrategyVaultERC20.sol";
 import {ByzNft} from "../../src/tokens/ByzNft.sol";
 import {Auction} from "../../src/core/Auction.sol";
 import {Escrow} from "../../src/vault/Escrow.sol";
+import {StakerRewards} from "../../src/core/StakerRewards.sol";
 
 import {EigenPodManager} from "eigenlayer-contracts/pods/EigenPodManager.sol";
 import {DelegationManager} from "eigenlayer-contracts/core/DelegationManager.sol";
@@ -38,6 +39,8 @@ contract ExistingDeploymentParser is Script, Test {
     Auction public auctionImplementation;
     Escrow public escrow;
     Escrow public escrowImplementation;
+    StakerRewards public stakerRewards;
+    StakerRewards public stakerRewardsImplementation;
 
     // EigenLayer contracts
     DelegationManager public delegation;

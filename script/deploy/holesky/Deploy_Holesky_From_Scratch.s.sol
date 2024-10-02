@@ -97,7 +97,8 @@ contract Deploy_Holesky_From_Scratch is ExistingDeploymentParser {
         auctionImplementation = new Auction(
             escrow,
             strategyVaultManager,
-            pushSplitFactory
+            pushSplitFactory,
+            stakerRewards
         );
         escrowImplementation = new Escrow(
             bidReceiver,
