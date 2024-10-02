@@ -63,18 +63,16 @@ contract StrategyVaultManager is
      * @param upgradeable If true, the Strategy Vault is upgradeable. If false, the Strategy Vault is not upgradeable.
      * @param operator The address for the operator that this StrategyVault will delegate to.
      * @param oracle The oracle implementation to use for the vault.
-     * @param stakerReward The address of the StakerReward contract.
      * @return The address of the newly created StrategyVaultETH.
      */
     function createStratVaultETH(
         bool whitelistedDeposit,
         bool upgradeable,
         address operator,
-        address oracle,
-        address stakerReward
+        address oracle
     ) public returns (address) {
         // Create a Native ETH StrategyVault
-        IStrategyVaultETH newStratVault = _deployStrategyVaultETH(whitelistedDeposit, upgradeable, oracle, stakerReward);
+        IStrategyVaultETH newStratVault = _deployStrategyVaultETH(whitelistedDeposit, upgradeable, oracle);
        
         // Delegate the StrategyVault towards the operator
         newStratVault.delegateTo(operator);
@@ -89,7 +87,6 @@ contract StrategyVaultManager is
      * @param upgradeable If true, the Strategy Vault is upgradeable. If false, the Strategy Vault is not upgradeable.
      * @param operator The address for the operator that this StrategyVault will delegate to.
      * @param oracle The oracle implementation to use for the vault.
-     * @param stakerReward The address of the StakerReward contract.
      * @dev This action triggers (a) new auction(s) to get (a) new Distributed Validator(s) to stake on the Beacon Chain. The number of Auction triggered depends on the number of ETH sent.
      * @dev Function will revert unless a multiple of 32 ETH are sent with the transaction.
      * @dev The caller receives Byzantine StrategyVault shares in return for the ETH staked.
@@ -99,12 +96,11 @@ contract StrategyVaultManager is
         bool whitelistedDeposit,
         bool upgradeable,
         address operator,
-        address oracle,
-        address stakerReward
+        address oracle
     ) external payable returns (address) {
 
         // Create a Native ETH StrategyVault
-        IStrategyVaultETH newStratVault = IStrategyVaultETH(createStratVaultETH(whitelistedDeposit, upgradeable, operator, oracle, stakerReward));
+        IStrategyVaultETH newStratVault = IStrategyVaultETH(createStratVaultETH(whitelistedDeposit, upgradeable, operator, oracle));
 
         // Stake the ETH on the new StrategyVault
         newStratVault.stakeNativeETH{value: msg.value}();
@@ -277,10 +273,9 @@ contract StrategyVaultManager is
      * @param whitelistedDeposit If false, anyone can deposit into the Strategy Vault. If true, only whitelisted addresses can deposit into the Strategy Vault.
      * @param upgradeable If true, the Strategy Vault is upgradeable. If false, the Strategy Vault is not upgradeable.
      * @param oracle The oracle implementation to use for the vault.
-     * @param stakerReward The address of the StakerReward contract.
      * @return The address of the newly deployed Strategy Vault.
      */
-    function _deployStrategyVaultETH(bool whitelistedDeposit, bool upgradeable, address oracle, address stakerReward) internal returns (IStrategyVaultETH) {
+    function _deployStrategyVaultETH(bool whitelistedDeposit, bool upgradeable, address oracle) internal returns (IStrategyVaultETH) {
         // mint a byzNft for the Strategy Vault's creator
         uint256 nftId = byzNft.mint(msg.sender, numStratVaults);
 

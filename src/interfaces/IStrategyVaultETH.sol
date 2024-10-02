@@ -93,12 +93,6 @@ interface IStrategyVaultETH is IStrategyVault {
     external;
 
   /**
-   * @notice Call the EigenPodManager contract
-   * @param data to call contract 
-   */
-  function callEigenPodManager(bytes calldata data) external payable returns (bytes memory);
-
-  /**
    * @notice Returns the number of active DVs staked by the Strategy Vault.
    */
   function getVaultDVNumber() external view returns (uint256);

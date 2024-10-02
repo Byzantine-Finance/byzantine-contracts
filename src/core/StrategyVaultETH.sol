@@ -74,7 +74,6 @@ contract StrategyVaultETH is Initializable, StrategyVaultETHStorage, ERC7535Mult
      * @param _whitelistedDeposit Whether the deposit function is whitelisted or not.
      * @param _upgradeable Whether the StrategyVault is upgradeable or not.
      * @param _oracle The oracle implementation to use for the vault.
-     * @param _stakerReward The address of the StakerReward contract.
      * @dev Called on construction by the StrategyVaultManager.
      * @dev StrategyVaultETH so the deposit token is 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE
      */
@@ -90,15 +89,14 @@ contract StrategyVaultETH is Initializable, StrategyVaultETHStorage, ERC7535Mult
         __ERC7535MultiRewardVault_init(_oracle);
 
         // Initialize the contract
-        __StrategyVaultETH_init_unchained(_nftId, _stratVaultCreator, _whitelistedDeposit, _upgradeable, _stakerReward);
+        __StrategyVaultETH_init_unchained(_nftId, _stratVaultCreator, _whitelistedDeposit, _upgradeable);
     }
 
-    function __StrategyVaultETH_init_unchained(uint256 _nftId, address _stratVaultCreator, bool _whitelistedDeposit, bool _upgradeable, address _stakerReward) internal onlyInitializing {
+    function __StrategyVaultETH_init_unchained(uint256 _nftId, address _stratVaultCreator, bool _whitelistedDeposit, bool _upgradeable) internal onlyInitializing {
         // Set up the vault state variables
         stratVaultNftId = _nftId;
         whitelistedDeposit = _whitelistedDeposit;
-        upgradeable = _upgradeable;     
-        stakerReward = _stakerReward;
+        upgradeable = _upgradeable;        
 
         // If whitelisted Vault, whitelist the creator
         if (_whitelistedDeposit) {
@@ -349,15 +347,12 @@ contract StrategyVaultETH is Initializable, StrategyVaultETHStorage, ERC7535Mult
     function _mintVaultShares(uint256 amount, address receiver) internal {
         if (receiver != address(stratVaultManager)) {
             super.deposit(amount, receiver);
-            _distributeStakerRewards();
         } else {
             super.deposit(amount, stratVaultOwner());
-            _distributeStakerRewards();
         }
     }
 
     function _burnVaultShares(uint256 amount, address receiver) internal {
         super.withdraw(amount, receiver, msg.sender);
-        _distributeStakerRewards();
     }
 }

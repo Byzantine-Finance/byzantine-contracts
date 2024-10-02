@@ -626,7 +626,7 @@ contract AuctionTest is ByzantineDeployer {
 
     function _createStratVaultETH() internal returns (address) {
         vm.prank(alice);
-        return strategyVaultManager.createStratVaultETH(true, true, ELOperator1, address(0), address(0));
+        return strategyVaultManager.createStratVaultETH(true, true, ELOperator1, address(0));
     }
 
 }
