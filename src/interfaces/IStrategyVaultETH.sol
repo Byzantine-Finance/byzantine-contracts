@@ -2,45 +2,36 @@
 pragma solidity ^0.8.20;
 
 import {BeaconChainProofs} from "eigenlayer-contracts/libraries/BeaconChainProofs.sol";
+import {IERC7535Upgradeable} from "../vault/ERC7535/IERC7535Upgradeable.sol";
 
 import "./IStrategyVault.sol";
 
-interface IStrategyVaultETH is IStrategyVault {
+interface IStrategyVaultETH is IStrategyVault, IERC7535Upgradeable {
 
   /* ============== GETTERS ============== */
 
   /// @notice Get the address of the beacon chain admin
   function beaconChainAdmin() external view returns (address);
 
-    /* ============== EXTERNAL FUNCTIONS ============== */
-
-    /**
-     * @notice Used to initialize the StrategyVaultETH given it's setup parameters.
-     * @param _nftId The id of the ByzNft associated to this StrategyVault.
-     * @param _stratVaultCreator The address of the creator of the StrategyVault.
-     * @param _whitelistedDeposit Whether the deposit function is whitelisted or not.
-     * @param _upgradeable Whether the StrategyVault is upgradeable or not.
-     * @param _oracle The oracle implementation to use for the vault.
-     * @dev Called on construction by the StrategyVaultManager.
-     * @dev StrategyVaultETH so the deposit token is 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE
-     */
-    function initialize(
-        uint256 _nftId,
-        address _stratVaultCreator,
-        bool _whitelistedDeposit,
-        bool _upgradeable,
-        address _oracle
-    ) external;
+  /* ============== EXTERNAL FUNCTIONS ============== */
 
   /**
-   * @notice Deposit ETH to the StrategyVault and get Vault shares in return.
-   * @dev If first deposit, create an Eigen Pod for the StrategyVault.
-   * @dev If whitelistedDeposit is true, then only users with the whitelisted role can call this function.
-   * @dev The caller receives Byzantine StrategyVault shares in return for the ETH staked.
-   * @dev Revert if the amount deposited is not a multiple of 32 ETH.
-   * @dev Trigger auction(s) for each bundle of 32 ETH deposited to get Distributed Validator(s)
+   * @notice Used to initialize the StrategyVaultETH given it's setup parameters.
+   * @param _nftId The id of the ByzNft associated to this StrategyVault.
+   * @param _stratVaultCreator The address of the creator of the StrategyVault.
+   * @param _whitelistedDeposit Whether the deposit function is whitelisted or not.
+   * @param _upgradeable Whether the StrategyVault is upgradeable or not.
+   * @param _oracle The oracle implementation to use for the vault.
+   * @dev Called on construction by the StrategyVaultManager.
+   * @dev StrategyVaultETH so the deposit token is 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE
    */
-  function stakeNativeETH() external payable; 
+  function initialize(
+      uint256 _nftId,
+      address _stratVaultCreator,
+      bool _whitelistedDeposit,
+      bool _upgradeable,
+      address _oracle
+  ) external;
 
   /* ============== BEACON CHAIN ADMIN FUNCTIONS ============== */
 

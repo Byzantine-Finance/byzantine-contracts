@@ -38,6 +38,7 @@ interface IStrategyVaultManager {
      * @param upgradeable If true, the Strategy Vault is upgradeable. If false, the Strategy Vault is not upgradeable.
      * @param operator The address for the operator that this StrategyVault will delegate to.
      * @param oracle The oracle implementation to use for the vault.
+     * @param receiver The address to receive the Byzantine vault shares.
      * @dev This action triggers (a) new auction(s) to get (a) new Distributed Validator(s) to stake on the Beacon Chain. The number of Auction triggered depends on the number of ETH sent.
      * @dev Function will revert unless a multiple of 32 ETH are sent with the transaction.
      * @dev The caller receives Byzantine StrategyVault shares in return for the ETH staked.
@@ -47,7 +48,8 @@ interface IStrategyVaultManager {
         bool whitelistedDeposit,
         bool upgradeable,
         address operator,
-        address oracle
+        address oracle,
+        address receiver
     ) 
         external payable returns (address);
 

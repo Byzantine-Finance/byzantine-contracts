@@ -89,9 +89,8 @@ contract ERC7535MultiRewardVault is Initializable, ERC7535Upgradeable, OwnableUp
      * @param receiver The address to receive the Byzantine vault shares.
      * @return The amount of shares minted.
      */
-    function deposit(uint256 assets, address receiver) public override payable nonReentrant returns (uint256) {
-        uint256 shares = super.deposit(assets, receiver);
-        return shares;
+    function deposit(uint256 assets, address receiver) public virtual override payable returns (uint256) {
+        return super.deposit(assets, receiver);
     }
 
     /**
@@ -100,9 +99,8 @@ contract ERC7535MultiRewardVault is Initializable, ERC7535Upgradeable, OwnableUp
      * @param receiver The address to receive the Byzantine vault shares.
      * @return The amount of ETH deposited.
      */
-    function mint(uint256 shares, address receiver) public override payable nonReentrant returns (uint256) {
-        uint256 assets = super.mint(shares, receiver);
-        return assets;
+    function mint(uint256 shares, address receiver) public virtual override payable returns (uint256) {
+        return super.mint(shares, receiver);
     }
 
     /**

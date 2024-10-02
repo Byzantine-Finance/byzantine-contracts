@@ -117,32 +117,31 @@ contract StrategyVaultETH is Initializable, StrategyVaultETHStorage, ERC7535Mult
     /* ============== EXTERNAL FUNCTIONS ============== */
 
     /**
-     * @notice Deposit ETH to the StrategyVault and get Vault shares in return.
-     * @dev If first deposit, create an Eigen Pod for the StrategyVault.
-     * @dev If whitelistedDeposit is true, then only users with the whitelisted role can call this function.
-     * @dev The caller receives Byzantine StrategyVault shares in return for the ETH staked.
+     * @notice Deposit ETH to the StrategyVault and get Vault shares in return. ERC7535 compliant.
+     * @param assets The amount of ETH being deposit.
+     * @param receiver The address to receive the Byzantine vault shares.
+     * @return The amount of shares minted.
+     * @dev If whitelistedDeposit is true, then only users within the whitelist can call this function.
      * @dev Revert if the amount deposited is not a multiple of 32 ETH.
      * @dev Trigger auction(s) for each bundle of 32 ETH deposited to get Distributed Validator(s)
      */
-    function stakeNativeETH() external payable checkWhitelist {
+    function deposit(uint256 assets, address receiver) public override(ERC7535MultiRewardVault, IERC7535Upgradeable) payable checkWhitelist returns (uint256) {
+        _triggerAuction();
+        return super.deposit(assets, receiver);
+    }
 
-        // Check that the deposit is a multiple of 32 ETH
-        if (msg.value % 32 ether != 0) revert CanOnlyDepositMultipleOf32ETH();
-
-        // Calculate how many bundles of 32 ETH were sent
-        uint256 num32ETHBundles = msg.value / 32 ether;
-
-        // Trigger an auction for each bundle of 32 ETH
-        for (uint256 i = 0; i < num32ETHBundles;) {
-            bytes32 winningClusterId = auction.triggerAuction();
-            clusterIdsFIFO.push(winningClusterId);
-            unchecked {
-                ++i;
-            }
-        }
-        
-        // Mint vault shares to the staker in return for the ETH staked
-        // _mintVaultShares(msg.value, msg.sender);
+    /**
+     * @notice Deposit ETH to the StrategyVault. Amount determined by number of shares minting. ERC7535 compliant.
+     * @param shares The amount of vault shares to mint.
+     * @param receiver The address to receive the Byzantine vault shares.
+     * @return The amount of ETH deposited.
+     * @dev If whitelistedDeposit is true, then only users within the whitelist can call this function.
+     * @dev Revert if the amount deposited is not a multiple of 32 ETH.
+     * @dev Trigger auction(s) for each bundle of 32 ETH deposited to get Distributed Validator(s)
+     */
+    function mint(uint256 shares, address receiver) public override(ERC7535MultiRewardVault, IERC7535Upgradeable) payable checkWhitelist returns (uint256) {
+        _triggerAuction();
+        return super.mint(shares, receiver);
     }
 
     /**
@@ -344,11 +343,20 @@ contract StrategyVaultETH is Initializable, StrategyVaultETHStorage, ERC7535Mult
 
     /* ============== INTERNAL FUNCTIONS ============== */
 
-    function _mintVaultShares(uint256 amount, address receiver) internal {
-        if (receiver != address(stratVaultManager)) {
-            super.deposit(amount, receiver);
-        } else {
-            super.deposit(amount, stratVaultOwner());
+    function _triggerAuction() internal {
+        // Check that the deposit is a multiple of 32 ETH
+        if (msg.value % 32 ether != 0) revert CanOnlyDepositMultipleOf32ETH();
+
+        // Calculate how many bundles of 32 ETH were sent
+        uint256 num32ETHBundles = msg.value / 32 ether;
+
+        // Trigger an auction for each bundle of 32 ETH
+        for (uint256 i = 0; i < num32ETHBundles;) {
+            bytes32 winningClusterId = auction.triggerAuction();
+            clusterIdsFIFO.push(winningClusterId);
+            unchecked {
+                ++i;
+            }
         }
     }
 
