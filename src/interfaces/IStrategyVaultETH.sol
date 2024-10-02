@@ -2,8 +2,6 @@
 pragma solidity ^0.8.20;
 
 import {BeaconChainProofs} from "eigenlayer-contracts/libraries/BeaconChainProofs.sol";
-import {IDelegationManager} from "eigenlayer-contracts/interfaces/IDelegationManager.sol";
-import {IStrategy} from "eigenlayer-contracts/interfaces/IStrategy.sol";
 
 import "./IStrategyVault.sol";
 
@@ -14,7 +12,7 @@ interface IStrategyVaultETH is IStrategyVault {
   /// @notice Get the address of the beacon chain admin
   function beaconChainAdmin() external view returns (address);
 
-    /* ============== INITIALIZER ============== */
+    /* ============== EXTERNAL FUNCTIONS ============== */
 
     /**
      * @notice Used to initialize the StrategyVaultETH given it's setup parameters.
@@ -33,8 +31,6 @@ interface IStrategyVaultETH is IStrategyVault {
         bool _upgradeable,
         address _oracle
     ) external;
-
-    /* ============== EXTERNAL FUNCTIONS ============== */
 
   /**
    * @notice Deposit ETH to the StrategyVault and get Vault shares in return.
@@ -112,14 +108,8 @@ interface IStrategyVaultETH is IStrategyVault {
 
     /* ============== ERRORS ============== */
 
-    /// @dev Returned when not provided the right number of nodes 
-    error InvalidClusterSize();
-
     /// @dev Returned when trying to deposit an incorrect amount of ETH. Can only deposit a multiple of 32 ETH. (32, 64, 96, 128, etc.)
     error CanOnlyDepositMultipleOf32ETH();
-
-    /// @dev Returned when trying to access DV data but no ETH has been deposited
-    error NativeRestakingNotActivated();
 
     /// @dev Returned when trying to trigger Beacon Chain transactions from an unauthorized address
     error OnlyBeaconChainAdmin();

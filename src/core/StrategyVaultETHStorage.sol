@@ -47,10 +47,6 @@ abstract contract StrategyVaultETHStorage is IStrategyVaultETH {
 
     /* ============== STATE VARIABLES ============== */
 
-    /// @notice The address of the StakerReward contract
-    // TODO: Make immutable?
-    address public stakerReward;
-
     /// @notice The ByzNft associated to this StrategyVault.
     /// @notice The owner of the ByzNft is the StrategyVault creator.
     /// TODO When non-upgradeable put that variable immutable and set it in the constructor
