@@ -25,14 +25,11 @@ contract StakerRewards is
 {
     /* ============== CONSTANTS + IMMUTABLES ============== */
 
-    /// @notice StrategyModuleManager contract
+    /// @notice StratVaultManager contract
     IStrategyVaultManager public immutable stratVaultManager;
 
     /// @notice Escrow contract
     IEscrow public immutable escrow;
-
-    /// @notice ByzNft contract
-    IByzNft public immutable byzNft;
 
     /// @notice Auction contract
     IAuction public immutable auction;
@@ -43,15 +40,13 @@ contract StakerRewards is
     /* ============== STATE VARIABLES ============== */
 
     /// @notice Total of non consumed VCs at Checkpoint's `updateTime`, 1 VC consumed per day per nodeOp
-    uint256 public totalVCs;
+    uint256 public totalVCs = 0;
     /// @notice Number of active DVs of size 4
-    uint256 public numberDV4;
+    uint256 public numberDV4 = 0;
     /// @notice Number of active DVs of size 7
-    uint256 public numberDV7;
-    /// @notice Sum of all rewards distributed to stakers but not yet claimed by them
-    uint256 public totalNotYetClaimedRewards;
-    /// @notice Interval of rewards claim
-    uint256 public claimInterval;
+    uint256 public numberDV7 = 0;
+    /// @notice Rewards distributed to stakers but not yet sent to StratVaultETH
+    uint256 public totalPendingRewards = 0;
 
     /// @notice Address deployed by Chainlink at each registration of upkeep, it is the address that calls `performUpkeep`
     address public forwarderAddress;
@@ -61,52 +56,36 @@ contract StakerRewards is
     uint256 public lastPerformUpkeep;
 
     /// @notice Checkpoint updated at every new event
-    /// @dev dailyRewardsPer32ETH = `getAllocatableRewards` / totalVCs
+    /// @dev dailyRewardsPer32ETH = `getAllocatableRewards` / totalVCs * totalDVs
     struct Checkpoint {
         uint256 updateTime;
-        uint256 dailyRewardsPer32ETH; // Daily rewards distributed to each staker for every 32ETH staked
+        uint256 dailyRewardsPer32ETH; // Daily rewards distributed for every 32ETH staked
     }
     Checkpoint public checkpoint;
 
     /// @notice Cluster data
     struct ClusterData {
-        uint32 smallestVC; // Maximum number of days the owner of the stratMod can claim rewards TODO: check if still needed
+        uint32 smallestVC; // Smallest number of VCs among the nodeOp of a cluster
         uint256 exitTimestamp; // = block.timestamp + smallestVC * _ONE_DAY
         uint8 clusterSize;
     }
     /// @notice ClusterId => ClusterData
     mapping(bytes32 => ClusterData) public clusters;
 
-    struct StakerData {
-        uint256 updateTime; // When staking multiple of 32ETH
-        uint256 lastClaim; //
-        uint256 multipleOf32ETH; // Number of 32ETH staked
-        uint256 rewardsToClaim; // In case a staker stake multiple of 32ETH at different moments, the rewards that are not yet claimed
-        bool isExit; // if exit, no permission to claim
-    }
-    /// @notice Staker => StakerData
-    mapping(address => StakerData) public stakers;
+    /// @notice StratVaultETH address => StratVaultETH's last update timestamp
+    mapping(address => uint256) public vaultLastUpdate;
 
     /* ============== MODIFIERS ============== */
 
-    // modifier onlyStratModManagerOrStakerRewards() {
-    //     if (
-    //         msg.sender != address(stratModManager) &&
-    //         msg.sender != address(this)
-    //     ) revert OnlyStratModManagerOrStakerRewards();
-    //     _;
-    // }
+    modifier onlyNftOwner(address _vaultAddr) {
+        if (msg.sender != IStrategyVaultETH(_vaultAddr).stratVaultOwner()) revert OnlyNftOwner();
+        _;
+    }
 
     modifier onlyStratVaultManager() {
         if (msg.sender != address(stratVaultManager)) revert OnlyStrategyVaultManager();
         _;
     }
-
-    // modifier onlyStratModOwner(address _owner, address _stratMod) {
-    //     uint256 stratModNftId = IStrategyModule(_stratMod).stratModNftId();
-    //     if (byzNft.ownerOf(stratModNftId) != _owner) revert NotStratModOwner();
-    //     _;
-    // }
 
     /* ============== CONSTRUCTOR & INITIALIZER ============== */
 
@@ -114,12 +93,10 @@ contract StakerRewards is
     constructor(
         IStrategyVaultManager _stratVaultManager,
         IEscrow _escrow,
-        IByzNft _byzNft,
         IAuction _auction
     ) {
         stratVaultManager = _stratVaultManager;
         escrow = _escrow;
-        byzNft = _byzNft;
         auction = _auction;
         // Disable initializer in the context of the implementation contract
         _disableInitializers();
@@ -128,13 +105,9 @@ contract StakerRewards is
     /**
      * @dev Initializes the address of the initial owner
      */
-    function initialize(
-        uint256 _upkeepInterval,
-        uint256 _claimInterval
-    ) external initializer {
+    function initialize(uint256 _upkeepInterval) external initializer {
         __ReentrancyGuard_init();
         upkeepInterval = _upkeepInterval;
-        claimInterval = _claimInterval;
     }
 
     /* ============== EXTERNAL FUNCTIONS ============== */
@@ -145,27 +118,23 @@ contract StakerRewards is
     receive() external payable {}
 
     /**
-     * @notice Update the Checkpoint and StratModData structs when a strategy module is deployed (becomes an active DV)
-     * @param _staker Address of the staker
+     * @notice Function called by StratVaultManager when a DV is activated to create a checkpoint and update variables
+     * @param _vaultAddr Address of the StratVaultETH
      * @param _clusterId Id of the cluster
-     * @dev Revert if the strategy module has already been deployed
      */
-    function registerNativeStaking(
-        address _staker,
-        bytes32 _clusterId
-    ) public onlyStratVaultManager {
-        // Get the total number of new VCs, the smallest VC and the cluster size
+    function registerNativeStaking(address _vaultAddr, bytes32 _clusterId) public onlyStratVaultManager {
+        // Check the number of DV in the StratVaultETH before the current DV
+        uint256 numExistingDVs = IStrategyVaultETH(_vaultAddr).getVaultDVNumber() - 1;
+        if (numExistingDVs > 0) {
+            uint256 pendingRewards = calculateRewards(_vaultAddr, numExistingDVs);
+            (bool success, ) = payable(_vaultAddr).call{value: pendingRewards}("");
+            if (!success) revert FailedToSendRewards();
+        }
+        vaultLastUpdate[_vaultAddr] = block.timestamp;
+
+        // Get the total new VCs, the smallest VC and the cluster size
         IAuction.NodeDetails[] memory nodes = auction.getClusterDetails(_clusterId).nodes;
         (uint256 totalClusterVCs, uint32 smallestVC, uint8 clusterSize) = _getTotalAndSmallestVCs(nodes);
-
-        // Update variables and checkpoint
-        totalVCs += totalClusterVCs;
-        if (block.timestamp - checkpoint.updateTime > _ONE_DAY) {
-            _subtractConsumedVCsFromTotalVCs();
-            _updateTotalNotClaimedRewards(0);
-        }
-        clusterSize == 4 ? ++numberDV4 : ++numberDV7;
-        _updateCheckpoint();
 
         // Update ClusterData
         ClusterData storage cluster = clusters[_clusterId];
@@ -173,129 +142,85 @@ contract StakerRewards is
         cluster.exitTimestamp = block.timestamp + smallestVC * _ONE_DAY;
         cluster.clusterSize = clusterSize;
 
-        // Update StakerData
-        StakerData storage staker = stakers[_staker];
-        // If the staker has already staked 32 ETH, calculate the rewards until now
-        if (staker.multipleOf32ETH > 0) {
-            staker.rewardsToClaim = claimableRewards(_staker);
-        }
-        staker.updateTime = block.timestamp;
-        ++staker.multipleOf32ETH;
-    }
-
-    /**
-     * @notice Function that allows the staker to claim rewards
-     * @dev The function does the following actions:
-     * 1. Calculate the rewards and send them to the staker
-     * 2. Update totalNotYetClaimedRewards
-     * 3. Update the checkpoint data and totalVCs if necessary
-     * 4. Update the strategy module data
-     * @dev Revert if last claim was within the last 4 days or the strategy module was deployed less than 4 days ago
-     */
-    function sendPOSRewards(
-        address _staker
-    ) public {
-        StakerData storage staker = stakers[_staker];
-        if (staker.isExit || staker.updateTime == 0) revert RewardsClaimedOrNoPermission();
-
-        uint256 daysSinceLastClaim = (block.timestamp - staker.lastClaim) / _ONE_DAY;
-        require(
-            daysSinceLastClaim >= claimInterval,
-            "Claim interval or joining time less than 4 days"
-        );
-
-        // Calculate the rewards and send them to the staker
-        uint256 claimable = claimableRewards(_staker);
-        (bool success, ) = payable(msg.sender).call{value: claimable}("");
-        if (!success) revert FailedToSendRewards();
-
-        // Update totalNotYetClaimedRewards
-        _updateTotalNotClaimedRewards(claimable);
-
-        // Remove the consumed VCs from totalVCs and update the checkpoint if totalActiveDVs is not 0
+        // Update variables and checkpoint
+        totalVCs += totalClusterVCs;
         if (block.timestamp - checkpoint.updateTime > _ONE_DAY) {
-            _subtractConsumedVCsFromTotalVCs();
-            _updateCheckpoint();
+            _removeConsumedVCs();
+            _updatePendingRewards(0);
         }
-
-        // Update stakerData
-        staker.updateTime = block.timestamp;
-        staker.lastClaim = block.timestamp;
+        clusterSize == 4 ? ++numberDV4 : ++numberDV7;
+        _updateCheckpoint();
     }
 
-    /**
-     * @notice Update the claim interval
-     * @param _claimInterval New claim interval
+    /** 
+     * @notice Function called by StratVaultETH when a staker withdraws its rewards
+     * @dev The function does the following actions:
+     * 1. Calculate the last set of pending rewards and send them to the StratVaultETH
+     * 2. Update variables and checkpoint if necessary
      */
-    function updateClaimInterval(
-        uint256 _claimInterval
-    ) public {
-        claimInterval = _claimInterval;
+    function withdrawPosRewards(address _vaultAddr) public onlyNftOwner(_vaultAddr) {
+        // Calculate the rewards and send them to the StratVaultETH
+        uint256 numDVs = IStrategyVaultETH(_vaultAddr).getVaultDVNumber();
+        uint256 rewards = calculateRewards(_vaultAddr, numDVs);
+
+        if (rewards > 0) {
+            (bool success, ) = payable(_vaultAddr).call{value: rewards}("");
+            if (!success) revert FailedToSendRewards();
+
+            // Update the last update timestamp of the StratVaultETH
+            vaultLastUpdate[_vaultAddr] = block.timestamp;
+            // Update totalPendingRewards
+            _updatePendingRewards(rewards);
+            // Remove the consumed VCs and update Checkpoint
+            if (block.timestamp - checkpoint.updateTime > _ONE_DAY) {
+                _removeConsumedVCs();
+                _updateCheckpoint();
+            }
+        }
     }
+
 
     /* ============== VIEW FUNCTIONS ============== */
 
     /**
-     * @notice Calculate the rewards for a staker
-     * @param _staker Address of the staker
-     * @dev Revert if all rewards have been claimed or if the staker calls the function after exitTimestamp and claimPermission is not 2
-     * @dev The second check aims to ensure that `performUpkeep` has been called to exit the strategy module
+     * @notice Calculate the pending rewards since last update
+     * @param _vaultAddr Address of the StratVaultETH
+     * @dev Revert if the last update timestamp is 0
      */
-    function claimableRewards(address _staker) public view returns (uint256) {
-        StakerData storage staker = stakers[_staker];
-        uint256 elapsedDays = _getElapsedDays(staker.updateTime);
-        return checkpoint.dailyRewardsPer32ETH * elapsedDays * staker.multipleOf32ETH + staker.rewardsToClaim;
+    function calculateRewards(address _vaultAddr, uint256 _numDVs) public view returns (uint256) {
+        uint256 lastUpdate = vaultLastUpdate[_vaultAddr];
+        if (lastUpdate == 0) revert InvalidTimestamp();
+        uint256 elapsedDays = _getElapsedDays(lastUpdate);
+        return checkpoint.dailyRewardsPer32ETH * elapsedDays * _numDVs;
     }
 
     /**
-     * @notice Calculate the amount of ETH in the contract that can be allocated to the stakers
-     * @dev allocatableRewards = address(this).balance - totalNotYetClaimedRewards
+     * @notice Calculate the allocatable amount of ETH in the StakerRewards contract 
      * @dev The calculation of the dailyRewardsPer32ETH cannot take into account the rewards that were already distributed to the stakers.
      */
     function getAllocatableRewards() public view returns (uint256) {
-        return address(this).balance - totalNotYetClaimedRewards;
+        return address(this).balance - totalPendingRewards;
     }
 
     /**
-     * @notice Returns the strategy module data of a given strategy module address
+     * @notice Returns the cluster data of a given clusterId
      */
-    function getClusterData(
-        bytes32 _clusterId
-    ) public view returns (uint256, uint256, uint8) {
-        ClusterData memory clusterData = clusters[_clusterId];
+    function getClusterData(bytes32 _clusterId) public view returns (uint256, uint256, uint8) {
+        ClusterData memory cluster = clusters[_clusterId];
         return (
-            clusterData.smallestVC,
-            clusterData.exitTimestamp,
-            clusterData.clusterSize
+            cluster.smallestVC,
+            cluster.exitTimestamp,
+            cluster.clusterSize
         );
     }
 
     /**
      * @notice Returns the current checkpoint data
      */
-    function getCheckpointData()
-        public
-        view
-        returns (uint256, uint256)
-    {
-        return (
-            checkpoint.updateTime,
-            checkpoint.dailyRewardsPer32ETH
-        );
+    function getCheckpointData() public view returns (uint256, uint256) {
+        return (checkpoint.updateTime, checkpoint.dailyRewardsPer32ETH);
     }
 
-    function getStakerData(
-        address _staker
-    ) public view returns (uint256, uint256, uint256, uint256, bool) {
-        StakerData memory staker = stakers[_staker];
-        return (
-            staker.updateTime,
-            staker.lastClaim,
-            staker.multipleOf32ETH,
-            staker.rewardsToClaim,
-            staker.isExit
-        );
-    }
 
     /* ============== CHAINLINK AUTOMATION FUNCTIONS ============== */
 
@@ -306,7 +231,7 @@ contract StakerRewards is
      * @dev If `upkeepNeeded` returns `true`,  `performUpkeep` is called.
      * @dev This function doe not consume any gas and is simulated offchain.
      * @dev `checkData` is not used in our case.
-     * @dev Revert if totalActiveDVs is 0
+     * @dev Revert if there is no DV
      * @dev Revert if the time interval since the last upkeep is less than the upkeep interval
      */
     function checkUpkeep(bytes memory /*checkData*/) public view override returns (bool upkeepNeeded, bytes memory performData) {
@@ -314,9 +239,9 @@ contract StakerRewards is
         if (block.timestamp - lastPerformUpkeep < upkeepInterval)
             revert UpkeepNotNeeded();
 
-        // Get the number of strategy modules requiring update
+        // Get the number of clusters requiring update
         address[] memory stratVaults = stratVaultManager.getAllStratVaultETHs();
-        uint256 counter;
+        uint256 counter = 0;
 
         for (uint256 i; i < stratVaults.length; ) {
             bytes32[] memory clusterIds = IStrategyVaultETH(stratVaults[i]).getAllDVIds();
@@ -324,8 +249,9 @@ contract StakerRewards is
             if (clusterIds.length == 0) continue;
 
             for (uint256 j; j < clusterIds.length; ) {  
-                ClusterData memory clusterData = clusters[clusterIds[j]];
-                if (clusterData.exitTimestamp < block.timestamp) {
+                if (clusters[clusterIds[j]].exitTimestamp == 0) continue; 
+                ClusterData memory cluster = clusters[clusterIds[j]];
+                if (cluster.exitTimestamp < block.timestamp) {
                     ++counter;
                 }
 
@@ -339,47 +265,46 @@ contract StakerRewards is
             }
         }
 
-        // Array of addresses of strategy modules at the size of counter
+        // Array of cluster IDs at the size of counter
         bytes32[] memory listClusterIds = new bytes32[](counter);
-        // Array of VC numbers of each strategy module at the size of counter
-        uint256[] memory clusterTotalVCs = new uint256[](counter);
-        // Array of remaining bid prices of each cluster to send back to Escrow contract
-        uint256[] memory remainingBidPrices = new uint256[](counter);
+        // Total remaining VCs to remove
+        uint256 remainingVCsToRemove;
+        // Total bid prices to send back to Escrow contract
+        uint256 totalBidsToEscrow;
 
         upkeepNeeded = false;
         uint256 indexCounter;
 
-        // Iterate over all the strategy modules again to get the addresses of the strategy modules and set upkeepNeeded to true
+        // Iterate over the clusters again to set upkeepNeeded to true and prepare the performData
         for (uint256 i; i < stratVaults.length; ) {
             bytes32[] memory clusterIds = IStrategyVaultETH(stratVaults[i]).getAllDVIds();
 
-            // For each strategy module, check if the current block timestamp is equal to the exitTimestamp
+            // Check if the current block timestamp becomes bigger than the exitTimestamp
             for (uint256 j; j < clusterIds.length; ) {
-                ClusterData memory clusterData = clusters[clusterIds[j]];
+                if (clusters[clusterIds[j]].exitTimestamp == 0) continue; 
+                ClusterData memory cluster = clusters[clusterIds[j]];
 
-                if (clusterData.exitTimestamp < block.timestamp) {
-                    // If yes, set the upkeepNeeded to true
+                if (cluster.exitTimestamp < block.timestamp) {
+                    // Set the upkeepNeeded to true
                     upkeepNeeded = true;
-                    // Store the address of the strategy module to the array
+                    // Store the clusterId to the array
                     listClusterIds[indexCounter] = clusterIds[j];
-                    // Update the VC number of each node
+                    // Get the total number of VCs and the smallest VC number of the cluster
                     IAuction.NodeDetails[] memory nodes = auction.getClusterDetails(clusterIds[j]).nodes;
                     (uint256 totalClusterVCs, uint32 smallestVC, ) = _getTotalAndSmallestVCs(nodes);
-                    // Store the VC number of the strategy module to the array
-                    clusterTotalVCs[indexCounter] = totalClusterVCs;
+                    // Add up the remaining VC number of each cluster
+                    remainingVCsToRemove += (totalClusterVCs - smallestVC * cluster.clusterSize);
                     // Calculate the total remaining bid prices of each node
-                    uint256 bidPriceToSendBack;
                     for (uint8 k; k < nodes.length; ) {
                         IAuction.BidDetails memory bidDetails = auction.getBidDetails(nodes[k].bidId);
                         uint256 dailyVcPrice = _getDailyVcPrice(bidDetails.bidPrice, bidDetails.vcNumber);
                         uint256 leftVCs = bidDetails.vcNumber - smallestVC;
-                        bidPriceToSendBack += (dailyVcPrice * leftVCs);
+                        totalBidsToEscrow += (dailyVcPrice * leftVCs);
 
                         unchecked {
                             ++k;
                         }
                     }
-                    remainingBidPrices[indexCounter] = bidPriceToSendBack;
 
                     ++indexCounter;
                 }
@@ -394,7 +319,12 @@ contract StakerRewards is
             }
         }
 
-        performData = abi.encode(listClusterIds, clusterTotalVCs, remainingBidPrices);
+        if (!upkeepNeeded) {
+            performData = ""; 
+        } else {
+            performData = abi.encode(listClusterIds, remainingVCsToRemove, totalBidsToEscrow);
+        }
+
         return (upkeepNeeded, performData);
     }
 
@@ -403,10 +333,10 @@ contract StakerRewards is
      * @param performData is the encoded data returned by `checkUpkeep` 
      * @dev This function does the following:
        1. Update lastPerformUpkeep to the current block timestamp
-       2. Iterate over all the strategy modules and update the VC number of each node
-       3. Update totalVCs and totalNotYetClaimedRewards variables
-       4. Add up the remaining VCs of all relevant strategy modules to be subtracted from totalVCs
-       5. TODO: Send back the bid prices of the exited DVs to the Escrow contract
+       2. Iterate over all the clusters and update the VC number of each node
+       3. Update totalVCs and totalPendingRewards variables
+       4. Add up the remaining VCs of all relevant clusters to be subtracted from totalVCs
+       5. Send back the bid prices of the exited DVs to the Escrow contract
        6. Update the checkpoint data
      * @dev Revert if it is called by a non-forwarder address
     */
@@ -419,14 +349,9 @@ contract StakerRewards is
 
         lastPerformUpkeep = block.timestamp;
 
-        // Decode `performData` to get the strategy module addresses and their total VC number
-        (
-            bytes32[] memory clusterIds,
-            uint256[] memory clusterTotalVCs,
-            uint256[] memory remainingBidPrices
-        ) = abi.decode(performData, (bytes32[], uint256[], uint256[])); // TODO: work till here: quesiton: list of bidprices or just one bidprice?
+        // Decode `performData` 
+        (bytes32[] memory clusterIds, uint256 remainingVCsToRemove, uint256 totalBidsToEscrow) = abi.decode(performData, (bytes32[], uint256, uint256));
 
-        uint256 remainingVCsToSubtract;
         uint256 numberDV4ToExit;
         uint256 numberDV7ToExit;
         
@@ -435,36 +360,29 @@ contract StakerRewards is
             uint32 consumedVCs = cluster.smallestVC;
 
             // Subtract the consumed VC number for each node
-            _updateNodeVcNumber(clusterIds[i], consumedVCs);
-
-            // Add up the remaining VCs of every strategy module
-            remainingVCsToSubtract += (clusterTotalVCs[i] - consumedVCs * cluster.clusterSize);
+            auction.updateNodeVCNumber(clusterIds[i], consumedVCs);
             // Add up the number of active DVs to exit
             cluster.clusterSize == 4 ? ++numberDV4ToExit : ++numberDV7ToExit;
-
-            // TODO: assume that there is always new DV to replace the exited DV 
-            uint256 bidPrice = remainingBidPrices[i];
-            (bool success, ) = payable(address(escrow)).call{value: bidPrice}("");
-            if (!success) revert FailedToSendBackBidPrice();
 
             unchecked {
                 ++i;
             }
         }
+         
+        (bool success, ) = payable(address(escrow)).call{value: totalBidsToEscrow}("");
+        if (!success) revert FailedToSendBackBidPrice();
 
-        // Update totalVCs and totalNotYetClaimedRewards variables
+        // Update totalVCs and totalPendingRewards variables
         if (block.timestamp - checkpoint.updateTime > _ONE_DAY) {
-            _subtractConsumedVCsFromTotalVCs();
-            _updateTotalNotClaimedRewards(0);
+            _removeConsumedVCs();
+            _updatePendingRewards(0);
         }
 
-        // Subtract the total remaining non-consumed VCs from totalVCs
-        totalVCs -= remainingVCsToSubtract;
-        // Decrease totalActiveDVs by 1 as the DV is no longer active
+        // Subtract the remaining VCs of the exited DVs from totalVCs
+        totalVCs -= remainingVCsToRemove;
+        // Decrease the number of DVs
         numberDV4 -= numberDV4ToExit;
         numberDV7 -= numberDV7ToExit;
-
-        // TODO: Step 5 here
 
         // Update the checkpoint data
         _updateCheckpoint();
@@ -475,9 +393,7 @@ contract StakerRewards is
      * @param _forwarderAddress The new address to set
      * @dev Only callable by the StrategyModuleManager
      */
-    function setForwarderAddress(
-        address _forwarderAddress
-    ) external onlyStratVaultManager {
+    function setForwarderAddress(address _forwarderAddress) external onlyStratVaultManager {
         forwarderAddress = _forwarderAddress;
     }
 
@@ -486,14 +402,16 @@ contract StakerRewards is
      * @dev Only callable by the StrategyModuleManager
      * @param _upkeepInterval The new interval between upkeep calls
      */
-    function updateUpkeepInterval(
-        uint256 _upkeepInterval
-    ) external onlyStratVaultManager {
+    function updateUpkeepInterval(uint256 _upkeepInterval) external onlyStratVaultManager {
         upkeepInterval = _upkeepInterval;
     }
 
     /* ============== INTERNAL FUNCTIONS ============== */
 
+    /**
+     * @notice Get the total number of VCs and the smallest VC number of a cluster
+     * @param nodes The nodes of the cluster
+     */
     function _getTotalAndSmallestVCs(IAuction.NodeDetails[] memory nodes) internal pure returns (uint256 totalClusterVCs, uint32 smallestVcNumber, uint8 clusterSize) {
         clusterSize = uint8(nodes.length);
         smallestVcNumber = nodes[0].currentVCNumber; 
@@ -507,49 +425,39 @@ contract StakerRewards is
             }
         }
     }
-
-
-    function _updateNodeVcNumber(bytes32 _clusterId, uint32 _smallestVC) internal view{
-        IAuction.NodeDetails[] memory nodes = auction.getClusterDetails(_clusterId).nodes;
-
-        for (uint8 i; i < nodes.length;) {
-            nodes[i].currentVCNumber = nodes[i].currentVCNumber - _smallestVC;
-            unchecked {
-                ++i;
-            }
-        }
-    }
-
+    
     /**
-     * @notice Decrease totalVCs by the number of VCs consumed by all the stakers since the previous checkpoint
-     * @dev This function is only called if totalActiveDVs is not 0.
+     * @notice Decrease totalVCs by the number of VCs used by the nodeOps since the previous checkpoint
      */
-    function _subtractConsumedVCsFromTotalVCs() internal nonReentrant {
+    function _removeConsumedVCs() internal nonReentrant {
         uint256 dailyConsumedVCs = numberDV4 * 4 + numberDV7 * 7;
         uint256 totalConsumedVCs = _getElapsedDays(checkpoint.updateTime) * dailyConsumedVCs;
         totalVCs -= totalConsumedVCs;
     }
 
     /**
-     * @notice Update totalNotYetClaimedRewards by adding the rewards ditributed to all stakers since the previous checkpoint
-     * @dev This function is only called if totalActiveDVs is not 0.
-     * @dev Rewards that were claimed by a staker should be subtracted from totalNotYetClaimedRewards.
+     * @notice Update totalPendingRewards by adding the distributed rewards since the previous checkpoint
+     * @dev Rewards that were already sent to StratVaultETH should be subtracted from totalPendingRewards
      */
-    function _updateTotalNotClaimedRewards(uint256 _rewardsClaimed) internal nonReentrant {
+    function _updatePendingRewards(uint256 _rewardsToVault) internal nonReentrant {
         uint256 elapsedDays = _getElapsedDays(checkpoint.updateTime);
-        uint256 rewardsDistributed = checkpoint.dailyRewardsPer32ETH * elapsedDays * (numberDV4 + numberDV7);
+        uint256 distributedRewards = checkpoint.dailyRewardsPer32ETH * elapsedDays * (numberDV4 + numberDV7);
 
-        if (_rewardsClaimed == 0) {
-            totalNotYetClaimedRewards += rewardsDistributed;
+        if (_rewardsToVault == 0) {
+            totalPendingRewards += distributedRewards;
         } else {
-            totalNotYetClaimedRewards = totalNotYetClaimedRewards + rewardsDistributed -_rewardsClaimed;
+            totalPendingRewards = totalPendingRewards + distributedRewards - _rewardsToVault;
         }
     }
 
     /**
      * @notice Update the checkpoint struct including calculating and updating dailyRewardsPer32ETH
+     * @dev Revert if there are no active DVs or if totalVCs is 0
      */
     function _updateCheckpoint() internal nonReentrant {
+        if (numberDV4 == 0 && numberDV7 == 0) revert NoActiveDVs();
+        if (totalVCs == 0) revert TotalVCsCannotBeZero();
+
         uint256 consumedVCsPerDayPerValidator = ((numberDV4 * 4 + numberDV7 * 7) * _WAD) / (numberDV4 + numberDV7);
         uint256 dailyRewardsPer32ETH = (getAllocatableRewards() / totalVCs) * consumedVCsPerDayPerValidator / _WAD;
         checkpoint.dailyRewardsPer32ETH = dailyRewardsPer32ETH;
@@ -558,12 +466,17 @@ contract StakerRewards is
 
     /**
      * @notice Get the number of days that have elapsed between the last checkpoint and the current one
-     * @param _lastTimestamp can be the last update time of Checkpoint or StratModData
+     * @param _lastTimestamp can be Checkpoint's updateTime or StratVaultETH's lastUpdate
      */
     function _getElapsedDays(uint256 _lastTimestamp) internal view returns (uint256) {
         return (block.timestamp - _lastTimestamp) / _ONE_DAY;
     }
 
+    /**
+     * @notice Get the daily VC price of a node
+     * @param _bidPrice The bid price paid by the node
+     * @param _vcNumber The VC number bought by the node
+     */
     function _getDailyVcPrice(uint256 _bidPrice, uint32 _vcNumber) internal pure returns(uint256) {
         return _bidPrice / _vcNumber;
     }
