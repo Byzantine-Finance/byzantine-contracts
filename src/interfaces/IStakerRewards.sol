@@ -2,16 +2,21 @@
 pragma solidity ^0.8.20;
 
 interface IStakerRewards {
-
     // External functions
+    function registerNativeStaking(address _vaultAddr, bytes32 _clusterId) external;
     function withdrawPosRewards(address _vaultAddr) external;
     function updateUpkeepInterval(uint256 _upkeepInterval) external;
     function setForwarderAddress(address _forwarderAddress) external;
 
     // View functions
-    function calculateRewards(address _vaultAddr, uint256 _numDVs) external view returns (uint256);
+    function calculateRewards(
+        address _vaultAddr,
+        uint256 _numDVs
+    ) external view returns (uint256);
     function getAllocatableRewards() external view returns (uint256);
-    function getClusterData(bytes32 _clusterId) external view returns (uint256, uint256, uint8);
+    function getClusterData(
+        bytes32 _clusterId
+    ) external view returns (uint256, uint256, uint8);
     function getCheckpointData() external view returns (uint256, uint256);
 
     /// @dev Returned when the transfer of the rewards to the staker failed
@@ -32,6 +37,9 @@ interface IStakerRewards {
     /// @dev Error when unauthorized call to a function callable only by the StrategyVaultManager.
     error OnlyStrategyVaultManager();
 
+    /// @dev Error when unauthorized call to a function callable only by a StratVaultETH.
+    error OnlyStratVaultETH();
+
     /// @dev Error when the bid price cannot be sent back to the escrow
     error FailedToSendBackBidPrice();
 
@@ -41,8 +49,8 @@ interface IStakerRewards {
     /// @dev Error when the timestamp is invalid
     error InvalidTimestamp();
 
-    /// @dev Error when unauthorized call to a function callable only by the Strategy Vault Owner (aka the ByzNft holder).
-    error OnlyNftOwner();
+    /// @dev Error when unauthorized call to a function callable only by a Strategy Vault.
+    error OnlyStrategyVault();
 
     /// @dev Error when there are no active DVs
     error NoActiveDVs();

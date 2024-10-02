@@ -6,7 +6,7 @@ import {PushSplitFactory} from "splits-v2/splitters/push/PushSplitFactory.sol";
 import { IAuction } from "../interfaces/IAuction.sol";
 import { IStrategyVaultManager } from "../interfaces/IStrategyVaultManager.sol";
 import { IEscrow } from "../interfaces/IEscrow.sol";
-import { StakerRewards } from "./StakerRewards.sol";
+import { IStakerRewards } from "../interfaces/IStakerRewards.sol";
 
 import {HitchensOrderStatisticsTreeLib } from "../libraries/HitchensOrderStatisticsTreeLib.sol";
 
@@ -39,7 +39,7 @@ abstract contract AuctionStorage is IAuction {
     PushSplitFactory public immutable pushSplitFactory;
 
     /// @notice StakerRewards contract
-    StakerRewards public immutable stakerRewards;
+    IStakerRewards public immutable stakerRewards;
 
     /* ===================== STATE VARIABLES ===================== */
 
@@ -86,7 +86,7 @@ abstract contract AuctionStorage is IAuction {
         IEscrow _escrow,
         IStrategyVaultManager _strategyVaultManager,
         PushSplitFactory _pushSplitFactory,
-        StakerRewards _stakerRewards
+        IStakerRewards _stakerRewards
     ) {
         escrow = _escrow;
         strategyVaultManager = _strategyVaultManager;

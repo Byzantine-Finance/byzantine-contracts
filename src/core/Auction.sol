@@ -27,7 +27,7 @@ contract Auction is
         IEscrow _escrow,
         IStrategyVaultManager _strategyVaultManager,
         PushSplitFactory _pushSplitFactory,
-        StakerRewards _stakerRewards
+        IStakerRewards _stakerRewards
     ) AuctionStorage(_escrow, _strategyVaultManager, _pushSplitFactory, _stakerRewards) {
         // Disable initializer in the context of the implementation contract
         _disableInitializers();

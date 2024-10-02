@@ -16,6 +16,8 @@ import "../interfaces/IByzNft.sol";
 import "../interfaces/IAuction.sol";
 import {console} from "forge-std/console.sol";
 
+// TODO: check nonReentrant modifier 
+
 contract StakerRewards is
     Initializable,
     ReentrancyGuardUpgradeable,
@@ -77,8 +79,8 @@ contract StakerRewards is
 
     /* ============== MODIFIERS ============== */
 
-    modifier onlyNftOwner(address _vaultAddr) {
-        if (msg.sender != IStrategyVaultETH(_vaultAddr).stratVaultOwner()) revert OnlyNftOwner();
+    modifier onlyStratVaultETH() {
+        if (!stratVaultManager.isStratVaultETH(msg.sender)) revert OnlyStratVaultETH();
         _;
     }
 
@@ -122,10 +124,11 @@ contract StakerRewards is
      * @param _vaultAddr Address of the StratVaultETH
      * @param _clusterId Id of the cluster
      */
-    function registerNativeStaking(address _vaultAddr, bytes32 _clusterId) public onlyStratVaultManager {
+    function registerNativeStaking(address _vaultAddr, bytes32 _clusterId) external onlyStratVaultETH {
         // Check the number of DV in the StratVaultETH before the current DV
+        // TODO: handle the rewards transfer error during waiting time between stakeNativeETH and moveETHToBeaconChain
         uint256 numExistingDVs = IStrategyVaultETH(_vaultAddr).getVaultDVNumber() - 1;
-        if (numExistingDVs > 0) {
+        if (numExistingDVs > 0 && vaultLastUpdate[_vaultAddr] != 0) {
             uint256 pendingRewards = calculateRewards(_vaultAddr, numExistingDVs);
             (bool success, ) = payable(_vaultAddr).call{value: pendingRewards}("");
             if (!success) revert FailedToSendRewards();
@@ -144,7 +147,7 @@ contract StakerRewards is
 
         // Update variables and checkpoint
         totalVCs += totalClusterVCs;
-        if (block.timestamp - checkpoint.updateTime > _ONE_DAY) {
+        if (checkpoint.updateTime != 0 && block.timestamp - checkpoint.updateTime > _ONE_DAY) {
             _removeConsumedVCs();
             _updatePendingRewards(0);
         }
@@ -158,7 +161,7 @@ contract StakerRewards is
      * 1. Calculate the last set of pending rewards and send them to the StratVaultETH
      * 2. Update variables and checkpoint if necessary
      */
-    function withdrawPosRewards(address _vaultAddr) public onlyNftOwner(_vaultAddr) {
+    function withdrawPosRewards(address _vaultAddr) external onlyStratVaultETH {
         // Calculate the rewards and send them to the StratVaultETH
         uint256 numDVs = IStrategyVaultETH(_vaultAddr).getVaultDVNumber();
         uint256 rewards = calculateRewards(_vaultAddr, numDVs);
@@ -172,7 +175,7 @@ contract StakerRewards is
             // Update totalPendingRewards
             _updatePendingRewards(rewards);
             // Remove the consumed VCs and update Checkpoint
-            if (block.timestamp - checkpoint.updateTime > _ONE_DAY) {
+            if (checkpoint.updateTime != 0 && block.timestamp - checkpoint.updateTime > _ONE_DAY) {
                 _removeConsumedVCs();
                 _updateCheckpoint();
             }
@@ -188,9 +191,7 @@ contract StakerRewards is
      * @dev Revert if the last update timestamp is 0
      */
     function calculateRewards(address _vaultAddr, uint256 _numDVs) public view returns (uint256) {
-        uint256 lastUpdate = vaultLastUpdate[_vaultAddr];
-        if (lastUpdate == 0) revert InvalidTimestamp();
-        uint256 elapsedDays = _getElapsedDays(lastUpdate);
+        uint256 elapsedDays = _getElapsedDays(vaultLastUpdate[_vaultAddr]);
         return checkpoint.dailyRewardsPer32ETH * elapsedDays * _numDVs;
     }
 
@@ -373,7 +374,7 @@ contract StakerRewards is
         if (!success) revert FailedToSendBackBidPrice();
 
         // Update totalVCs and totalPendingRewards variables
-        if (block.timestamp - checkpoint.updateTime > _ONE_DAY) {
+        if (checkpoint.updateTime != 0 && block.timestamp - checkpoint.updateTime > _ONE_DAY) {
             _removeConsumedVCs();
             _updatePendingRewards(0);
         }
@@ -393,7 +394,7 @@ contract StakerRewards is
      * @param _forwarderAddress The new address to set
      * @dev Only callable by the StrategyModuleManager
      */
-    function setForwarderAddress(address _forwarderAddress) external onlyStratVaultManager {
+    function setForwarderAddress(address _forwarderAddress) external {
         forwarderAddress = _forwarderAddress;
     }
 
@@ -469,6 +470,7 @@ contract StakerRewards is
      * @param _lastTimestamp can be Checkpoint's updateTime or StratVaultETH's lastUpdate
      */
     function _getElapsedDays(uint256 _lastTimestamp) internal view returns (uint256) {
+        if (_lastTimestamp == 0) revert InvalidTimestamp();
         return (block.timestamp - _lastTimestamp) / _ONE_DAY;
     }
 
