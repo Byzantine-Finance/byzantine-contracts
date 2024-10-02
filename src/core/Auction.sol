@@ -67,6 +67,9 @@ contract Auction is
         _clusterDetails[winningClusterId].status = ClusterStatus.IN_CREATION;
         ClusterDetails memory winningClusterDetails = getClusterDetails(winningClusterId);
 
+        // Transfer the winning bids price to the StakerReward contract
+        _transferBidToStakerReward(winningClusterDetails.nodes);
+
         // Remove the winning cluster from the main auction tree
         _mainAuctionTree.remove(winningClusterId, winningAvgAuctionScore);
 
@@ -362,6 +365,17 @@ contract Auction is
         emit BidWithdrawn(msg.sender, _auctionScore);
     }*/
 
+    /**
+     * @notice Update the status of a cluster
+     * @param _clusterId The id of the cluster to update the status
+     * @param _newStatus The new status
+     * @dev Callable only by a StrategyVaultETH contract
+     * @dev The check to know if the cluster is in the calling vault is done in the StrategyVaultETH contract
+     */
+    function updateClusterStatus(bytes32 _clusterId, IAuction.ClusterStatus _newStatus) external onlyStratVaultETH {
+        _clusterDetails[_clusterId].status = _newStatus;
+    }
+
     /* ===================== VIEW FUNCTIONS ===================== */
 
     /// @notice Returns true if `_nodeOpAddr` is whitelisted, false otherwise.
@@ -592,6 +606,20 @@ contract Auction is
     function _transferToEscrow(uint256 _priceToPay) private {
         (bool success,) = address(escrow).call{value: _priceToPay}("");
         if (!success) revert EscrowTransferFailed();
+    }
+
+    /// @notice Transfer the bid price to the StakerRewards contract
+    function _transferBidToStakerReward(NodeDetails[] memory _nodes) private {
+
+        uint256 bidToTransfer;
+        for (uint256 i = 0; i < _nodes.length;) {
+            bidToTransfer = _bidDetails[_nodes[i].bidId].bidPrice;
+            escrow.releaseFunds(bidToTransfer);
+            unchecked {
+                ++i;
+            }
+        }
+        
     }
 
     /// @notice Create the split parameters depending on the winning nodes

@@ -9,6 +9,11 @@ import "./IStrategyVault.sol";
 
 interface IStrategyVaultETH is IStrategyVault {
 
+  /* ============== GETTERS ============== */
+
+  /// @notice Get the address of the beacon chain admin
+  function beaconChainAdmin() external view returns (address);
+
     /* ============== INITIALIZER ============== */
 
     /**
@@ -18,7 +23,6 @@ interface IStrategyVaultETH is IStrategyVault {
      * @param _whitelistedDeposit Whether the deposit function is whitelisted or not.
      * @param _upgradeable Whether the StrategyVault is upgradeable or not.
      * @param _oracle The oracle implementation to use for the vault.
-     * @param _stakerReward The address of the StakerReward contract.
      * @dev Called on construction by the StrategyVaultManager.
      * @dev StrategyVaultETH so the deposit token is 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE
      */
@@ -27,99 +31,90 @@ interface IStrategyVaultETH is IStrategyVault {
         address _stratVaultCreator,
         bool _whitelistedDeposit,
         bool _upgradeable,
-        address _oracle,
-        address _stakerReward
+        address _oracle
     ) external;
 
     /* ============== EXTERNAL FUNCTIONS ============== */
 
-    /**
-     * @notice Deposit ETH to the StrategyVault and get Vault shares in return.
-     * @dev If first deposit, create an Eigen Pod for the StrategyVault.
-     * @dev If whitelistedDeposit is true, then only users with the whitelisted role can call this function.
-     * @dev The caller receives Byzantine StrategyVault shares in return for the ETH staked.
-     * @dev Revert if the amount deposited is not a multiple of 32 ETH.
-     * @dev Trigger auction(s) for each bundle of 32 ETH deposited to get Distributed Validator(s)
-     */
-    function stakeNativeETH() external payable;
+  /**
+   * @notice Deposit ETH to the StrategyVault and get Vault shares in return.
+   * @dev If first deposit, create an Eigen Pod for the StrategyVault.
+   * @dev If whitelistedDeposit is true, then only users with the whitelisted role can call this function.
+   * @dev The caller receives Byzantine StrategyVault shares in return for the ETH staked.
+   * @dev Revert if the amount deposited is not a multiple of 32 ETH.
+   * @dev Trigger auction(s) for each bundle of 32 ETH deposited to get Distributed Validator(s)
+   */
+  function stakeNativeETH() external payable; 
 
-    /**
-     * @notice Begins the withdrawal process to pull ETH out of the StrategyVault
-     * @param queuedWithdrawalParams TODO: Fill in
-     * @param strategies An array of strategy contracts for all tokens being withdrawn from EigenLayer.
-     * @dev Withdrawal is not instant - a withdrawal delay exists for removing the assets from EigenLayer
-     */
-    function startWithdrawETH(
-        IDelegationManager.QueuedWithdrawalParams[] memory queuedWithdrawalParams,
-        IStrategy[] memory strategies
-    ) external;
+  /* ============== BEACON CHAIN ADMIN FUNCTIONS ============== */
 
-    /**
-     * @notice Call the EigenPodManager contract
-     * @param data to call contract 
-     */
-    function callEigenPodManager(bytes calldata data) external payable returns (bytes memory);
+  /**
+   * @notice Deposit 32ETH in the beacon chain to activate a Distributed Validator and start validating on the consensus layer.
+   * @dev Function callable only by BeaconChainAdmin to be sure the deposit data are the ones of a DV created within the Byzantine protocol. 
+   * @param pubkey The 48 bytes public key of the beacon chain DV.
+   * @param signature The DV's signature of the deposit data.
+   * @param depositDataRoot The root/hash of the deposit data for the DV's deposit.
+   * @param clusterId The ID of the cluster associated to these deposit data.
+   * @dev Reverts if not exactly 32 ETH are sent.
+   * @dev Reverts if the cluster is not in the vault.
+   */
+  function activateCluster(
+      bytes calldata pubkey, 
+      bytes calldata signature,
+      bytes32 depositDataRoot,
+      bytes32 clusterId
+  ) external;
 
-    /**
-     * @notice This function verifies that the withdrawal credentials of the Distributed Validator(s) owned by
-     * the stratVaultOwner are pointed to the EigenPod of this contract. It also verifies the effective balance of the DV.
-     * It verifies the provided proof of the ETH DV against the beacon chain state root, marks the validator as 'active'
-     * in EigenLayer, and credits the restaked ETH in Eigenlayer.
-     * @param proofTimestamp is the exact timestamp where the proof was generated
-     * @param stateRootProof proves a `beaconStateRoot` against a block root fetched from the oracle
-     * @param validatorIndices is the list of indices of the validators being proven, refer to consensus specs
-     * @param validatorFieldsProofs proofs against the `beaconStateRoot` for each validator in `validatorFields`
-     * @param validatorFields are the fields of the "Validator Container", refer to consensus specs for details: 
-     * https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/beacon-chain.md#validator
-     * @dev That function must be called for a validator which is "INACTIVE".
-     * @dev The timestamp used to generate the Beacon Block Root is `block.timestamp - FINALITY_TIME` to be sure
-     * that the Beacon Block is finalized.
-     * @dev The arguments can be generated with the Byzantine API.
-     * @dev /!\ The Withdrawal credential proof must be recent enough to be valid (no older than VERIFY_BALANCE_UPDATE_WINDOW_SECONDS).
-     * It entails to re-generate a proof every 4.5 hours.
-     */
-    function verifyWithdrawalCredentials(
-        uint64 proofTimestamp,
-        BeaconChainProofs.StateRootProof calldata stateRootProof,
-        uint40[] calldata validatorIndices,
-        bytes[] calldata validatorFieldsProofs,
-        bytes32[][] calldata validatorFields
-    ) external;
+  /**
+   * @notice This function verifies that the withdrawal credentials of the Distributed Validator(s) owned by
+   * the stratVaultOwner are pointed to the EigenPod of this contract. It also verifies the effective balance of the DV.
+   * It verifies the provided proof of the ETH DV against the beacon chain state root, marks the validator as 'active'
+   * in EigenLayer, and credits the restaked ETH in Eigenlayer.
+   * @param proofTimestamp is the exact timestamp where the proof was generated
+   * @param stateRootProof proves a `beaconStateRoot` against a block root fetched from the oracle
+   * @param validatorIndices is the list of indices of the validators being proven, refer to consensus specs
+   * @param validatorFieldsProofs proofs against the `beaconStateRoot` for each validator in `validatorFields`
+   * @param validatorFields are the fields of the "Validator Container", refer to consensus specs for details: 
+   * https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/beacon-chain.md#validator
+   * @dev That function must be called for a validator which is "INACTIVE".
+   * @dev The timestamp used to generate the Beacon Block Root is `block.timestamp - FINALITY_TIME` to be sure
+   * that the Beacon Block is finalized.
+   * @dev The arguments can be generated with the Byzantine API.
+   * @dev /!\ The Withdrawal credential proof must be recent enough to be valid (no older than VERIFY_BALANCE_UPDATE_WINDOW_SECONDS).
+   * It entails to re-generate a proof every 4.5 hours.
+   */
+  function verifyWithdrawalCredentials(
+    uint64 proofTimestamp,
+    BeaconChainProofs.StateRootProof calldata stateRootProof,
+    uint40[] calldata validatorIndices,
+    bytes[] calldata validatorFieldsProofs,
+    bytes32[][] calldata validatorFields
+  )
+    external;
 
-    /**
-     * @notice The caller delegate its Strategy Vault's stake to an Eigen Layer operator.
-     * @notice /!\ Delegation is all-or-nothing: when a Staker delegates to an Operator, they delegate ALL their stake.
-     * @param operator The account teh Strategy Vault is delegating its assets to for use in serving applications built on EigenLayer.
-     * @dev The operator must not have set a delegation approver, everyone can delegate to it without permission.
-     * @dev Ensures that:
-     *          1) the `staker` is not already delegated to an operator
-     *          2) the `operator` has indeed registered as an operator in EigenLayer
-     */
-    function delegateTo(address operator) external;
+  /**
+   * @notice Call the EigenPodManager contract
+   * @param data to call contract 
+   */
+  function callEigenPodManager(bytes calldata data) external payable returns (bytes memory);
 
-    /**
-     * @notice Updates the whitelistedDeposit flag.
-     * @param _whitelistedDeposit The new whitelistedDeposit flag.
-     * @dev Callable only by the owner of the Strategy Vault's ByzNft.
-     */
-    function updateWhitelistedDeposit(bool _whitelistedDeposit) external;
+  /**
+   * @notice Returns the number of active DVs staked by the Strategy Vault.
+   */
+  function getVaultDVNumber() external view returns (uint256);
 
-    /* ================ VIEW FUNCTIONS ================ */
+  /**
+   * @notice Returns the IDs of the active DVs staked by the Strategy Vault.
+   */
+  function getAllDVIds() external view returns (bytes32[] memory);
 
-    /**
-     * @notice Returns the address of the owner of the Strategy Vault's ByzNft.
-     */
-    function stratVaultOwner() external view returns (address);
+  /* ============== STRATEGY VAULT MANAGER FUNCTIONS ============== */
 
-    /**
-     * @notice Returns the number of active DVs staked by the Strategy Vault.
-     */
-    function getVaultDVNumber() external view returns (uint256);
-
-    /**
-     * @notice Returns the IDs of the active DVs staked by the Strategy Vault.
-     */
-    function getAllDVIds() external view returns (bytes32[] memory);
+  /**
+   * @notice Create an EigenPod for the StrategyVault.
+   * @dev Can only be called by the StrategyVaultManager during the vault creation.
+   */
+  function createEigenPod() external;
 
     /* ============== ERRORS ============== */
 
@@ -132,12 +127,10 @@ interface IStrategyVaultETH is IStrategyVault {
     /// @dev Returned when trying to access DV data but no ETH has been deposited
     error NativeRestakingNotActivated();
 
-    /// @dev Returned when the staker rewards distribution fails
-    error FailedToDistributeStakerRewards();
+    /// @dev Returned when trying to trigger Beacon Chain transactions from an unauthorized address
+    error OnlyBeaconChainAdmin();
 
-    /* ============== EVENTS ============== */
-
-    /// @notice Emitted when StakerReward contract distributes rewards
-    event StakerRewardsDistributed(uint256 amount);
+    /// @dev Returned when trying to interact with a cluster ID not in the vault
+    error ClusterNotInVault();
 
 }

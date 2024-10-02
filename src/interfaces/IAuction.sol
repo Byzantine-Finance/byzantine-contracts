@@ -16,7 +16,8 @@ interface IAuction {
         INACTIVE,
         IN_CREATION,
         DEPOSITED_NOT_VERIFIED,
-        DEPOSITED_VERIFIED
+        DEPOSITED_VERIFIED,
+        EXITED
     }
 
     /* ===================== STRUCTS ===================== */
@@ -231,6 +232,15 @@ interface IAuction {
      * @param _auctionScore: auction score of the bid to withdraw. Will withdraw the last bid with this score.
      */
     // function withdrawBid(uint256 _auctionScore) external;
+
+    /**
+     * @notice Update the status of a cluster
+     * @param _clusterId The id of the cluster to update the status
+     * @param _newStatus The new status
+     * @dev Callable only by a StrategyVaultETH contract
+     * @dev The check to know if the cluster is in the calling vault is done in the StrategyVaultETH contract
+     */
+    function updateClusterStatus(bytes32 _clusterId, IAuction.ClusterStatus _newStatus) external;
 
     /* ===================== OWNER FUNCTIONS ===================== */
 

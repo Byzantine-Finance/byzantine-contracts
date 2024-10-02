@@ -7,6 +7,7 @@ import {ERC7535MultiRewardVault} from "../vault/ERC7535MultiRewardVault.sol";
 import "./StrategyVaultETHStorage.sol";
 
 // TODO: Finish withdrawal logic
+// TODO: Distribute or give access to rewards only when ETH are staked on the Beacon Chain
 
 contract StrategyVaultETH is Initializable, StrategyVaultETHStorage, ERC7535MultiRewardVault {
     using FIFOLib for FIFOLib.FIFO;
@@ -24,8 +25,15 @@ contract StrategyVaultETH is Initializable, StrategyVaultETHStorage, ERC7535Mult
         _;
     }
 
+    modifier onlyBeaconChainAdmin() {
+        if (msg.sender != beaconChainAdmin) revert OnlyBeaconChainAdmin();
+        _;
+    }
+
     modifier checkWhitelist() {
-        if (whitelistedDeposit && !isWhitelisted[msg.sender]) revert OnlyWhitelistedDeposit();
+        if (msg.sender != address(stratVaultManager)) { // deposit during the vault creation
+            if (whitelistedDeposit && !isWhitelisted[msg.sender]) revert OnlyWhitelistedDeposit();
+        }
         _;
     }
 
@@ -44,13 +52,17 @@ contract StrategyVaultETH is Initializable, StrategyVaultETHStorage, ERC7535Mult
         IAuction _auction,
         IByzNft _byzNft,
         IEigenPodManager _eigenPodManager,
-        IDelegationManager _delegationManager
+        IDelegationManager _delegationManager,
+        IStakerRewards _stakerRewards,
+        address _beaconChainAdmin
     ) {
         stratVaultManager = _stratVaultManager;
         auction = _auction;
         byzNft = _byzNft;
         eigenPodManager = _eigenPodManager;
         delegationManager = _delegationManager;
+        stakerRewards = _stakerRewards;
+        beaconChainAdmin = _beaconChainAdmin;
         // Disable initializer in the context of the implementation contract
         _disableInitializers();
     }
@@ -66,8 +78,13 @@ contract StrategyVaultETH is Initializable, StrategyVaultETHStorage, ERC7535Mult
      * @dev Called on construction by the StrategyVaultManager.
      * @dev StrategyVaultETH so the deposit token is 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE
      */
-    //TODO: Rename to __StrategyVaultETH_init?
-    function initialize(uint256 _nftId, address _stratVaultCreator, bool _whitelistedDeposit, bool _upgradeable, address _oracle, address _stakerReward) public onlyInitializing {
+    function initialize(
+       uint256 _nftId,
+       address _stratVaultCreator,
+       bool _whitelistedDeposit,
+       bool _upgradeable,
+       address _oracle
+    ) external initializer {
 
         // Initialize parent contracts (ERC7535MultiRewardVault)
         __ERC7535MultiRewardVault_init(_oracle);
@@ -101,49 +118,6 @@ contract StrategyVaultETH is Initializable, StrategyVaultETHStorage, ERC7535Mult
     
     /* ============== EXTERNAL FUNCTIONS ============== */
 
-    // /**
-    //  * @notice Deposit 32ETH in the beacon chain to activate a Distributed Validator and start validating on the consensus layer.
-    //  * Also creates an EigenPod for the StrategyVault.
-    //  * @param pubkey The 48 bytes public key of the beacon chain DV.
-    //  * @param signature The DV's signature of the deposit data.
-    //  * @param depositDataRoot The root/hash of the deposit data for the DV's deposit.
-    //  * @dev If whitelistedDeposit is true, then only users with the whitelisted role can call this function.
-    //  * @dev The first call to this function is done by the StrategyVaultManager and creates the StrategyVault's EigenPod.
-    //  * @dev The caller receives Byzantine StrategyVault shares in return for the ETH staked.
-    //  */
-    // function stakeNativeETH(
-    //     bytes calldata pubkey, 
-    //     bytes calldata signature,
-    //     bytes32 depositDataRoot
-    // ) external payable {
-    //     /// TODO Check the whitelist --> creator is whitelisted in initialize function
-    //     /// TODO Put these checks in a modifier
-    //     /// TODO Remove the roles
-    //     /// if (whitelistedDeposit && !hasRole(whitelisted, msg.sender)) revert OnlyWhitelistedDeposit();
-
-    //     // Check that the deposit is a multiple of 32 ETH
-    //     if (msg.value % 32 ether != 0) revert CanOnlyDepositMultipleOf32ETH();
-
-    //     // Calculate how many bundles of 32 ETH were sent
-    //     uint256 num32ETHBundles = msg.value / 32 ether;
-
-    //     // Trigger an auction for each bundle of 32 ETH
-    //     for (uint256 i = 0; i < num32ETHBundles;) {
-    //         bytes32 winningClusterId = auction.triggerAuction();
-    //         clusterIdsFIFO.push(winningClusterId);
-    //         unchecked {
-    //             ++i;
-    //         }
-    //     }
-        
-    //     // Mint vault shares to the staker in return for the ETH staked
-    //     _mintVaultShares(msg.value, msg.sender);
-
-    //     // Create Eigen Pod (if not already has one) and stake the native ETH
-    //     // eigenPodManager.stake{value: msg.value}(pubkey, signature, depositDataRoot);
-
-    // }
-
     /**
      * @notice Deposit ETH to the StrategyVault and get Vault shares in return.
      * @dev If first deposit, create an Eigen Pod for the StrategyVault.
@@ -170,7 +144,7 @@ contract StrategyVaultETH is Initializable, StrategyVaultETHStorage, ERC7535Mult
         }
         
         // Mint vault shares to the staker in return for the ETH staked
-        _mintVaultShares(msg.value, msg.sender);
+        // _mintVaultShares(msg.value, msg.sender);
     }
 
     /**
@@ -221,14 +195,58 @@ contract StrategyVaultETH is Initializable, StrategyVaultETHStorage, ERC7535Mult
     //     _burnVaultShares(assetAmount, receiver);
     // }
 
-    /* ============== VAULT CREATOR FUNCTIONS ============== */
+    /* ============== STRATEGY VAULT MANAGER FUNCTIONS ============== */
 
     /**
-     * @notice Call the EigenPodManager contract
-     * @param data to call contract 
+     * @notice The caller delegate its Strategy Vault's stake to an Eigen Layer operator.
+     * @notice /!\ Delegation is all-or-nothing: when a Staker delegates to an Operator, they delegate ALL their stake.
+     * @param operator The account teh Strategy Vault is delegating its assets to for use in serving applications built on EigenLayer.
+     * @dev The operator must not have set a delegation approver, everyone can delegate to it without permission.
+     * @dev Ensures that:
+     *          1) the `staker` is not already delegated to an operator
+     *          2) the `operator` has indeed registered as an operator in EigenLayer
      */
-    function callEigenPodManager(bytes calldata data) external payable onlyNftOwner returns (bytes memory) {
-        return _executeCall(payable(address(eigenPodManager)), msg.value, data);
+    function delegateTo(address operator) external checkDelegator {
+
+        // Create an empty delegation approver signature
+        ISignatureUtils.SignatureWithExpiry memory emptySignatureAndExpiry;
+
+        delegationManager.delegateTo(operator, emptySignatureAndExpiry, bytes32(0));
+    }
+
+    /**
+     * @notice Create an EigenPod for the StrategyVault.
+     * @dev Can only be called by the StrategyVaultManager during the vault creation.
+     */
+    function createEigenPod() external onlyStratVaultManager {
+        eigenPodManager.createPod();
+    }
+
+    /* ============== BEACON CHAIN ADMIN FUNCTIONS ============== */
+
+    /**
+     * @notice Deposit 32ETH in the beacon chain to activate a Distributed Validator and start validating on the consensus layer.
+     * @dev Function callable only by BeaconChainAdmin to be sure the deposit data are the ones of a DV created within the Byzantine protocol. 
+     * @param pubkey The 48 bytes public key of the beacon chain DV.
+     * @param signature The DV's signature of the deposit data.
+     * @param depositDataRoot The root/hash of the deposit data for the DV's deposit.
+     * @param clusterId The ID of the cluster associated to these deposit data.
+     * @dev Reverts if not exactly 32 ETH are sent.
+     * @dev Reverts if the cluster is not in the vault.
+     */
+    function activateCluster(
+        bytes calldata pubkey, 
+        bytes calldata signature,
+        bytes32 depositDataRoot,
+        bytes32 clusterId
+    ) external onlyBeaconChainAdmin {
+        if (!clusterIdsFIFO.exists(clusterId)) revert ClusterNotInVault();
+
+        // Change the cluster status to DEPOSITED_NOT_VERIFIED
+        auction.updateClusterStatus(clusterId, IAuction.ClusterStatus.DEPOSITED_NOT_VERIFIED);
+
+        // Stake the native ETH in the Beacon Chain
+        eigenPodManager.stake{value: 32 ether}(pubkey, signature, depositDataRoot);
     }
 
     /**
@@ -274,22 +292,7 @@ contract StrategyVaultETH is Initializable, StrategyVaultETHStorage, ERC7535Mult
         // delegationManager.increaseDelegatedShares(address(this), strategy, amount);
     }
 
-    /**
-     * @notice The caller delegate its Strategy Vault's stake to an Eigen Layer operator.
-     * @notice /!\ Delegation is all-or-nothing: when a Staker delegates to an Operator, they delegate ALL their stake.
-     * @param operator The account teh Strategy Vault is delegating its assets to for use in serving applications built on EigenLayer.
-     * @dev The operator must not have set a delegation approver, everyone can delegate to it without permission.
-     * @dev Ensures that:
-     *          1) the `staker` is not already delegated to an operator
-     *          2) the `operator` has indeed registered as an operator in EigenLayer
-     */
-    function delegateTo(address operator) external checkDelegator {
-
-        // Create an empty delegation approver signature
-        ISignatureUtils.SignatureWithExpiry memory emptySignatureAndExpiry;
-
-        delegationManager.delegateTo(operator, emptySignatureAndExpiry, bytes32(0));
-    }
+    /* ============== VAULT CREATOR FUNCTIONS ============== */
 
     /**
      * @notice Updates the whitelistedDeposit flag.
@@ -300,6 +303,17 @@ contract StrategyVaultETH is Initializable, StrategyVaultETHStorage, ERC7535Mult
         whitelistedDeposit = _whitelistedDeposit;
     }
 
+    /**
+     * @notice Whitelist a staker.
+     * @param staker The address to whitelist.
+     * @dev Callable only by the owner of the Strategy Vault's ByzNft.
+     */
+    function whitelistStaker(address staker) external onlyNftOwner {
+        if (!whitelistedDeposit) revert WhitelistedDepositDisabled();
+        if (isWhitelisted[staker]) revert StakerAlreadyWhitelisted();
+        isWhitelisted[staker] = true;
+    }
+
     /* ================ VIEW FUNCTIONS ================ */
 
     /**
@@ -307,6 +321,13 @@ contract StrategyVaultETH is Initializable, StrategyVaultETHStorage, ERC7535Mult
      */
     function stratVaultOwner() public view returns (address) {
         return byzNft.ownerOf(stratVaultNftId);
+    }
+
+    /**
+     * @notice Returns the Eigen Layer operator that the Strategy Vault is delegated to
+     */
+    function hasDelegatedTo() public view returns (address) {
+        return delegationManager.delegatedTo(address(this));
     }
 
     /**
@@ -339,34 +360,4 @@ contract StrategyVaultETH is Initializable, StrategyVaultETHStorage, ERC7535Mult
         super.withdraw(amount, receiver, msg.sender);
         _distributeStakerRewards();
     }
-
-    /**
-     * @notice Execute a low level call
-     * @param to address to execute call
-     * @param value amount of ETH to send with call
-     * @param data bytes array to execute
-     */
-    function _executeCall(
-        address payable to,
-        uint256 value,
-        bytes memory data
-    ) private returns (bytes memory) {
-        (bool success, bytes memory retData) = address(to).call{value: value}(data);
-        if (!success) revert CallFailed(data);
-        return retData;
-    }
-
-    /**
-     * @dev Distributes staker rewards to the contract from the stakerReward contract.
-     //TODO: Integrate with the stakerReward contract
-     */
-    function _distributeStakerRewards() internal {
-        uint256 balanceBefore = address(this).balance;
-        (bool success, ) = stakerReward.call(abi.encodeWithSignature("distributeRewards()"));
-        if (!success) revert FailedToDistributeStakerRewards();
-        uint256 balanceAfter = address(this).balance;
-        uint256 rewardsDistributed = balanceAfter - balanceBefore;
-        emit StakerRewardsDistributed(rewardsDistributed);
-    }
-
 }

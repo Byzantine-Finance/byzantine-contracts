@@ -10,18 +10,18 @@ contract Escrow is IEscrow {
      * @notice Address which receives the bid of the auction winners
      * @dev This will be updated to a smart contract vault in the future to distribute the stakers rewards
      */
-    address public immutable bidPriceReceiver;
+    address public immutable stakerRewards;
 
     /// @notice Auction contract
     IAuction public immutable auction;
 
     /**
-     * @notice Constructor to set the bidPriceReceiver address and the auction contract
-     * @param _bidPriceReceiver Address which receives the bid of the winners and distribute it to the stakers
+     * @notice Constructor to set the stakerRewards address and the auction contract
+     * @param _stakerRewards Address which receives the bid of the winners and distribute it to the stakers
      * @param _auction The auction proxy contract
      */
-    constructor(address _bidPriceReceiver, IAuction _auction) {
-        bidPriceReceiver = _bidPriceReceiver;
+    constructor(address _stakerRewards, IAuction _auction) {
+        stakerRewards = _stakerRewards;
         auction = _auction;
     }
 
@@ -40,7 +40,7 @@ contract Escrow is IEscrow {
      */
     function releaseFunds(uint256 _bidPrice) public onlyAuction {
         if (address(this).balance < _bidPrice) revert InsufficientFundsInEscrow();
-        (bool success, ) = payable(bidPriceReceiver).call{value: _bidPrice}("");
+        (bool success, ) = payable(stakerRewards).call{value: _bidPrice}("");
         if (!success) revert FailedToSendEther();
     }
 

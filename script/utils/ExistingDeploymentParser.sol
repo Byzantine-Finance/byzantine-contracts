@@ -11,6 +11,7 @@ import {StrategyVaultERC20} from "../../src/core/StrategyVaultERC20.sol";
 import {ByzNft} from "../../src/tokens/ByzNft.sol";
 import {Auction} from "../../src/core/Auction.sol";
 import {Escrow} from "../../src/vault/Escrow.sol";
+import {StakerRewards} from "../../src/core/StakerRewards.sol";
 
 import {EigenPodManager} from "eigenlayer-contracts/pods/EigenPodManager.sol";
 import {DelegationManager} from "eigenlayer-contracts/core/DelegationManager.sol";
@@ -38,6 +39,11 @@ contract ExistingDeploymentParser is Script, Test {
     Auction public auctionImplementation;
     Escrow public escrow;
     Escrow public escrowImplementation;
+    StakerRewards public stakerRewards;
+    StakerRewards public stakerRewardsImplementation;
+
+    // Beacon Chain Admin address
+    address public beaconChainAdmin;
 
     // EigenLayer contracts
     DelegationManager public delegation;
@@ -78,6 +84,8 @@ contract ExistingDeploymentParser is Script, Test {
 
         // read bidReceiver address
         bidReceiver = stdJson.readAddress(initialDeploymentData, ".bidReceiver");
+        // read beaconChainAdmin address
+        beaconChainAdmin = stdJson.readAddress(initialDeploymentData, ".beaconChainAdmin");
 
         // read eigen layer contract addresses
         eigenPodManager = EigenPodManager(stdJson.readAddress(initialDeploymentData, ".eigenLayerContractAddr.eigenPodManager"));
@@ -167,6 +175,14 @@ contract ExistingDeploymentParser is Script, Test {
             strategyVaultETHImplementation.delegationManager() == delegation,
             "strategyVaultETHImplementation: delegationManager address not set correctly"
         );
+        require(
+            strategyVaultETHImplementation.stakerRewards() == stakerRewards,
+            "strategyVaultETHImplementation: stakerRewards address not set correctly"
+        );
+        require(
+            strategyVaultETHImplementation.beaconChainAdmin() == beaconChainAdmin,
+            "strategyVaultETHImplementation: beaconChainAdmin address not set correctly"
+        );
         // StrategyVaultERC20Implementation
         require(
             strategyVaultERC20Implementation.stratVaultManager() == strategyVaultManager,
@@ -199,8 +215,8 @@ contract ExistingDeploymentParser is Script, Test {
         );
         // Escrow
         require(
-            escrow.bidPriceReceiver() == bidReceiver,
-            "escrow: bidPriceReceiver address not set correctly"
+            escrow.stakerRewards() == bidReceiver,
+            "escrow: stakerRewards address not set correctly"
         );
         require(
             escrow.auction() == auction,
@@ -314,6 +330,7 @@ contract ExistingDeploymentParser is Script, Test {
 
         string memory parameters = "parameters";
         vm.serializeAddress(parameters, "byzantineAdmin", byzantineAdmin);
+        vm.serializeAddress(parameters, "beaconChainAdmin", beaconChainAdmin);
         string memory parameters_output = vm.serializeAddress(parameters, "bidReceiver", bidReceiver);
 
         string memory chain_info = "chainInfo";

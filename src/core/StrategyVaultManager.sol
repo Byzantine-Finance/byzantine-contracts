@@ -234,44 +234,6 @@ contract StrategyVaultManager is
     /* ============== EIGEN LAYER INTERACTION ============== */
 
     /**
-     * @notice Specify which `staker`'s StrategyVaults are delegated.
-     * @param staker The address of the StrategyVaults' owner.
-     * @dev Revert if the `staker` doesn't have any StrategyVault.
-     */
-    function isDelegated(address staker) public view returns (bool[] memory) {
-        // if (!hasStratVaults(staker)) revert DoNotHaveStratVault(staker);
-
-        // address[] memory stratVaults = getStratVaults(staker);
-        // bool[] memory stratVaultsDelegated = new bool[](stratVaults.length);
-        // for (uint256 i = 0; i < stratVaults.length;) {
-        //     stratVaultsDelegated[i] = delegationManager.isDelegated(stratVaults[i]);
-        //     unchecked {
-        //         ++i;
-        //     }
-        // }
-        // return stratVaultsDelegated;
-    }
-
-    /**
-     * @notice Specify to which operators `staker`'s StrategyVaults has delegated to.
-     * @param staker The address of the StrategyVaults' owner.
-     * @dev Revert if the `staker` doesn't have any StrategyVault.
-     */
-    function hasDelegatedTo(address staker) public view returns (address[] memory) {
-        // if (!hasStratVaults(staker)) revert DoNotHaveStratVault(staker);
-
-        // address[] memory stratVaults = getStratVaults(staker);
-        // address[] memory stratVaultsDelegateTo = new address[](stratVaults.length);
-        // for (uint256 i = 0; i < stratVaults.length;) {
-        //     stratVaultsDelegateTo[i] = delegationManager.delegatedTo(stratVaults[i]);
-        //     unchecked {
-        //         ++i;
-        //     }
-        // }
-        // return stratVaultsDelegateTo;
-    }
-
-    /**
      * @notice Returns the address of the Strategy Vault's EigenPod (whether it is deployed yet or not).
      * @param stratVaultAddr The address of the StrategyVault contract you want to know the EigenPod address.
      * @dev If the `stratVaultAddr` is not an instance of a StrategyVault contract, the function will all the same 
@@ -279,16 +241,6 @@ contract StrategyVaultManager is
      */
     function getPodByStratVaultAddr(address stratVaultAddr) public view returns (address) {
         return address(eigenPodManager.getPod(stratVaultAddr));
-    }
-
-    /**
-     * @notice Returns 'true' if the `stratVaultAddr` has created an EigenPod, and 'false' otherwise.
-     * @param stratVaultAddr The StrategyVault Address you want to know if it has created an EigenPod.
-     * @dev If the `stratVaultAddr` is not an instance of a StrategyVault contract, the function will all the same 
-     * returns the EigenPod of the input address. SO USE THAT FUNCTION CARREFULLY.
-     */
-    function hasPod(address stratVaultAddr) public view returns (bool) {
-        return eigenPodManager.hasPod(stratVaultAddr);
     }
 
     /* ============== INTERNAL FUNCTIONS ============== */
@@ -334,7 +286,8 @@ contract StrategyVaultManager is
 
         // create the stratVault
         address stratVault = address(new BeaconProxy(address(stratVaultETHBeacon), ""));
-        IStrategyVaultETH(stratVault).initialize(nftId, msg.sender, whitelistedDeposit, upgradeable, oracle, stakerReward);
+        IStrategyVaultETH(stratVault).initialize(nftId, msg.sender, whitelistedDeposit, upgradeable, oracle);
+        IStrategyVaultETH(stratVault).createEigenPod();
 
         // Add the newly created stratVaultETH to the unordered stratVaultETH set
         _stratVaultETHSet.insert(stratVault);
