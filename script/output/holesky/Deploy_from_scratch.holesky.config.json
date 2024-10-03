@@ -1,24 +1,28 @@
 {
   "addresses": {
-    "auction": "0x1ae6F573F0D7b4b966Ce103BC18F3A3b9E43987b",
-    "auctionImplementation": "0xedbE23174eC71604FBc4D7af6416dc8396c46572",
-    "byzNft": "0xB8492aD52067B0b0a520041c0B16A3092bee05Bc",
-    "byzNftImplementation": "0x3F26e94839Bf370062043122CCB1c95e668E69Db",
-    "byzantineProxyAdmin": "0x6aA4FfD1aecB89879b9A98f01A4d9c1531D63e1c",
-    "emptyContract": "0xb3b18C956f1D0D90a5E45D3249b9C31711aFb8a6",
-    "escrow": "0x5FE3eD446e0195E9626744D1047E31C8927535d5",
-    "escrowImplementation": "0xD0f7EC487Bf492e1a6341648F4ce597430276439",
-    "strategyVaultBeacon": "0x5504899Eb7a4A21485Fa20C48371776E9E6D4E43",
-    "strategyVaultImplementation": "0x37b1fd2f69aD252534161a7C30A0Bea1e9750182",
-    "strategyVaultManager": "0x6b70ECA73689463C863873154744169Bcc622308",
-    "strategyVaultManagerImplementation": "0x4d67959Ffbaafd79DE45fF73147147185d626bf7"
+    "auction": "0x2a238CbF7A05B45Fb101d9Fde6A1025719Da50fF",
+    "auctionImplementation": "0xeCd7D94A8E90FdC41007f075d3B9AdAB5a64F2C7",
+    "byzNft": "0x5CE5664674351bf9c9c596aEe6C44675f823F56e",
+    "byzNftImplementation": "0xE4Ae458C8f5fA146aFf4341b72ebb232D14eeB43",
+    "byzantineProxyAdmin": "0x7a350f5d52458e364697E5545cC653C4f9C4faA3",
+    "emptyContract": "0x5f93Aa561Ab1F7e2E99f07dBA97Ae58Bb9F6d71A",
+    "escrow": "0x2AFc1b35CA3102111099f02851CA1C20eA208dDc",
+    "escrowImplementation": "0xD179620DCAdABC5B399C77Ff60Ea323c545CA444",
+    "stakerRewards": "0xCAF6DaE5Ce3D18Ea23bf43Dc3c99eF2B60063f49",
+    "stakerRewardsImplementation": "0x0dEa6a4A041aDB60E0C5ae77650D6c3b0dE68FaB",
+    "strategyVaultERC20Beacon": "0xdCd2B28bf750F2Bdd5b11B83188A6d4a764e9F6a",
+    "strategyVaultERC20Implementation": "0x3DAd82039f4f4684dFEe88207748CC1E5D9c1A4C",
+    "strategyVaultETHBeacon": "0x2c3300cC606cebC0172D2B3B2599200a3aC0B433",
+    "strategyVaultETHImplementation": "0xfe18F34b62700363C560AA0AF6424d0002Bb28a5",
+    "strategyVaultManager": "0x94768Ff014890787C9b1CdEdBdbee12439AA212B",
+    "strategyVaultManagerImplementation": "0xDFE3EE6d4dECB1af9d76cF7B9bE19e08a2bcf7A4"
   },
   "chainInfo": {
     "chainId": 17000,
-    "deploymentBlock": 1769907
+    "deploymentBlock": 2460508
   },
   "parameters": {
-    "bidReceiver": "0x9c475A3FB5E0ee61B049516b7e1186Cc3F1362C0",
+    "beaconChainAdmin": "0x5c27a880ec9024F006A70B8f1fB91b82d94ef4D4",
     "byzantineAdmin": "0x6D040d67Ab711EC159F870F5259f27bB8d62FeD7"
   }
 }
