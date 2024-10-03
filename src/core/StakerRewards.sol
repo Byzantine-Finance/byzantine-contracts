@@ -74,8 +74,12 @@ contract StakerRewards is
     /// @notice ClusterId => ClusterData
     mapping(bytes32 => ClusterData) public clusters;
 
-    /// @notice StratVaultETH address => StratVaultETH's last update timestamp
-    mapping(address => uint256) public vaultLastUpdate;
+    struct VaultData {
+        uint256 lastUpdate;
+        uint256 numActiveDVs;
+    }
+    /// @notice StratVaultETH address => VaultData
+    mapping(address => VaultData) public vaults;
 
     /* ============== MODIFIERS ============== */
 
@@ -120,23 +124,13 @@ contract StakerRewards is
     receive() external payable {}
 
     /**
-     * @notice Function called by StratVaultManager when a DV is activated to create a checkpoint and update variables
-     * @param _vaultAddr Address of the StratVaultETH
-     * @param _clusterId Id of the cluster
+     * @notice Function called by StratVaultETH when a DV is created to add a new checkpoint and update variables
+     * @param _clusterId The ID of the cluster
      */
-    function registerNativeStaking(address _vaultAddr, bytes32 _clusterId) external onlyStratVaultETH {
-        // Check the number of DV in the StratVaultETH before the current DV
-        // TODO: handle the rewards transfer error during waiting time between stakeNativeETH and moveETHToBeaconChain
-        uint256 numExistingDVs = IStrategyVaultETH(_vaultAddr).getVaultDVNumber() - 1;
-        if (numExistingDVs > 0 && vaultLastUpdate[_vaultAddr] != 0) {
-            uint256 pendingRewards = calculateRewards(_vaultAddr, numExistingDVs);
-            (bool success, ) = payable(_vaultAddr).call{value: pendingRewards}("");
-            if (!success) revert FailedToSendRewards();
-        }
-        vaultLastUpdate[_vaultAddr] = block.timestamp;
-
+    function dvCreationCheckpoint(bytes32 _clusterId) external onlyStratVaultETH {
         // Get the total new VCs, the smallest VC and the cluster size
-        IAuction.NodeDetails[] memory nodes = auction.getClusterDetails(_clusterId).nodes;
+        IAuction.ClusterDetails memory clusterDetails = auction.getClusterDetails(_clusterId);
+        IAuction.NodeDetails[] memory nodes = clusterDetails.nodes;
         (uint256 totalClusterVCs, uint32 smallestVC, uint8 clusterSize) = _getTotalAndSmallestVCs(nodes);
 
         // Update ClusterData
@@ -147,12 +141,42 @@ contract StakerRewards is
 
         // Update variables and checkpoint
         totalVCs += totalClusterVCs;
-        if (checkpoint.updateTime != 0 && block.timestamp - checkpoint.updateTime > _ONE_DAY) {
+        if (numberDV4 + numberDV7 > 0 && block.timestamp - checkpoint.updateTime > _ONE_DAY) {
             _removeConsumedVCs();
             _updatePendingRewards(0);
         }
+
         clusterSize == 4 ? ++numberDV4 : ++numberDV7;
         _updateCheckpoint();
+    }
+
+    /**
+     * @notice Function called by StratVaultETH when a DV is activated to add a new checkpoint and update variables
+     * @param _vaultAddr Address of the StratVaultETH
+     */
+    function dvActivationCheckpoint(address _vaultAddr) external onlyStratVaultETH {
+        VaultData storage vault = vaults[_vaultAddr];
+
+        if (vault.lastUpdate != 0) {
+            uint256 pendingRewards = calculateRewards(_vaultAddr, vault.numActiveDVs);
+
+            if (pendingRewards > 0) {
+                (bool success, ) = payable(_vaultAddr).call{value: pendingRewards}("");
+                if (!success) revert FailedToSendRewards();
+
+                // Remove the rewards sent to StratVaultETH from totalPendingRewards
+                _updatePendingRewards(pendingRewards);
+                // Remove the consumed VCs if the checkpoint is not updated for a day
+                if (block.timestamp - checkpoint.updateTime > _ONE_DAY) {
+                    _removeConsumedVCs();
+                }
+                // Update the checkpoint
+                _updateCheckpoint();
+            }
+        }
+
+        vault.lastUpdate = block.timestamp;
+        ++vault.numActiveDVs;
     }
 
     /** 
@@ -163,22 +187,24 @@ contract StakerRewards is
      */
     function withdrawPosRewards(address _vaultAddr) external onlyStratVaultETH {
         // Calculate the rewards and send them to the StratVaultETH
-        uint256 numDVs = IStrategyVaultETH(_vaultAddr).getVaultDVNumber();
-        uint256 rewards = calculateRewards(_vaultAddr, numDVs);
+        VaultData storage vault = vaults[_vaultAddr];
+        uint256 numActiveDVsInVault = vault.numActiveDVs;
+        uint256 pendingRewards = calculateRewards(_vaultAddr, numActiveDVsInVault);
 
-        if (rewards > 0) {
-            (bool success, ) = payable(_vaultAddr).call{value: rewards}("");
+        if (pendingRewards > 0) {
+            (bool success, ) = payable(_vaultAddr).call{value: pendingRewards}("");
             if (!success) revert FailedToSendRewards();
 
-            // Update the last update timestamp of the StratVaultETH
-            vaultLastUpdate[_vaultAddr] = block.timestamp;
-            // Update totalPendingRewards
-            _updatePendingRewards(rewards);
+            // Remove the rewards sent to the StratVaultETH from totalPendingRewards
+            _updatePendingRewards(pendingRewards);
             // Remove the consumed VCs and update Checkpoint
-            if (checkpoint.updateTime != 0 && block.timestamp - checkpoint.updateTime > _ONE_DAY) {
+            if (block.timestamp - checkpoint.updateTime > _ONE_DAY) {
                 _removeConsumedVCs();
-                _updateCheckpoint();
             }
+            // Update the checkpoint
+            _updateCheckpoint();
+            // Update the last update timestamp of the StratVaultETH
+            vault.lastUpdate = block.timestamp;
         }
     }
 
@@ -191,7 +217,8 @@ contract StakerRewards is
      * @dev Revert if the last update timestamp is 0
      */
     function calculateRewards(address _vaultAddr, uint256 _numDVs) public view returns (uint256) {
-        uint256 elapsedDays = _getElapsedDays(vaultLastUpdate[_vaultAddr]);
+        VaultData storage vault = vaults[_vaultAddr];
+        uint256 elapsedDays = _getElapsedDays(vault.lastUpdate);
         return checkpoint.dailyRewardsPer32ETH * elapsedDays * _numDVs;
     }
 
@@ -222,6 +249,13 @@ contract StakerRewards is
         return (checkpoint.updateTime, checkpoint.dailyRewardsPer32ETH);
     }
 
+    /**
+     * @notice Returns the last update timestamp and the number of active DVs of a given StratVaultETH
+     */
+    function getVaultData(address _vaultAddr) public view returns (uint256, uint256) {
+        VaultData memory vault = vaults[_vaultAddr];
+        return (vault.lastUpdate, vault.numActiveDVs);
+    }
 
     /* ============== CHAINLINK AUTOMATION FUNCTIONS ============== */
 
@@ -244,14 +278,15 @@ contract StakerRewards is
         address[] memory stratVaults = stratVaultManager.getAllStratVaultETHs();
         uint256 counter = 0;
 
+        // Iterate over all the clusters that are registered in the StakerRewards contract so are active
         for (uint256 i; i < stratVaults.length; ) {
             bytes32[] memory clusterIds = IStrategyVaultETH(stratVaults[i]).getAllDVIds();
-
             if (clusterIds.length == 0) continue;
 
             for (uint256 j; j < clusterIds.length; ) {  
-                if (clusters[clusterIds[j]].exitTimestamp == 0) continue; 
+                if (clusters[clusterIds[j]].exitTimestamp == 0) continue;
                 ClusterData memory cluster = clusters[clusterIds[j]];
+
                 if (cluster.exitTimestamp < block.timestamp) {
                     ++counter;
                 }
@@ -264,6 +299,11 @@ contract StakerRewards is
             unchecked {
                 ++i;
             }
+        }
+
+        // Skip the second loop if counter is 0, skip the the next loop and no upkeep needed
+        if (counter == 0) {
+            return (false, "");
         }
 
         // Array of cluster IDs at the size of counter
@@ -280,11 +320,11 @@ contract StakerRewards is
         for (uint256 i; i < stratVaults.length; ) {
             bytes32[] memory clusterIds = IStrategyVaultETH(stratVaults[i]).getAllDVIds();
 
-            // Check if the current block timestamp becomes bigger than the exitTimestamp
             for (uint256 j; j < clusterIds.length; ) {
                 if (clusters[clusterIds[j]].exitTimestamp == 0) continue; 
                 ClusterData memory cluster = clusters[clusterIds[j]];
 
+                // Check if the current block timestamp becomes bigger than the exitTimestamp
                 if (cluster.exitTimestamp < block.timestamp) {
                     // Set the upkeepNeeded to true
                     upkeepNeeded = true;
@@ -374,7 +414,7 @@ contract StakerRewards is
         if (!success) revert FailedToSendBackBidPrice();
 
         // Update totalVCs and totalPendingRewards variables
-        if (checkpoint.updateTime != 0 && block.timestamp - checkpoint.updateTime > _ONE_DAY) {
+        if (block.timestamp - checkpoint.updateTime > _ONE_DAY) {
             _removeConsumedVCs();
             _updatePendingRewards(0);
         }
@@ -394,7 +434,7 @@ contract StakerRewards is
      * @param _forwarderAddress The new address to set
      * @dev Only callable by the StrategyModuleManager
      */
-    function setForwarderAddress(address _forwarderAddress) external {
+    function setForwarderAddress(address _forwarderAddress) external onlyStratVaultManager {
         forwarderAddress = _forwarderAddress;
     }
 
@@ -433,6 +473,7 @@ contract StakerRewards is
     function _removeConsumedVCs() internal nonReentrant {
         uint256 dailyConsumedVCs = numberDV4 * 4 + numberDV7 * 7;
         uint256 totalConsumedVCs = _getElapsedDays(checkpoint.updateTime) * dailyConsumedVCs;
+        if (totalVCs < totalConsumedVCs) revert TotalVCsLessThanConsumedVCs();
         totalVCs -= totalConsumedVCs;
     }
 
