@@ -377,6 +377,17 @@ contract Auction is
         _clusterDetails[_clusterId].status = _newStatus;
     }
 
+    /**
+     * @notice Set the pubkey hash of a cluster
+     * @param _clusterId The id of the cluster to set the pubkey hash
+     * @param _clusterPubkey The pubkey of the cluster
+     * @dev Callable only by a StrategyVaultETH contract
+     * @dev The check to know if the cluster is in the calling vault is done in the StrategyVaultETH contract
+     */
+    function setClusterPubKey(bytes32 _clusterId, bytes calldata _clusterPubkey) external onlyStratVaultETH {
+        _clusterDetails[_clusterId].clusterPubKeyHash = sha256(abi.encodePacked(_clusterPubkey, bytes16(0)));
+    }
+
     /* ===================== VIEW FUNCTIONS ===================== */
 
     /// @notice Returns true if `_nodeOpAddr` is whitelisted, false otherwise.

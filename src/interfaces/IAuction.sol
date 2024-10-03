@@ -62,6 +62,8 @@ interface IAuction {
 
     /// @notice Stores the nodes details of a Distributed Validator
     struct ClusterDetails {
+        // Distributed Validator pubKey hash
+        bytes32 clusterPubKeyHash;
         // Average auction score of all the node operators in the cluster
         uint256 averageAuctionScore;
         // Node operators making up the cluster
@@ -256,6 +258,15 @@ interface IAuction {
      * @dev The check to know if the cluster is in the calling vault is done in the StrategyVaultETH contract
      */
     function updateClusterStatus(bytes32 _clusterId, IAuction.ClusterStatus _newStatus) external;
+
+    /**
+     * @notice Set the pubkey hash of a cluster
+     * @param _clusterId The id of the cluster to set the pubkey hash
+     * @param _clusterPubkey The pubkey of the cluster
+     * @dev Callable only by a StrategyVaultETH contract
+     * @dev The check to know if the cluster is in the calling vault is done in the StrategyVaultETH contract
+     */
+    function setClusterPubKey(bytes32 _clusterId, bytes calldata _clusterPubkey) external;
 
     /* ===================== OWNER FUNCTIONS ===================== */
 

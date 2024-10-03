@@ -298,6 +298,8 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
 
         // Verify the DV status has been updated
         assertEq(uint256(auction.getClusterDetails(clusterIds[0]).status), uint256(IAuction.ClusterStatus.DEPOSITED));
+        // Verify the pubkey hash has been set
+        assertEq(auction.getClusterDetails(clusterIds[0]).clusterPubKeyHash, sha256(abi.encodePacked(pubkey, bytes16(0))));
 
         // Verify the balance of the StratVaultETH
         assertEq(address(aliceStratVault1).balance, 0 ether);

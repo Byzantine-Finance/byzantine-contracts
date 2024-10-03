@@ -272,11 +272,12 @@ contract StrategyVaultETH is StrategyVaultETHStorage, ERC7535MultiRewardVault {
     ) external onlyBeaconChainAdmin {
         if (!clusterIdsFIFO.exists(clusterId)) revert ClusterNotInVault();
 
-        // Change the cluster status to DEPOSITED
-        auction.updateClusterStatus(clusterId, IAuction.ClusterStatus.DEPOSITED);
-
         // Stake the native ETH in the Beacon Chain
         eigenPodManager.stake{value: 32 ether}(pubkey, signature, depositDataRoot);
+
+        // Change the cluster status to DEPOSITED and set the cluster pubkey hash
+        auction.updateClusterStatus(clusterId, IAuction.ClusterStatus.DEPOSITED);
+        auction.setClusterPubKey(clusterId, pubkey);
     }
 
     /* ============== VAULT CREATOR FUNCTIONS ============== */
