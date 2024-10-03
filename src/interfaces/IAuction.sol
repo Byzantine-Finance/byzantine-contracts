@@ -15,8 +15,7 @@ interface IAuction {
     enum ClusterStatus {
         INACTIVE,
         IN_CREATION,
-        DEPOSITED_NOT_VERIFIED,
-        DEPOSITED_VERIFIED,
+        DEPOSITED, // IEigenPod.validatorStatus() to know if the withdrawal credentials are verified or not
         EXITED
     }
 
