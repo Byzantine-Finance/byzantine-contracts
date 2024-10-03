@@ -33,8 +33,6 @@ contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
 
     // Byzantine Admin
     address public byzantineAdmin = address(this);
-    // Address which receives the bid of the winners (will be a smart contract in the future to distribute the rewards)
-    address public bidReceiver = makeAddr("bidReceiver");
     // Address of the Beacon Chain Admin (allowed to activate DVs and submit Beacon Merkle Proofs)
     address public beaconChainAdmin = makeAddr("beaconChainAdmin");
     // Initial Auction parameters
@@ -104,6 +102,9 @@ contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
         escrow = Escrow(
             payable(address(new TransparentUpgradeableProxy(address(emptyContract), address(byzantineProxyAdmin), "")))
         );
+        stakerRewards = StakerRewards(
+            payable(address(new TransparentUpgradeableProxy(address(emptyContract), address(byzantineProxyAdmin), "")))
+        );
 
         // StrategyVaultETH implementation contract
         IStrategyVault strategyVaultETHImplementation = new StrategyVaultETH(
@@ -147,9 +148,10 @@ contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
             pushSplitFactory
         );
         Escrow escrowImplementation = new Escrow(
-            bidReceiver,
+            stakerRewards,
             auction
         );
+        StakerRewards stakerRewardsImplementation = new StakerRewards();
 
         // Third, upgrade the proxy contracts to use the correct implementation contracts and initialize them.
         // Upgrade StrategyVaultManager
@@ -186,6 +188,12 @@ contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
         byzantineProxyAdmin.upgradeAndCall(
             TransparentUpgradeableProxy(payable(address(escrow))),
             address(escrowImplementation),
+            ""
+        );
+        // Upgrade StakerRewards
+        byzantineProxyAdmin.upgradeAndCall(
+            TransparentUpgradeableProxy(payable(address(stakerRewards))),
+            address(stakerRewardsImplementation),
             ""
         );
     }

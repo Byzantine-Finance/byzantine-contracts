@@ -59,6 +59,9 @@ contract Deploy_Holesky_From_Scratch is ExistingDeploymentParser {
         escrow = Escrow(
             payable(address(new TransparentUpgradeableProxy(address(emptyContract), address(byzantineProxyAdmin), "")))
         );
+        stakerRewards = StakerRewards(
+            payable(address(new TransparentUpgradeableProxy(address(emptyContract), address(byzantineProxyAdmin), "")))
+        );
 
         // StrategyVaultETH implementation contract
         strategyVaultETHImplementation = new StrategyVaultETH(
@@ -102,9 +105,10 @@ contract Deploy_Holesky_From_Scratch is ExistingDeploymentParser {
             pushSplitFactory
         );
         escrowImplementation = new Escrow(
-            bidReceiver,
+            stakerRewards,
             auction
         );
+        stakerRewardsImplementation = new StakerRewards();
 
         // Third, upgrade the proxy contracts to use the correct implementation contracts and initialize them.
         // Upgrade StrategyVaultManager
@@ -141,6 +145,12 @@ contract Deploy_Holesky_From_Scratch is ExistingDeploymentParser {
         byzantineProxyAdmin.upgradeAndCall(
             TransparentUpgradeableProxy(payable(address(escrow))),
             address(escrowImplementation),
+            ""
+        );
+        // Upgrade StakerRewards
+        byzantineProxyAdmin.upgradeAndCall(
+            TransparentUpgradeableProxy(payable(address(stakerRewards))),
+            address(stakerRewardsImplementation),
             ""
         );
     }

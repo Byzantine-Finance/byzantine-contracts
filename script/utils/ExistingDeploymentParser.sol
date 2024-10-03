@@ -57,8 +57,6 @@ contract ExistingDeploymentParser is Script, Test {
 
     // Byzantine Admin
     address byzantineAdmin;
-    // Address which receives the bid of the winners (will be a smart contract in the future to distribute the rewards)
-    address bidReceiver;
     // Initial Auction parameters
     uint256 EXPECTED_POS_DAILY_RETURN_WEI;
     uint16 MAX_DISCOUNT_RATE;
@@ -82,8 +80,6 @@ contract ExistingDeploymentParser is Script, Test {
         MAX_DISCOUNT_RATE = uint16(stdJson.readUint(initialDeploymentData, ".auctionConfig.max_discount_rate"));
         MIN_VALIDATION_DURATION = uint32(stdJson.readUint(initialDeploymentData, ".auctionConfig.min_validation_duration"));
 
-        // read bidReceiver address
-        bidReceiver = stdJson.readAddress(initialDeploymentData, ".bidReceiver");
         // read beaconChainAdmin address
         beaconChainAdmin = stdJson.readAddress(initialDeploymentData, ".beaconChainAdmin");
 
@@ -110,6 +106,8 @@ contract ExistingDeploymentParser is Script, Test {
         byzNftImplementation = ByzNft(stdJson.readAddress(contractsAddressesData, ".addresses.byzNftImplementation"));
         byzantineProxyAdmin = ProxyAdmin(stdJson.readAddress(contractsAddressesData, ".addresses.byzantineProxyAdmin"));
         emptyContract = EmptyContract(stdJson.readAddress(contractsAddressesData, ".addresses.emptyContract"));
+        stakerRewards = StakerRewards(payable(stdJson.readAddress(contractsAddressesData, ".addresses.stakerRewards")));
+        stakerRewardsImplementation = StakerRewards(payable(stdJson.readAddress(contractsAddressesData, ".addresses.stakerRewardsImplementation")));
         escrow = Escrow(payable(stdJson.readAddress(contractsAddressesData, ".addresses.escrow")));
         escrowImplementation = Escrow(payable(stdJson.readAddress(contractsAddressesData, ".addresses.escrowImplementation")));
         strategyVaultETHBeacon = UpgradeableBeacon(stdJson.readAddress(contractsAddressesData, ".addresses.strategyVaultETHBeacon"));
@@ -215,7 +213,7 @@ contract ExistingDeploymentParser is Script, Test {
         );
         // Escrow
         require(
-            escrow.stakerRewards() == bidReceiver,
+            escrow.stakerRewards() == stakerRewards,
             "escrow: stakerRewards address not set correctly"
         );
         require(
@@ -255,6 +253,11 @@ contract ExistingDeploymentParser is Script, Test {
             byzantineProxyAdmin.getProxyImplementation(TransparentUpgradeableProxy(payable(address(escrow)))) == address(escrowImplementation),
             "escrow: implementation set incorrectly"
         );
+        // StakerRewards
+        require(
+            byzantineProxyAdmin.getProxyImplementation(TransparentUpgradeableProxy(payable(address(stakerRewards)))) == address(stakerRewardsImplementation),
+            "stakerRewards: implementation set incorrectly"
+        );
     }
 
     /**
@@ -271,6 +274,9 @@ contract ExistingDeploymentParser is Script, Test {
         // Auction
         vm.expectRevert(bytes("Initializable: contract is already initialized"));
         auction.initialize(byzantineAdmin, EXPECTED_POS_DAILY_RETURN_WEI, MAX_DISCOUNT_RATE, MIN_VALIDATION_DURATION);
+        // // StakerRewards
+        // vm.expectRevert(bytes("Initializable: contract is already initialized"));
+        // stakerRewards.initialize(byzantineAdmin);
     }
 
     /// @notice Verify params based on config constants that are updated from calling `_parseInitialDeploymentParams`
@@ -285,13 +291,18 @@ contract ExistingDeploymentParser is Script, Test {
         require(byzNft.owner() == address(strategyVaultManager), "byzNft: owner not set correctly");
         // Auction
         require(auction.owner() == byzantineAdmin, "auction: owner not set correctly");
-        // Cannot verify _expectedDailyReturnWei, _maxDiscountRate, _minDuration,_clusterSize as it is private variables
+        require(auction.expectedDailyReturnWei() == EXPECTED_POS_DAILY_RETURN_WEI, "auction: expectedDailyReturnWei not set correctly");
+        require(auction.maxDiscountRate() == MAX_DISCOUNT_RATE, "auction: maxDiscountRate not set correctly");
+        require(auction.minDuration() == MIN_VALIDATION_DURATION, "auction: minDuration not set correctly");
+        // StakerRewards
+        // require(stakerRewards.upkeepInterval() == upkeepInterval, "stakerRewards: upkeepInterval not set correctly");
     }
 
     function logInitialDeploymentParams() public {
         emit log_string("==== Parsed Initilize Params for Initial Deployment ====");
 
         emit log_named_address("byzantineAdmin", byzantineAdmin);
+        emit log_named_address("beaconChainAdmin", beaconChainAdmin);
 
         emit log_named_uint("EXPECTED_POS_DAILY_RETURN_WEI", EXPECTED_POS_DAILY_RETURN_WEI);
         emit log_named_uint("MAX_DISCOUNT_RATE", MAX_DISCOUNT_RATE);
@@ -326,12 +337,13 @@ contract ExistingDeploymentParser is Script, Test {
         vm.serializeAddress(deployed_addresses, "auctionImplementation", address(auctionImplementation));
         vm.serializeAddress(deployed_addresses, "escrow", address(escrow));
         vm.serializeAddress(deployed_addresses, "escrowImplementation", address(escrowImplementation));
+        vm.serializeAddress(deployed_addresses, "stakerRewards", address(stakerRewards));
+        vm.serializeAddress(deployed_addresses, "stakerRewardsImplementation", address(stakerRewardsImplementation));
         string memory deployed_addresses_output = vm.serializeAddress(deployed_addresses, "emptyContract", address(emptyContract));
 
         string memory parameters = "parameters";
         vm.serializeAddress(parameters, "byzantineAdmin", byzantineAdmin);
-        vm.serializeAddress(parameters, "beaconChainAdmin", beaconChainAdmin);
-        string memory parameters_output = vm.serializeAddress(parameters, "bidReceiver", bidReceiver);
+        string memory parameters_output = vm.serializeAddress(parameters, "beaconChainAdmin", beaconChainAdmin);
 
         string memory chain_info = "chainInfo";
         vm.serializeUint(chain_info, "deploymentBlock", block.number);
@@ -364,6 +376,8 @@ contract ExistingDeploymentParser is Script, Test {
         vm.serializeAddress(deployed_addresses, "auctionImplementation", address(auctionImplementation));
         vm.serializeAddress(deployed_addresses, "escrow", address(escrow));
         vm.serializeAddress(deployed_addresses, "escrowImplementation", address(escrowImplementation));
+        vm.serializeAddress(deployed_addresses, "stakerRewards", address(stakerRewards));
+        vm.serializeAddress(deployed_addresses, "stakerRewardsImplementation", address(stakerRewardsImplementation));
         string memory deployed_addresses_output = vm.serializeAddress(deployed_addresses, "emptyContract", address(emptyContract));
 
         vm.writeJson(deployed_addresses_output, outputPath, ".addresses");
