@@ -243,6 +243,9 @@ contract StrategyVaultETH is StrategyVaultETHStorage, ERC7535MultiRewardVault {
 
         // Stake the native ETH in the Beacon Chain
         eigenPodManager.stake{value: 32 ether}(pubkey, signature, depositDataRoot);
+
+        // Call dvActivationCheckpoint
+        stakerRewards.dvActivationCheckpoint(address(this));
     }
 
     /**
@@ -353,6 +356,10 @@ contract StrategyVaultETH is StrategyVaultETHStorage, ERC7535MultiRewardVault {
         for (uint256 i = 0; i < num32ETHBundles;) {
             bytes32 winningClusterId = auction.triggerAuction();
             clusterIdsFIFO.push(winningClusterId);
+
+            // Call dvCreationCheckpoint in StakerRewards contract 
+            stakerRewards.dvCreationCheckpoint(winningClusterId);
+
             unchecked {
                 ++i;
             }
