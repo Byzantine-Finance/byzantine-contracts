@@ -31,12 +31,11 @@ contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
     Auction public auction;
     Escrow public escrow;
     StakerRewards public stakerRewards;
-    StakerRewards public stakerRewards;
 
     // Byzantine Admin
     address public byzantineAdmin = address(this);
     // Address which receives the bid of the winners (will be a smart contract in the future to distribute the rewards)
-    address public bidReceiver = makeAddr("bidReceiver");
+    // address public bidReceiver = makeAddr("bidReceiver");
     // Address of the Beacon Chain Admin (allowed to activate DVs and submit Beacon Merkle Proofs)
     address public beaconChainAdmin = makeAddr("beaconChainAdmin");
     // Initial Auction parameters

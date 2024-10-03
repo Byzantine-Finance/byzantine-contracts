@@ -71,8 +71,7 @@ contract Deploy_Holesky_From_Scratch is ExistingDeploymentParser {
             eigenPodManager,
             delegation,
             stakerRewards,
-            beaconChainAdmin,
-            stakerRewards
+            beaconChainAdmin
         );
         // StrategyVaultETH beacon contract. The Beacon Proxy contract is deployed in the StrategyVaultManager
         // This contract points to the implementation contract.
