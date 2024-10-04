@@ -115,7 +115,8 @@ interface IAuction {
     /// @notice Emitted when a node operator joins a cluster. Track node operators' clusters.
     event WinnerJoinedCluster(
         address indexed nodeOpAddr,
-        bytes32 indexed clusterJoined
+        bytes32 indexed clusterJoined,
+        bytes32 winningBidId
     );
 
     /// @notice Emitted when a cluster is created. Track all the Byzantines' clusters.

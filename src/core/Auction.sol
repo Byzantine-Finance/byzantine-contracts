@@ -574,11 +574,12 @@ contract Auction is
             _nodeOpsDetails[nodeOpAddr].numBidsCluster4 -= 1;
             // Update the number of node ops in dv4 sub-auction if necessary
             if (_nodeOpsDetails[nodeOpAddr].numBidsCluster4 == 0) dv4AuctionNumNodeOps -= 1;
+
+            emit WinnerJoinedCluster(nodeOpAddr, _winningClusterId, _nodesToRemove[i].bidId);
+
             unchecked {
                 ++i;
             }
-
-            emit WinnerJoinedCluster(nodeOpAddr, _winningClusterId);
         }
         
         // If enough operators in dv4 sub-auction, update main tree
