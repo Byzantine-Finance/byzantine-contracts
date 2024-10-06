@@ -50,6 +50,17 @@ abstract contract ERC7535Upgradeable is Initializable, ERC20Upgradeable, IERC753
     }
 
     /**
+     * @dev Decimals are computed by adding the decimal offset on top of the underlying asset's decimals. This
+     * "original" value is cached during construction of the vault contract. If this read operation fails (e.g., the
+     * asset has not been created yet), a default of 18 is used to represent the underlying asset's decimals.
+     *
+     * See {IERC20Metadata-decimals}.
+     */
+    function decimals() public view virtual override(IERC20Metadata, ERC20Upgradeable) returns (uint8) {
+        return 18 + _decimalsOffset();
+    }
+
+    /**
      * @dev See {IERC7535-asset}.
      */
     function asset() public view virtual returns (address) {
@@ -205,15 +216,15 @@ abstract contract ERC7535Upgradeable is Initializable, ERC20Upgradeable, IERC753
     /**
      * @dev Internal conversion function (from assets to shares) with support for rounding direction.
      */
-    function _convertToShares(uint256 assets, MathUpgradeable.Rounding rounding) internal view virtual returns (uint256) {
-        return assets.mulDiv(totalSupply(), totalAssets() + 1, rounding);
+    function _convertToShares(uint256 assets, Math.Rounding rounding) internal view virtual returns (uint256) {
+        return assets.mulDiv(totalSupply() + 10 ** _decimalsOffset(), totalAssets() + 1, rounding);
     }
 
     /**
      * @dev Internal conversion function (from shares to assets) with support for rounding direction.
      */
-    function _convertToAssets(uint256 shares, MathUpgradeable.Rounding rounding) internal view virtual returns (uint256) {
-        return shares.mulDiv(totalAssets() + 1, totalSupply(), rounding);
+    function _convertToAssets(uint256 shares, Math.Rounding rounding) internal view virtual returns (uint256) {
+        return shares.mulDiv(totalAssets() + 1, totalSupply() + 10 ** _decimalsOffset(), rounding);
     }
 
     /**
@@ -241,6 +252,10 @@ abstract contract ERC7535Upgradeable is Initializable, ERC20Upgradeable, IERC753
         if (!success) revert WithdrawFailed();
 
         emit Withdraw(caller, receiver, owner, assets, shares);
+    }
+
+    function _decimalsOffset() internal view virtual returns (uint8) {
+        return 0;
     }
 
     /**
