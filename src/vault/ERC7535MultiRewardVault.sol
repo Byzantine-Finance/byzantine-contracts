@@ -208,15 +208,15 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
      * @return The total value of assets in the vault.
      * @dev This function is overridden to integrate with an oracle to determine the total value of all tokens in the vault.
      * @dev This ensures that when depositing or withdrawing, a user receives the correct amount of assets or shares.
+     * @dev Allows for assets to be priced in USD, ETH or any other asset, as long as the oracles are updated accordingly and uniformly.
      */
     function totalAssets() public view override returns (uint256) {
-        // Calculate value of assets (native ETH)
-        uint256 assetAmount = address(this).balance;
-        address asset = address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE); // Native ETH
-        TokenInfo memory ethInfo = assetInfo[IERC20MetadataUpgradeable(asset)];
-        uint256 totalValue = assetAmount * oracle.getPrice(asset, ethInfo.priceFeed);
+        // Calculate value of native ETH
+        uint256 ethBalance = address(this).balance;
+        uint256 ethPrice = oracle.getPrice(address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE), address(0));
+        uint256 totalValue = ethBalance * ethPrice / 1e18;
         
-        // Calculate value of reward tokens
+        // Calculate value of reward tokens, add them to the total value
         for (uint i = 0; i < rewardTokens.length; i++) {
             IERC20Upgradeable token = rewardTokens[i];
             uint256 balance = token.balanceOf(address(this));
