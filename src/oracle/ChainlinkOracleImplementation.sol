@@ -28,6 +28,7 @@ contract ChainlinkOracleImplementation is IOracle {
     /// @param priceFeed The address of the Chainlink price feed
     /// @return price The price of the asset with 18 decimal places
     function getPrice(address asset, address priceFeed) external view override returns (uint256) {
+        // Get price data from the feed
         AggregatorV3Interface feed = AggregatorV3Interface(priceFeed);
         
         (
@@ -38,20 +39,20 @@ contract ChainlinkOracleImplementation is IOracle {
             uint80 answeredInRound
         ) = feed.latestRoundData();
         
+        // Check if the price is valid
         if (price <= 0) revert InvalidPrice();
         if (updatedAt == 0) revert RoundNotComplete();
         if (answeredInRound < roundID) revert StalePrice();
         if (block.timestamp - updatedAt > MAX_DELAY) revert PriceTooOld(updatedAt);
         
+        // Convert the price to 18 decimal places if the feed is not using 18 decimals
         uint8 feedDecimals = feed.decimals();
-        
-        // Convert the price to 18 decimal places
         if (feedDecimals < 18) {
-            return uint256(price) * (10 ** (18 - feedDecimals));
+            return uint256(price) * 10**(18 - feedDecimals);
         } else if (feedDecimals > 18) {
-            return uint256(price) / (10 ** (feedDecimals - 18));
+            return uint256(price) / 10**(feedDecimals - 18);
+        } else {
+            return uint256(price);
         }
-        
-        return uint256(price);
     }
 }
