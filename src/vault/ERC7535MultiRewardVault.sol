@@ -238,7 +238,7 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
      * would represent an infinite amout of shares.
      */
     function _convertToShares(uint256 assets, MathUpgradeable.Rounding rounding) internal view override returns (uint256 shares) {
-        uint256 supply = totalSupply();
+        uint256 supply = totalSupply() + 10 ** _decimalsOffset(); // Supply includes virtual reserves
         return (supply == 0)
             ? assets
             : assets.mulDiv(supply, totalAssets(), rounding);
@@ -249,7 +249,7 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
      * @dev This function is overriden to calculate total value of assets including reward tokens.
      */
     function _convertToAssets(uint256 shares, MathUpgradeable.Rounding rounding) internal view override returns (uint256 assets) {
-        uint256 supply = totalSupply();
+        uint256 supply = totalSupply() + 10 ** _decimalsOffset(); // Supply includes virtual reserves
         return (supply == 0)
             ? shares
             : shares.mulDiv(totalAssets(), supply, rounding);
