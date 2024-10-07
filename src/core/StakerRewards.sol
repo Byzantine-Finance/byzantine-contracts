@@ -167,15 +167,22 @@ contract StakerRewards is
         VaultData storage vault = vaults[_vaultAddr];
         uint256 numValsInVault = vault.numValidatorsInVault;
 
-        // Send the pending rewards to the StratVaultETH 
-        if (numValsInVault > 0 && _hasTimeElapsed(vault.lastUpdate, _ONE_DAY)) {
-            uint256 pendingRewards = _sendPendingRewards(_vaultAddr, numValsInVault);
-            _updatePendingRewards(pendingRewards);
-        }
-
-        // Update global data 
-        if ((numValidators4 + numValidators7 > 0) && _hasTimeElapsed(checkpoint.updateTime, _ONE_DAY)) {
+        // Ensure that there is at least one validator, and that both the vault's and the checkpoint's update times have elapsed by at least one day
+        if (numValsInVault > 0 && _hasTimeElapsed(vault.lastUpdate, _ONE_DAY) && _hasTimeElapsed(checkpoint.updateTime, _ONE_DAY)) {
+            // Send pending rewards to StratVaultETH
+            uint256 rewardsToVault = _sendPendingRewards(_vaultAddr, numValsInVault);
+            // Update global data 
             _removeConsumedVCs();
+            _updatePendingRewards(rewardsToVault);
+            _updateCheckpoint();
+        } else if (numValsInVault > 0 && _hasTimeElapsed(vault.lastUpdate, _ONE_DAY)) {
+            // Send pending rewards to StratVaultETH
+            uint256 rewardsToVault = _sendPendingRewards(_vaultAddr, numValsInVault);
+            // Only remove rewardsToVault from totalPendingRewards
+            _updatePendingRewards(rewardsToVault);
+        } else if (numValidators4 + numValidators7 > 0 && _hasTimeElapsed(checkpoint.updateTime, _ONE_DAY)) {
+            _removeConsumedVCs();
+            _updatePendingRewards(0);
             _updateCheckpoint();
         }
 
@@ -192,24 +199,29 @@ contract StakerRewards is
     }
 
     /** 
-     * @notice Function called by StratVaultETH when a staker withdraws rewards
-     * @dev The function does the following actions:
-     * 1. Calculate the last set of pending rewards and send them to the StratVaultETH
-     * 2. Update variables and checkpoint if necessary
+     * @notice Function called by StratVaultETH when a staker exits the validator (unstake)
+     * @param _vaultAddr Address of the StratVaultETH
      */
     function withdrawCheckpoint(address _vaultAddr) external onlyStratVaultETH {
         VaultData storage vault = vaults[_vaultAddr];
         uint256 numValsInVault = vault.numValidatorsInVault;
 
-        // Send the pending rewards to the StratVaultETH 
-        if (numValsInVault > 0 && _hasTimeElapsed(vault.lastUpdate, _ONE_DAY)) {
-            uint256 pendingRewards = _sendPendingRewards(_vaultAddr, numValsInVault);
-            _updatePendingRewards(pendingRewards);
-        }
-
-        // Update global data 
-        if ((numValidators4 + numValidators7 > 0) && _hasTimeElapsed(checkpoint.updateTime, _ONE_DAY)) {
+        // Ensure that there is at least one validator, and that both the vault's and the checkpoint's update times have elapsed by at least one day
+        if (numValsInVault > 0 && _hasTimeElapsed(vault.lastUpdate, _ONE_DAY) && _hasTimeElapsed(checkpoint.updateTime, _ONE_DAY)) {
+            // Send pending rewards to StratVaultETH
+            uint256 rewardsToVault = _sendPendingRewards(_vaultAddr, numValsInVault);
+            // Update global data 
             _removeConsumedVCs();
+            _updatePendingRewards(rewardsToVault);
+            _updateCheckpoint();
+        } else if (numValsInVault > 0 && _hasTimeElapsed(vault.lastUpdate, _ONE_DAY)) {
+            // Send pending rewards to StratVaultETH
+            uint256 rewardsToVault = _sendPendingRewards(_vaultAddr, numValsInVault);
+            // Only remove rewardsToVault from totalPendingRewards
+            _updatePendingRewards(rewardsToVault);
+        } else if (numValidators4 + numValidators7 > 0 && _hasTimeElapsed(checkpoint.updateTime, _ONE_DAY)) {
+            _removeConsumedVCs();
+            _updatePendingRewards(0);
             _updateCheckpoint();
         }
     }
@@ -220,6 +232,7 @@ contract StakerRewards is
     /**
      * @notice Calculate the pending rewards since last update
      * @param _vaultAddr Address of the StratVaultETH
+     * @param _numDVs Number of validators in the vault
      * @dev Revert if the last update timestamp is 0
      */
     function calculateRewards(address _vaultAddr, uint256 _numDVs) public view returns (uint256) {
@@ -238,6 +251,7 @@ contract StakerRewards is
 
     /**
      * @notice Returns the cluster data of a given clusterId
+     * @param _clusterId The ID of the cluster
      */
     function getClusterData(bytes32 _clusterId) public view returns (uint256, uint256, uint256, uint8) {
         ClusterData memory cluster = clusters[_clusterId];
@@ -258,6 +272,7 @@ contract StakerRewards is
 
     /**
      * @notice Returns the last update timestamp and the number of active DVs of a given StratVaultETH
+     * @param _vaultAddr Address of the StratVaultETH
      */
     function getVaultData(address _vaultAddr) public view returns (uint256, uint256) {
         VaultData memory vault = vaults[_vaultAddr];
