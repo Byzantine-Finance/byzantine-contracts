@@ -1,0 +1,9 @@
+{
+  "addresses": {
+    "lastChainlinkOracleImplementation": "0xA59890143EFba5B6F0F19ba3D8bDC1CAB8854A2C"
+  },
+  "chainInfo": {
+    "chainId": 17000,
+    "deploymentBlock": 2486508
+  }
+}
