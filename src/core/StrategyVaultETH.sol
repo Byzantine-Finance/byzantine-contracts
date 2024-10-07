@@ -82,7 +82,7 @@ contract StrategyVaultETH is StrategyVaultETHStorage, ERC7535MultiRewardVault {
        bool _whitelistedDeposit,
        bool _upgradeable,
        address _oracle
-    ) external initializer {
+    ) external override initializer {
 
         // Initialize parent contracts (ERC7535MultiRewardVault)
         __ERC7535MultiRewardVault_init(_oracle);
@@ -191,7 +191,7 @@ contract StrategyVaultETH is StrategyVaultETHStorage, ERC7535MultiRewardVault {
         delegationManager.queueWithdrawals(queuedWithdrawalParams);
 
         // Calculate the withdrawal delay
-        uint256 withdrawalDelay = delegationManager.getWithdrawalDelay(strategies);
+        //uint256 withdrawalDelay = delegationManager.getWithdrawalDelay(strategies);
 
         // Setup scheduled function call for finishWithdrawETH after withdrawal delay is finished.
         // TODO

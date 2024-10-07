@@ -58,9 +58,13 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
     /* ============== CONSTRUCTOR & INITIALIZER ============== */
 
     /**
-     * @notice Used to initialize the ERC7535MultiRewardVault given it's setup parameters.
+     * @notice Initializes the ERC7535MultiRewardVault contract.
      * @param _oracle The oracle implementation address to use for the vault.
      */
+    function initialize(address _oracle) public virtual initializer {
+        __ERC7535MultiRewardVault_init(_oracle);
+    }
+
     function __ERC7535MultiRewardVault_init(address _oracle) internal onlyInitializing {
         __ERC7535_init();
         __ERC20_init("ETH Byzantine StrategyVault Token", "byzETH");

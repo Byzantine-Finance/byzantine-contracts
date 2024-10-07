@@ -15,7 +15,7 @@ interface AggregatorV3Interface {
     function decimals() external view returns (uint8);
 }
 
-contract ChainlinkOracle is IOracle {
+contract ChainlinkOracleImplementation is IOracle {
     error InvalidPrice();
     error RoundNotComplete();
     error StalePrice();
