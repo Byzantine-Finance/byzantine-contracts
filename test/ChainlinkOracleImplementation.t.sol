@@ -9,3 +9,4 @@ contract ChainlinkOracleImplementationTest is Test {
     function setUp() public {
         oracle = new ChainlinkOracleImplementation();
     }
+}

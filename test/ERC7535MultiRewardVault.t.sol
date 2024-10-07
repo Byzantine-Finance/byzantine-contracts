@@ -1,13 +1,33 @@
+<<<<<<< HEAD
 
+=======
+>>>>>>> 351b0e3 (test: various edits for testing file setup)
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
+<<<<<<< HEAD
 import "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 import "../src/vault/ERC7535MultiRewardVault.sol";
 import "./mocks/MockOracle.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
  
+=======
+import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
+import "../src/vault/ERC7535MultiRewardVault.sol";
+import "../src/interfaces/IOracle.sol";
+import "./mocks/EmptyContract.sol";
+import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+ 
+contract MockOracle is IOracle {
+    function getPrice(address, address) external pure returns (uint256) {
+        // Mock implementation
+        return 1e18; // 1:1 ratio for simplicity
+    }
+}
+
+>>>>>>> 351b0e3 (test: various edits for testing file setup)
 contract MockERC20 is ERC20 {
     constructor(string memory name, string memory symbol) ERC20(name, symbol) {}
 
@@ -50,7 +70,11 @@ contract ERC7535MultiRewardVaultTest is Test {
         vm.deal(bob, STARTING_BALANCE);
     }
 
+<<<<<<< HEAD
     function testInitialization() public view {
+=======
+    function testInitialization() public {
+>>>>>>> 351b0e3 (test: various edits for testing file setup)
         // Verify the owner is set correctly
         assertEq(vault.owner(), address(this));
 
@@ -59,6 +83,7 @@ contract ERC7535MultiRewardVaultTest is Test {
     }
 
     function testDeposit() public {
+<<<<<<< HEAD
         uint256 oneEth = 1 ether;
 
         /* ===================== ALICE DEPOSITS 1 ETH ===================== */
@@ -98,6 +123,33 @@ contract ERC7535MultiRewardVaultTest is Test {
         uint256 bobProportion = (vault.balanceOf(bob) * 1e18) / vault.totalSupply();
         assertApproxEqRel(aliceProportion, 800000000000000000, 1e14, "Alice should own 80% of the vault");
         assertApproxEqRel(bobProportion, 200000000000000000, 1e14, "Bob should own 20% of the vault");
+=======
+        /* ===================== ALICE DEPOSITS 1 ETH ===================== */
+        vm.prank(alice);
+        uint256 shares = vault.deposit{value: 1 ether}(1 ether, alice);
+        
+        // Verify the correct amount of shares are minted
+        assertEq(shares, 1 ether);
+
+        // Verify the shares are sent to alice 
+        assertEq(vault.balanceOf(alice), 1 ether);
+
+        // Verify the vault contract receives the correct amount of ETH
+        assertEq(address(vault).balance, 1 ether);
+
+        /* ===================== ALICE DEPOSITS 1 ETH WHILE REWARD TOKENS ARE ADDED ===================== */
+        // Add reward tokens that are worth 1:1 ratio with ETH
+        vault.addRewardToken(IERC20Upgradeable(address(rewardToken1)), address(0x123));
+        rewardToken1.mint(address(vault), 1 ether);
+
+        // Deposit 1 ETH
+        vm.prank(alice);
+        vault.deposit{value: 1 ether}(1 ether, alice);
+
+        // Verify the correct amount of shares are minted
+
+        
+>>>>>>> 351b0e3 (test: various edits for testing file setup)
     }
 
     function testMint() public {
@@ -125,6 +177,7 @@ contract ERC7535MultiRewardVaultTest is Test {
 
     function testAddRewardToken() public {
         /* ===================== ADD REWARD TOKEN 1 ===================== */
+<<<<<<< HEAD
         //vault.addRewardToken(rewardToken1, address(0x123));        
     }
 
@@ -144,6 +197,35 @@ contract ERC7535MultiRewardVaultTest is Test {
         uint256 expectedTotalAssets = 2 * expectedValuePerEth; // $2000 (1000 from ETH + 1000 from reward token)
         uint256 actualTotalAssets = vault.totalAssets();        
         assertEq(actualTotalAssets, expectedTotalAssets, "Total assets should be $2000");
+=======
+        vault.addRewardToken(IERC20Upgradeable(address(rewardToken1)), address(0x123));
+        (address priceFeed, uint8 decimals) = vault.rewardInfo(IERC20Upgradeable(address(rewardToken1)));
+        
+        // Verify the price feed is set correctly
+        assertEq(priceFeed, address(0x123));
+
+        // Verify the decimals are set correctly
+        assertEq(decimals, 18);
+    }
+
+    function testUpdateRewardPriceFeed() public {
+        /* ===================== UPDATE REWARD TOKEN 1 PRICE FEED ===================== */
+        vault.addRewardToken(IERC20Upgradeable(address(rewardToken1)), address(0x123));
+        vault.updateRewardPriceFeed(IERC20Upgradeable(address(rewardToken1)), address(0x456));
+        (address priceFeed,) = vault.rewardInfo(IERC20Upgradeable(address(rewardToken1)));
+
+        // Verify the price feed is updated correctly
+        assertEq(priceFeed, address(0x456));
+    }
+
+    function testTotalAssets() public {
+        // TODO: Implement test for totalAssets calculation
+        /* ===================== CALCULATE TOTAL ASSETS ===================== */
+        // 1. Deposit some ETH
+        // 2. Add reward tokens
+        // 3. Mint some reward tokens to the vault
+        // 4. Check if totalAssets correctly calculates the sum of ETH and reward tokens
+>>>>>>> 351b0e3 (test: various edits for testing file setup)
     }
 
     function testRewardDistribution() public {
