@@ -64,6 +64,9 @@ abstract contract StrategyVaultETHStorage is IStrategyVaultETH {
     /// @notice Whether the strategy is upgradeable (i.e can delegate to a different operator)
     bool public upgradeable;
 
+    /// @notice Amount of ETH deposited into the vault.
+    uint256 public amountOfDepositedETH;
+
     /**
      * @dev This empty reserved space is put in place to allow future versions to add new
      * variables without shifting down storage in the inheritance chain.

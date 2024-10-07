@@ -213,7 +213,7 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
      */
     function totalAssets() public view override returns (uint256) {
         // Calculate value of native ETH
-        uint256 ethBalance = address(this).balance;
+        uint256 ethBalance = _getETHBalance();
         uint256 ethPrice = oracle.getPrice(address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE), address(0));
         uint256 totalValue = ethBalance * ethPrice / 1e18;
         
@@ -280,5 +280,13 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
                 emit RewardTokenWithdrawn(receiver, rewardToken, rewardAmount);
             }
         }
+    }
+
+    /**
+     * @dev Returns the ETH balance of the vault.
+     * @return The ETH balance of the vault.
+     */
+    function _getETHBalance() internal view virtual returns (uint256) {
+        return address(this).balance;
     }
 }
