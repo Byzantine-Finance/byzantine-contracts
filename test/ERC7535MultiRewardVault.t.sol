@@ -23,7 +23,7 @@ import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 contract MockOracle is IOracle {
     function getPrice(address, address) external pure returns (uint256) {
         // Mock implementation
-        return 1e18; // 1:1 ratio for simplicity
+        return 1000 * 1e18; // $1000 with 18 decimals
     }
 }
 
@@ -219,13 +219,22 @@ contract ERC7535MultiRewardVaultTest is Test {
     }
 
     function testTotalAssets() public {
-        // TODO: Implement test for totalAssets calculation
         /* ===================== CALCULATE TOTAL ASSETS ===================== */
-        // 1. Deposit some ETH
-        // 2. Add reward tokens
-        // 3. Mint some reward tokens to the vault
-        // 4. Check if totalAssets correctly calculates the sum of ETH and reward tokens
->>>>>>> 351b0e3 (test: various edits for testing file setup)
+        uint256 oneEth = 1 ether;
+        uint256 expectedValuePerAsset = 1000 * 1e18; // $1000 in 18 decimal precision
+
+        // Deposit 1 ETH
+        vm.prank(alice);
+        vault.deposit{value: oneEth}(oneEth, alice);
+
+        // Add Reward Token 1 (RT1)
+        vault.addRewardToken(IERC20Upgradeable(address(rewardToken1)), address(0x123));
+        rewardToken1.mint(address(vault), oneEth); // Mint 1 reward token (assuming 18 decimals)
+
+        // Verify the total assets are calculated correctly
+        uint256 expectedTotalAssets = 2 * expectedValuePerAsset; // $2000 (1000 from ETH + 1000 from reward token)
+        uint256 actualTotalAssets = vault.totalAssets();        
+        assertEq(actualTotalAssets, expectedTotalAssets);
     }
 
     function testRewardDistribution() public {
