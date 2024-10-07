@@ -245,7 +245,7 @@ contract StrategyVaultETH is StrategyVaultETHStorage, ERC7535MultiRewardVault {
         eigenPodManager.stake{value: 32 ether}(pubkey, signature, depositDataRoot);
 
         // Call dvActivationCheckpoint
-        stakerRewards.dvActivationCheckpoint(address(this));
+        stakerRewards.dvActivationCheckpoint(address(this), clusterId);
     }
 
     /**
