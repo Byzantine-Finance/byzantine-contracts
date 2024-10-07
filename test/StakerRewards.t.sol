@@ -68,9 +68,11 @@ contract StakerRewardsTest is ProofParsing, ByzantineDeployer {
         _getDepositData(abi.encodePacked("./test/test-data/deposit-data-DV0-noPod.json"));
     }
 
-    function test_dvCreationCheckpoint() public startAtPresentDay {     
+    function test_dvCreationCheckpoint_withoutNoActiveValidators() public startAtPresentDay {     
         // ACT
         IStrategyVaultETH stratVaultETH = _createStratVaultETHAndStake(alice, 96 ether);
+
+        /* ====================== Only DV creation, no active validators ====================== */
 
         // ASSERT
         // Check if the global variables are correct
@@ -79,6 +81,8 @@ contract StakerRewardsTest is ProofParsing, ByzantineDeployer {
         assertEq(stakerRewards.numClusters4(), 3);
         assertEq(stakerRewards.numClusters7(), 0);
         assertEq(stakerRewards.totalPendingRewards(), 0);
+        assertEq(stakerRewards.numValidators4(), 0);
+        assertEq(stakerRewards.numValidators7(), 0);
 
         // Check if cluster 1 data is correct
         bytes32[] memory clusterIds = stratVaultETH.getAllDVIds();
@@ -115,16 +119,69 @@ contract StakerRewardsTest is ProofParsing, ByzantineDeployer {
         uint256 dailyRewardsPer32ETH = (stakerRewards.getAllocatableRewards() / stakerRewards.totalVCs()) * consumedVCsPerDayPerValidator / 1e18;
         console.log("dailyRewardsPer32ETH: %18e", dailyRewardsPer32ETH); // 3060123846317260 = 0,00306012384631726 ETH
         assertEq(rewardsPer32ETH, dailyRewardsPer32ETH);
+        assertEq(stakerRewards.totalPendingRewards(), 0);        
+    }
+
+    function test_dvCreationCheckpoint_withActiveValidators() public startAtPresentDay {
+
+        /* ====================== 2 validators active while DV creation ====================== */
+        // Check if (numValidators4 + numValidators7 > 0 && _hasTimeElapsed(checkpoint.updateTime, _ONE_DAY)) condition
+
+        // ARRANGE
+        IStrategyVaultETH stratVaultETH1 = _createStratVaultETHAndStake(alice, 64 ether); // 2 clusters
+        bytes32[] memory clusterIdsStratVault1 = stratVaultETH1.getAllDVIds();
+
+        // 1 days later
+        vm.warp(block.timestamp + 1 days);
+        vm.prank(beaconChainAdmin);
+        stratVaultETH1.activateCluster(pubkey, signature, depositDataRoot, clusterIdsStratVault1[0]); // 1 validator
+        vm.prank(beaconChainAdmin);
+        stratVaultETH1.activateCluster(pubkey, signature, depositDataRoot, clusterIdsStratVault1[1]); // 1 validator
+        uint256 totalVCsBeforeNewDVCreation = stakerRewards.totalVCs();
+        (uint256 updateTime, uint256 rewardsPer32ETH) = stakerRewards.getCheckpointData();
+
+        // ACT 
+        // 1 days later
+        vm.warp(block.timestamp + 1 days);
+        IStrategyVaultETH stratVaultETH2 = _createStratVaultETHAndStake(bob, 32 ether); // 1 cluster
+        bytes32[] memory clusterIdsStratVault2 = stratVaultETH2.getAllDVIds();
+
+        // ASSERT
+        assertEq(stakerRewards.numClusters4(), 3);
+        assertEq(stakerRewards.numValidators4(), 2);
+        // Check if number of consumed VCs has been correctly removed from totalVCs
+        uint256 cluster3TotalVCs = 0;
+        IAuction.ClusterDetails memory clusterDetails = auction.getClusterDetails(clusterIdsStratVault2[0]);
+        for (uint256 i = 0; i < clusterDetails.nodes.length; i++) {
+            IAuction.NodeDetails memory node = clusterDetails.nodes[i];
+            cluster3TotalVCs += node.currentVCNumber;
+        }
+        uint256 consumedVCs = 1 * 4 * stakerRewards.numValidators4(); // 1 day * 4 VCs * numValidators4
+        assertEq(stakerRewards.totalVCs(), totalVCsBeforeNewDVCreation + cluster3TotalVCs - consumedVCs);
+        // Check if the pending rewards have been distributed
+        uint256 distributedRewards = rewardsPer32ETH * _getElapsedDays(updateTime) * stakerRewards.numValidators4();
+        assertEq(stakerRewards.totalPendingRewards(), distributedRewards);
+        assertEq(stakerRewards.getAllocatableRewards(), address(stakerRewards).balance - distributedRewards);
+    }
+
+    function test_dvCreationCheckpoint_RevertWhen_calledByNonStratVaultETH() public startAtPresentDay {
+        // ARRANGE
+        IStrategyVaultETH stratVaultETH = _createStratVaultETHAndStake(alice, 96 ether);
+        bytes32[] memory clusterIds = stratVaultETH.getAllDVIds();
+
+        // ACT AND ASSERT
+        vm.expectRevert(IStakerRewards.OnlyStratVaultETH.selector);
+        stakerRewards.dvCreationCheckpoint(clusterIds[0]);
     }
 
     function test_dvActivationCheckpoint_oneVault() public startAtPresentDay {
 
-        /* ====================== First activation of DV ====================== */
+        /* ====================== Activation of DV1 ====================== */
 
         // ARRANGE 
         // Deposit 96 ETH in total
         // Total VCs of 3 clusters: 1741
-        IStrategyVaultETH stratVaultETH = _createStratVaultETHAndStake(alice, 96 ether);
+        IStrategyVaultETH stratVaultETH = _createStratVaultETHAndStake(alice, 96 ether); // 3 clusters
         bytes32[] memory clusterIds = stratVaultETH.getAllDVIds();
         uint256 initialBalanceCP1 = address(stakerRewards).balance;
         (, uint256 initialRewardsPer32ETHCP1) = stakerRewards.getCheckpointData();
@@ -158,13 +215,12 @@ contract StakerRewardsTest is ProofParsing, ByzantineDeployer {
         assertEq(lastUpdateCP1, dvActivationTimeCP1);
         assertEq(numActiveDVsCP1, 1);
 
-        /* ====================== Second activation of DV2 and DV3 ====================== */
+        /* ====================== Activation of DV2 and DV3 ====================== */
 
         // ARRANGE
         address stratVaultETHAddress = address(stratVaultETH);
         bytes32[] memory clusterIdsCopy = stratVaultETH.getAllDVIds();
         vm.warp(block.timestamp + 5 days);
-        vm.prank(beaconChainAdmin);
         uint256 usedVCsCP2 = 5 * 4 * stakerRewards.numValidators4(); // 5 days * 4 VCs * numValidators4
 
         // CP2: DV2 activation
@@ -194,6 +250,62 @@ contract StakerRewardsTest is ProofParsing, ByzantineDeployer {
         uint256 dailyRewardsPer32ETH = (stakerRewards.getAllocatableRewards() / stakerRewards.totalVCs()) * consumedVCsPerDayPerValidator / 1e18;
         console.log("dailyRewardsPer32ETH: %18e", dailyRewardsPer32ETH); // 0.00306012384631726 ETH
         assertEq(rewardsPer32ETHCP3, dailyRewardsPer32ETH);
+    }
+
+    function test_dvActivationCheckpoint_threeVaults() public startAtPresentDay {
+        // ARRANGE
+        // Three vaults and 4 clusters have been created
+        uint256 vaultCreationTime = block.timestamp;
+        IStrategyVaultETH xVault = _createStratVaultETHAndStake(alice, 64 ether); // cluster 1 and 2
+        bytes32[] memory xVaultClusterIds = xVault.getAllDVIds();
+        IStrategyVaultETH yVault = _createStratVaultETHAndStake(bob, 32 ether); // cluster 3
+        bytes32[] memory yVaultClusterIds = yVault.getAllDVIds();
+        IStrategyVaultETH zVault = _createStratVaultETHAndStake(alice, 32 ether); // cluster 4
+        bytes32[] memory zVaultClusterIds = zVault.getAllDVIds();
+        uint256 initialVCs = stakerRewards.totalVCs();
+
+        // CP1: DV1 activation (DV2 is not active yet)
+        // No VCs consumed and no rewards are sent to the vault as DV1 is the first active validator
+        vm.warp(block.timestamp + 2 days);
+        vm.prank(beaconChainAdmin);
+        xVault.activateCluster(pubkey, signature, depositDataRoot, xVaultClusterIds[0]);
+
+        // CP2: DV3 activation
+        vm.warp(block.timestamp + 3 days);
+        (uint256 updateTimeCP2, uint256 rewardsPer32ETHCP2) = stakerRewards.getCheckpointData();
+        uint256 consumedVCsCP2 = 3 * 4 * stakerRewards.numValidators4(); // 3 days * 4 VCs * numValidators4
+        uint256 distributedRewardsToVaultCP2 = rewardsPer32ETHCP2 * _getElapsedDays(updateTimeCP2) * stakerRewards.numValidators4();
+        vm.prank(beaconChainAdmin);
+        yVault.activateCluster(pubkey, signature, depositDataRoot, yVaultClusterIds[0]);
+
+        // ACT
+        // CP3: DV4 activation
+        vm.warp(block.timestamp + 4 days);
+        (uint256 updateTimeCP3, uint256 rewardsPer32ETHCP3) = stakerRewards.getCheckpointData();
+        uint256 consumedVCsCP3 = 4 * 4 * stakerRewards.numValidators4(); 
+        uint256 distributedRewardsToVaultCP3 = rewardsPer32ETHCP3 * _getElapsedDays(updateTimeCP3) * stakerRewards.numValidators4();
+        vm.prank(beaconChainAdmin);
+        zVault.activateCluster(pubkey, signature, depositDataRoot, zVaultClusterIds[0]);
+
+        // ASSERT
+        // Check if the total VCs is updated correctly
+        uint256 totalConsumedVCs = consumedVCsCP2 + consumedVCsCP3;
+        console.log("total VCs CP3: ", stakerRewards.totalVCs());
+        assertEq(stakerRewards.totalVCs(), initialVCs - totalConsumedVCs);
+        // Check if totalPendingRewards is increased and totalAllocatableRewards is decreased
+        uint256 totalDistributedRewards = distributedRewardsToVaultCP2 + distributedRewardsToVaultCP3;
+        assertEq(stakerRewards.totalPendingRewards(), totalDistributedRewards);
+        assertEq(stakerRewards.getAllocatableRewards(), address(stakerRewards).balance - totalDistributedRewards);
+    }
+
+    function test_dvActivationCheckpoint_RevertWhen_calledByNonStratVaultETH() public startAtPresentDay {
+        // ARRANGE
+        IStrategyVaultETH stratVaultETH = _createStratVaultETHAndStake(alice, 96 ether);
+        bytes32[] memory clusterIds = stratVaultETH.getAllDVIds();
+
+        // ACT AND ASSERT
+        vm.expectRevert(IStakerRewards.OnlyStratVaultETH.selector);
+        stakerRewards.dvActivationCheckpoint(address(stratVaultETH), clusterIds[0]);
     }
 
     function test_checkUpkeep_ReturnsFalse_ifNoValidators() public startAtPresentDay {
@@ -289,7 +401,7 @@ contract StakerRewardsTest is ProofParsing, ByzantineDeployer {
         assertEq(stakerRewards.numClusters4(), totalClusters - 1);
     }
 
-    function test_performUpkeep_Revert_ifNotCalledByForwarder() public {
+    function test_performUpkeep_RevertWhen_calledByNonForwarder() public {
         // ARRANGE
         IStrategyVaultETH stratVaultETH = _createStratVaultETHAndStake(alice, 96 ether);
         bytes32[] memory clusterIds = stratVaultETH.getAllDVIds();
@@ -364,11 +476,20 @@ contract StakerRewardsTest is ProofParsing, ByzantineDeployer {
         uint256 initialVCs = stakerRewards.totalVCs();
         (, uint256 rewardsPer32ETH) = stakerRewards.getCheckpointData();
 
-        // Activate DV1 and DV3
+        // Activate DV1 and DV2
         vm.startPrank(beaconChainAdmin);
         stratVaultETH.activateCluster(pubkey, signature, depositDataRoot, clusterIds[0]); // smallest VC = 150
         stratVaultETH.activateCluster(pubkey, signature, depositDataRoot, clusterIds[1]); // smallest VC = 149
         vm.stopPrank();
+
+        // Cluster 2 nodes' VC number
+        bytes32 cluster2Id = clusterIds[1];
+        IAuction.ClusterDetails memory cluster2Details = auction.getClusterDetails(cluster2Id);
+        uint256[] memory cluster2NodeVcNumber = new uint256[](cluster2Details.nodes.length);
+        for (uint256 i = 0; i < cluster2Details.nodes.length; i++) {
+            IAuction.NodeDetails memory node = cluster2Details.nodes[i];
+            cluster2NodeVcNumber[i] = node.currentVCNumber;
+        }
 
         /* ====================== First performUpkeep ====================== */
 
@@ -393,6 +514,12 @@ contract StakerRewardsTest is ProofParsing, ByzantineDeployer {
         // Check if remaining bids are correctly sent to escrow
         assertEq(address(stakerRewards).balance, initialSRBalance - totalBidsToEscrow);
         assertEq(address(escrow).balance, initialEscrowBalance + totalBidsToEscrow);
+        // Check if DV nodes' VC number is updated correctly
+        IAuction.ClusterDetails memory cluster2DetailsAfterUpkeep1 = auction.getClusterDetails(cluster2Id);
+        for (uint256 i = 0; i < cluster2DetailsAfterUpkeep1.nodes.length; i++) {
+            IAuction.NodeDetails memory node = cluster2DetailsAfterUpkeep1.nodes[i];
+            assertEq(node.currentVCNumber, cluster2NodeVcNumber[i] - 149);
+        }
         // Check if rewards since last checkpoint are distributed correctly 
         uint256 distributedRewards = rewardsPer32ETH * 149 * stakerRewards.numValidators4();
         assertEq(stakerRewards.totalPendingRewards(), distributedRewards);
@@ -483,7 +610,7 @@ contract StakerRewardsTest is ProofParsing, ByzantineDeployer {
         // ASSERT
         assertEq(updateTime, block.timestamp);
         uint256 averageVCsUsedPerDayPerValidator = (stakerRewards.numClusters4() * 4 * 1e18) / stakerRewards.numClusters4();
-        uint256 dailyRewardsPer32ETH = (stakerRewards.getAllocatableRewards() / stakerRewards.totalVCs()    ) * averageVCsUsedPerDayPerValidator / 1e18;
+        uint256 dailyRewardsPer32ETH = (stakerRewards.getAllocatableRewards() / stakerRewards.totalVCs()) * averageVCsUsedPerDayPerValidator / 1e18;
         assertEq(rewardsPer32ETH, dailyRewardsPer32ETH);
     }
 
@@ -491,6 +618,22 @@ contract StakerRewardsTest is ProofParsing, ByzantineDeployer {
         vm.prank(address(strategyVaultManager));
         stakerRewards.updateUpkeepInterval(100);
         assertEq(stakerRewards.upkeepInterval(), 100);
+    }
+
+    function test_updateUpkeepInterval_RevertWhen_calledByNonStratVaultManager() public {
+        vm.expectRevert(IStakerRewards.OnlyStrategyVaultManager.selector);
+        stakerRewards.updateUpkeepInterval(100);
+    }
+
+    function test_setForwarderAddress() public {
+        vm.prank(address(strategyVaultManager));
+        stakerRewards.setForwarderAddress(alice);
+        assertEq(stakerRewards.forwarderAddress(), alice);
+    }
+
+    function test_setForwarderAddress_RevertWhen_calledByNonStratVaultManager() public {
+        vm.expectRevert(IStakerRewards.OnlyStrategyVaultManager.selector);
+        stakerRewards.setForwarderAddress(forwarder);
     }
 
     /* ===================== HELPER FUNCTIONS ===================== */
@@ -535,11 +678,7 @@ contract StakerRewardsTest is ProofParsing, ByzantineDeployer {
         return bidIds;
     }
 
-    function _bidCluster4(
-        address _nodeOp,
-        uint16 _discountRate,
-        uint32 _timeInDays
-    ) internal returns (bytes32) {
+    function _bidCluster4(address _nodeOp, uint16 _discountRate, uint32 _timeInDays) internal returns (bytes32) {
         vm.warp(block.timestamp + 1);
         // Get price to pay
         uint256 priceToPay = auction.getPriceToPayCluster4(_nodeOp, _discountRate, _timeInDays);
@@ -553,9 +692,7 @@ contract StakerRewardsTest is ProofParsing, ByzantineDeployer {
         return stratVaultETH;
     }
 
-    function _getDepositData(
-        bytes memory depositFilePath
-    ) internal {
+    function _getDepositData(bytes memory depositFilePath) internal {
         // File generated with the Obol LaunchPad
         setJSON(string(depositFilePath));
 
