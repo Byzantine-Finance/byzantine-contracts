@@ -3,7 +3,6 @@ pragma solidity ^0.8.20;
 
 import "../interfaces/IOracle.sol";
 
-// Chainlink imports
 interface AggregatorV3Interface {
     function latestRoundData() external view returns (
         uint80 roundId,
@@ -21,13 +20,13 @@ contract ChainlinkOracleImplementation is IOracle {
     error StalePrice();
     error PriceTooOld(uint256 timestamp);
 
-    uint256 constant PRICE_PRECISION = 1e8;  // Chainlink typically uses 8 decimal places
+    uint256 constant PRICE_PRECISION = 1e18;  // Standardized precision
     uint256 constant MAX_DELAY = 1 hours;  // Maximum acceptable delay
 
     /// @notice Get the price of an asset from a Chainlink price feed
-    /// @param asset The asset to get the price of
+    /// @param asset The asset to get the price of (unused in this implementation but kept for interface compatibility)
     /// @param priceFeed The address of the Chainlink price feed
-    /// @return price The price of the asset
+    /// @return price The price of the asset with 18 decimal places
     function getPrice(address asset, address priceFeed) external view override returns (uint256) {
         AggregatorV3Interface feed = AggregatorV3Interface(priceFeed);
         
@@ -44,7 +43,15 @@ contract ChainlinkOracleImplementation is IOracle {
         if (answeredInRound < roundID) revert StalePrice();
         if (block.timestamp - updatedAt > MAX_DELAY) revert PriceTooOld(updatedAt);
         
-        uint8 decimals = feed.decimals();
-        return uint256(price) * (10 ** (PRICE_PRECISION - decimals));
+        uint8 feedDecimals = feed.decimals();
+        
+        // Convert the price to 18 decimal places
+        if (feedDecimals < 18) {
+            return uint256(price) * (10 ** (18 - feedDecimals));
+        } else if (feedDecimals > 18) {
+            return uint256(price) / (10 ** (feedDecimals - 18));
+        }
+        
+        return uint256(price);
     }
 }

@@ -1,3 +1,4 @@
+
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
@@ -10,9 +11,9 @@ import "./mocks/EmptyContract.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
  
 contract MockOracle is IOracle {
-    function getPrice(address, address) external pure returns (uint256) {
-        // Mock implementation
-        return 1000 * 1e18; // $1000 with 18 decimals
+    function getPrice(address, address) external pure override returns (uint256) {
+        // Return $1000 USD with 18 decimal places
+        return 1000 * 1e18;
     }
 }
 
@@ -58,7 +59,7 @@ contract ERC7535MultiRewardVaultTest is Test {
         vm.deal(bob, STARTING_BALANCE);
     }
 
-    function testInitialization() public {
+    function testInitialization() public view {
         // Verify the owner is set correctly
         assertEq(vault.owner(), address(this));
 
@@ -67,31 +68,45 @@ contract ERC7535MultiRewardVaultTest is Test {
     }
 
     function testDeposit() public {
+        uint256 oneEth = 1 ether;
+
         /* ===================== ALICE DEPOSITS 1 ETH ===================== */
+        // Alice deposits 1 ETH into the vault
         vm.prank(alice);
-        uint256 shares = vault.deposit{value: 1 ether}(1 ether, alice);
+        uint256 aliceShares = vault.deposit{value: oneEth}(oneEth, alice);
         
-        // Verify the correct amount of shares are minted
-        assertEq(shares, 1 ether);
+        // Verify Alice's deposit
+        assertEq(aliceShares, oneEth, "Alice should receive 1e18 shares for first deposit");
+        assertEq(vault.balanceOf(alice), oneEth, "Alice's balance should be 1e18 shares");
+        assertEq(address(vault).balance, oneEth, "Vault should have 1 ETH");
 
-        // Verify the shares are sent to alice 
-        assertEq(vault.balanceOf(alice), 1 ether);
-
-        // Verify the vault contract receives the correct amount of ETH
-        assertEq(address(vault).balance, 1 ether);
-
-        /* ===================== ALICE DEPOSITS 1 ETH WHILE REWARD TOKENS ARE ADDED ===================== */
-        // Add reward tokens that are worth 1:1 ratio with ETH
+        /* ===================== ADD 2 REWARD TOKENS ===================== */
+        // Add reward token to the vault
         vault.addRewardToken(IERC20Upgradeable(address(rewardToken1)), address(0x123));
-        rewardToken1.mint(address(vault), 1 ether);
+        // Mint 2 ETH worth of reward tokens to the vault
+        rewardToken1.mint(address(vault), 2 * oneEth);
 
-        // Deposit 1 ETH
-        vm.prank(alice);
-        vault.deposit{value: 1 ether}(1 ether, alice);
+        /* ===================== BOB DEPOSITS 1 ETH ===================== */
+        // Bob deposits 1 ETH into the vault
+        vm.prank(bob);
+        uint256 bobShares = vault.deposit{value: oneEth}(oneEth, bob);
 
-        // Verify the correct amount of shares are minted
-
+        // Calculate expected shares for Bob (should be 1/4 of total supply after his deposit)
+        uint256 expectedBobShares = oneEth / 4; // 0.25e18
         
+        // Verify Bob's deposit
+        assertApproxEqRel(bobShares, expectedBobShares, 1e14, "Bob should receive 0.25e18 shares");
+        assertEq(vault.balanceOf(bob), bobShares, "Bob's balance should match received shares");
+        assertEq(vault.balanceOf(alice), oneEth, "Alice's balance should remain unchanged");
+        assertEq(address(vault).balance, 2 * oneEth, "Vault should have 2 ETH");
+        assertEq(vault.totalSupply(), aliceShares + bobShares, "Total supply should be sum of Alice and Bob's shares");
+        assertEq(vault.totalAssets(), 4000 * 1e18, "Total assets should be $4000");
+
+        // Verify proportions of ownership
+        uint256 aliceProportion = (vault.balanceOf(alice) * 1e18) / vault.totalSupply();
+        uint256 bobProportion = (vault.balanceOf(bob) * 1e18) / vault.totalSupply();
+        assertApproxEqRel(aliceProportion, 800000000000000000, 1e14, "Alice should own 80% of the vault");
+        assertApproxEqRel(bobProportion, 200000000000000000, 1e14, "Bob should own 20% of the vault");
     }
 
     function testMint() public {
@@ -140,22 +155,21 @@ contract ERC7535MultiRewardVaultTest is Test {
     }
 
     function testTotalAssets() public {
-        /* ===================== CALCULATE TOTAL ASSETS ===================== */
         uint256 oneEth = 1 ether;
-        uint256 expectedValuePerAsset = 1000 * 1e18; // $1000 in 18 decimal precision
+        uint256 expectedValuePerEth = 1000 * 1e18; // $1000 in 18 decimal precision
 
         // Deposit 1 ETH
         vm.prank(alice);
         vault.deposit{value: oneEth}(oneEth, alice);
 
-        // Add Reward Token 1 (RT1)
+        // Add Reward Token 1 (RT1) (worth $1000)
         vault.addRewardToken(IERC20Upgradeable(address(rewardToken1)), address(0x123));
         rewardToken1.mint(address(vault), oneEth); // Mint 1 reward token (assuming 18 decimals)
 
         // Verify the total assets are calculated correctly
-        uint256 expectedTotalAssets = 2 * expectedValuePerAsset; // $2000 (1000 from ETH + 1000 from reward token)
+        uint256 expectedTotalAssets = 2 * expectedValuePerEth; // $2000 (1000 from ETH + 1000 from reward token)
         uint256 actualTotalAssets = vault.totalAssets();        
-        assertEq(actualTotalAssets, expectedTotalAssets);
+        assertEq(actualTotalAssets, expectedTotalAssets, "Total assets should be $2000");
     }
 
     function testRewardDistribution() public {

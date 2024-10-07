@@ -209,6 +209,7 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
      * @dev This function is overridden to integrate with an oracle to determine the total value of all tokens in the vault.
      * @dev This ensures that when depositing or withdrawing, a user receives the correct amount of assets or shares.
      * @dev Allows for assets to be priced in USD, ETH or any other asset, as long as the oracles are updated accordingly and uniformly.
+     * @dev Assumes that the oracle returns the price in 18 decimals.
      */
     function totalAssets() public view override returns (uint256) {
         // Calculate value of native ETH
@@ -222,7 +223,7 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
             uint256 balance = token.balanceOf(address(this));
             TokenInfo memory tokenInfo = rewardInfo[token];
             uint256 price = oracle.getPrice(address(token), tokenInfo.priceFeed);
-            totalValue += (balance * price) / (10 ** tokenInfo.decimals);
+            totalValue += (balance * price) / 1e18;
         }
         
         return totalValue;
@@ -233,15 +234,19 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
     /**
      * @dev Internal conversion function (from assets to shares) with support for rounding direction.
      * @dev This function is overriden to calculate total value of assets including reward tokens.
-     *
+     * @dev Treats totalAssets() as the total value of ETH + reward tokens in USD rather than the total amount of ETH.
      * Will revert if assets > 0, totalSupply > 0 and totalAssets = 0. That corresponds to a case where any asset
      * would represent an infinite amout of shares.
      */
     function _convertToShares(uint256 assets, MathUpgradeable.Rounding rounding) internal view override returns (uint256 shares) {
         uint256 supply = totalSupply() + 10 ** _decimalsOffset(); // Supply includes virtual reserves
-        return (supply == 0)
-            ? assets
-            : assets.mulDiv(supply, totalAssets(), rounding);
+        if (totalSupply() == 0) {
+            return assets; // On first deposit, totalSupply is 0, so return assets (amount of ETH deposited) as shares
+        } else {
+            uint256 ethPrice = oracle.getPrice(address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE), address(0));
+            uint256 assetsUsdValue = assets * ethPrice / 1e18;
+            return assetsUsdValue.mulDiv(supply, totalAssets(), rounding);
+        }
     }
     
     /**
@@ -250,9 +255,13 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
      */
     function _convertToAssets(uint256 shares, MathUpgradeable.Rounding rounding) internal view override returns (uint256 assets) {
         uint256 supply = totalSupply() + 10 ** _decimalsOffset(); // Supply includes virtual reserves
-        return (supply == 0)
-            ? shares
-            : shares.mulDiv(totalAssets(), supply, rounding);
+        if (totalSupply() == 0) {
+            return shares; // If there are no shares, return the number of shares as assets. TODO: Remove unnecessary code?
+        } else {
+            uint256 assetsUsdValue = shares.mulDiv(totalAssets(), supply, rounding);
+            uint256 ethPrice = oracle.getPrice(address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE), address(0));
+            return assetsUsdValue * 1e18 / ethPrice;
+        }
     }
 
     /**
