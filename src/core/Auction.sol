@@ -67,9 +67,6 @@ contract Auction is
         _clusterDetails[winningClusterId].status = ClusterStatus.IN_CREATION;
         ClusterDetails memory winningClusterDetails = getClusterDetails(winningClusterId);
 
-        // Transfer the winning bids price to the StakerReward contract
-        _transferBidToStakerReward(winningClusterDetails.nodes);
-
         // Remove the winning cluster from the main auction tree
         _mainAuctionTree.remove(winningClusterId, winningAvgAuctionScore);
 
@@ -80,10 +77,8 @@ contract Auction is
         address splitAddr = pushSplitFactory.createSplit(splitParams, owner(), owner());
         _clusterDetails[winningClusterId].splitAddr = splitAddr;
 
-        // If winning cluster is a newly created DV4, update dv4 sub-auction tree
-        if (_bidDetails[winningClusterDetails.nodes[0].bidId].auctionType == AuctionType.JOIN_CLUSTER_4) {
-            _mainUdateDv4SubAuction(winningClusterDetails.nodes, winningClusterId);
-        }
+        // Update the corresponding sub-auction tree
+        _mainUdateSubAuction(winningClusterDetails.nodes, winningClusterId, _bidDetails[winningClusterDetails.nodes[0].bidId].auctionType);
 
         emit ClusterCreated(winningClusterId, winningAvgAuctionScore, splitAddr);
 
@@ -529,7 +524,7 @@ contract Auction is
         bytes32 clusterId = ByzantineAuctionMath.generateClusterId(block.timestamp, winnersAddr, averageAuctionScore);        
 
         // Update main auction
-        _updateMainAuctionTree(clusterId, averageAuctionScore);
+        _updateMainAuctionTree(clusterId, averageAuctionScore, AuctionType.JOIN_CLUSTER_4);
 
         // Update cluster mapping
         _createClusterDetails(clusterId, averageAuctionScore, dv4Winners);
@@ -539,37 +534,46 @@ contract Auction is
         _dv4LatestWinningInfo.latestWinningClusterId = clusterId;
     }
 
-    /// @notice Called if a winning DV comes from the dv4 sub-auction
-    function _mainUdateDv4SubAuction(NodeDetails[] memory _nodesToRemove, bytes32 _winningClusterId) private {
+    /// @notice Called to update the winning cluster's sub-auction tree
+    function _mainUdateSubAuction(NodeDetails[] memory _nodesToRemove, bytes32 _winningClusterId, AuctionType _auctionType) private {
 
-        // Reset the latest winning info
-        _dv4LatestWinningInfo.lastestWinningScore = 0;
-        _dv4LatestWinningInfo.latestWinningClusterId = bytes32(0);
+        // Update sub auction tree dv4
+        if (_auctionType == AuctionType.JOIN_CLUSTER_4) {
+            // Reset the latest winning info
+            _dv4LatestWinningInfo.lastestWinningScore = 0;
+            _dv4LatestWinningInfo.latestWinningClusterId = bytes32(0);
 
-        for (uint256 i = 0; i < _nodesToRemove.length;) {
-            // Node op address
-            address nodeOpAddr = _bidDetails[_nodesToRemove[i].bidId].nodeOp;
-            // Remove the winning node operator bid from the dv4 sub-auction tree
-            _dv4AuctionTree.remove(_nodesToRemove[i].bidId, _bidDetails[_nodesToRemove[i].bidId].auctionScore);
-            // Update the bids number of the node op in dv4 sub-auction
-            _nodeOpsDetails[nodeOpAddr].numBidsCluster4 -= 1;
-            // Update the number of node ops in dv4 sub-auction if necessary
-            if (_nodeOpsDetails[nodeOpAddr].numBidsCluster4 == 0) dv4AuctionNumNodeOps -= 1;
+            for (uint256 i = 0; i < _nodesToRemove.length;) {
+                // Bidder address and bidPrice
+                address nodeOpAddr = _bidDetails[_nodesToRemove[i].bidId].nodeOp;
+                uint256 bidPrice = _bidDetails[_nodesToRemove[i].bidId].bidPrice;
+                // Transfer the bid price to the StakerRewards contract
+                escrow.releaseFunds(bidPrice);
+                // Remove the winning node operator bid from the dv4 sub-auction tree
+                _dv4AuctionTree.remove(_nodesToRemove[i].bidId, _bidDetails[_nodesToRemove[i].bidId].auctionScore);
+                // Update the bids number of the node op in dv4 sub-auction
+                _nodeOpsDetails[nodeOpAddr].numBidsCluster4 -= 1;
+                // Update the number of node ops in dv4 sub-auction if necessary
+                if (_nodeOpsDetails[nodeOpAddr].numBidsCluster4 == 0) dv4AuctionNumNodeOps -= 1;
 
-            emit WinnerJoinedCluster(nodeOpAddr, _winningClusterId, _nodesToRemove[i].bidId);
+                emit WinnerJoinedCluster(nodeOpAddr, _winningClusterId, _nodesToRemove[i].bidId);
 
-            unchecked {
-                ++i;
+                unchecked {
+                    ++i;
+                }
             }
+            
+            // If enough operators in dv4 sub-auction, update main tree
+            if (dv4AuctionNumNodeOps >= _CLUSTER_SIZE_4) _dv4UpdateMainAuction();
+        } else {
+            revert InvalidAuctionType();
         }
-        
-        // If enough operators in dv4 sub-auction, update main tree
-        if (dv4AuctionNumNodeOps >= _CLUSTER_SIZE_4) _dv4UpdateMainAuction();
+
     }
 
     /// @notice Update the main auction tree by adding a new virtual cluster and removing the old one
-    function _updateMainAuctionTree(bytes32 _newClusterId, uint256 _newAvgAuctionScore) private {
-        if (_dv4LatestWinningInfo.latestWinningClusterId != bytes32(0)) {
+    function _updateMainAuctionTree(bytes32 _newClusterId, uint256 _newAvgAuctionScore, AuctionType _auctionType) private {
+        if (_auctionType == AuctionType.JOIN_CLUSTER_4 && _dv4LatestWinningInfo.latestWinningClusterId != bytes32(0)) {
             uint256 lastAverageAuctionScore = _clusterDetails[_dv4LatestWinningInfo.latestWinningClusterId].averageAuctionScore;
             _mainAuctionTree.remove(_dv4LatestWinningInfo.latestWinningClusterId, lastAverageAuctionScore);
             delete _clusterDetails[_dv4LatestWinningInfo.latestWinningClusterId];
@@ -580,7 +584,7 @@ contract Auction is
     /// @notice Create a new entry in the `_clusterDetails` mapping
     function _createClusterDetails(bytes32 _clusterId, uint256 _averageAuctionScore, NodeDetails[] memory _nodes) private {
         _clusterDetails[_clusterId].averageAuctionScore = _averageAuctionScore;
-        for (uint256 i = 0; i < _CLUSTER_SIZE_4;) {
+        for (uint256 i = 0; i < _nodes.length;) {
             _clusterDetails[_clusterId].nodes.push(_nodes[i]);
             unchecked {
                 ++i;
@@ -604,20 +608,6 @@ contract Auction is
     function _transferToEscrow(uint256 _priceToPay) private {
         (bool success,) = address(escrow).call{value: _priceToPay}("");
         if (!success) revert EscrowTransferFailed();
-    }
-
-    /// @notice Transfer the bid price to the StakerRewards contract
-    function _transferBidToStakerReward(NodeDetails[] memory _nodes) private {
-
-        uint256 bidToTransfer;
-        for (uint256 i = 0; i < _nodes.length;) {
-            bidToTransfer = _bidDetails[_nodes[i].bidId].bidPrice;
-            escrow.releaseFunds(bidToTransfer);
-            unchecked {
-                ++i;
-            }
-        }
-        
     }
 
     /// @notice Create the split parameters depending on the winning nodes

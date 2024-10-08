@@ -323,4 +323,7 @@ interface IAuction {
 
     /// @dev Returned when the sender is not the bidder of the bid to update or withdraw
     error SenderNotBidder();
+
+    /// @dev Returned when the auction type (i.e the sub-auction) is unknown
+    error InvalidAuctionType();
 }
