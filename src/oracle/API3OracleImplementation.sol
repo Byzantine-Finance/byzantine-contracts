@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
+
 import "../interfaces/IOracle.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 // API3 Proxy Interface from https://github.com/api3dao/contracts/blob/main/contracts/api3-server-v1/proxies/interfaces/IProxy.sol
 interface IProxy {
@@ -9,7 +11,11 @@ interface IProxy {
     function api3ServerV1() external view returns (address);
 }
 
-contract API3OracleImplementation is IOracle {
+/// @title API3OracleImplementation
+/// @author Byzantine Finance
+/// @notice This API3 oracle implementation is used to get the price of an asset from an API3 dAPI.
+/// @dev This implementation has the ability to edit the ETH_USD_PROXY address.
+contract API3OracleImplementation is IOracle, Ownable {
     error InvalidPrice();
     error StalePrice(uint256 timestamp);
     error InvalidProxyAddress();
@@ -39,5 +45,11 @@ contract API3OracleImplementation is IOracle {
         // Convert the int224 value to uint256
         // API3 dAPIs always return values with 18 decimal places, so no conversion is needed
         return uint256(int256(value));
+    }
+
+    /// @notice Set the ETH/USD proxy address
+    /// @param _newProxy The new proxy address
+    function setETHUSDProxy(address _newProxy) external onlyOwner {
+        ETH_USD_PROXY = _newProxy;
     }
 }
