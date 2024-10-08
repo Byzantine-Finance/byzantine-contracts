@@ -217,7 +217,7 @@ interface IAuction {
      * @dev Reverts if the node op doesn't have a bid with `_bidId`.
      * @dev Revert if `_newDiscountRate` or `_newTimeInDays` don't respect the values set by the byzantine.
      */
-    function getUpdateBidCluster4Price(
+    function getUpdateBidPrice(
         address _nodeOpAddr,
         bytes32 _bidId,
         uint16 _newDiscountRate,
@@ -234,7 +234,7 @@ interface IAuction {
      * @dev Revert if `_newDiscountRate` or `_newTimeInDays` don't respect the values set by the byzantine.
      * @dev Reverts if the transfer of the funds to the Escrow contract failed.
      */
-    function updateBidCluster4(
+    function updateBid(
         bytes32 _bidId,
         uint16 _newDiscountRate,
         uint32 _newTimeInDays
