@@ -215,7 +215,7 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
         // Calculate value of native ETH
         uint256 ethBalance = _getETHBalance();
         uint256 ethPrice = oracle.getPrice(address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE), address(0));
-        uint256 totalValue = ethBalance * ethPrice / 1e18;
+        uint256 totalValue = ethBalance * ethPrice;
         
         // Calculate value of reward tokens, add them to the total value
         for (uint i = 0; i < rewardTokens.length; i++) {
@@ -223,10 +223,10 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
             uint256 balance = token.balanceOf(address(this));
             TokenInfo memory tokenInfo = rewardInfo[token];
             uint256 price = oracle.getPrice(address(token), tokenInfo.priceFeed);
-            totalValue += (balance * price) / 1e18;
+            totalValue += (balance * price);
         }
         
-        return totalValue;
+        return totalValue / 1e18;
     }
 
     /* ============== INTERNAL FUNCTIONS ============== */
