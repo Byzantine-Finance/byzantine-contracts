@@ -209,40 +209,36 @@ interface IAuction {
     ) external payable returns (bytes32);
 
     /**
-     * @notice Fonction to determine the price to add in the protocol if the node operator outbids. Returns 0 if he decreases its bid.
-     * @notice The bid which will be updated will be the last bid with `_oldAuctionScore`
+     * @notice Fonction to determine the price to add if the node operator outbids. Returns 0 if he downbids.
      * @param _nodeOpAddr: address of the node operator updating its bid
-     * @param _oldAuctionScore: auction score of the bid to update
-     * @param _newDiscountRate: discount rate (i.e the desired profit margin) in percentage (scale from 0 to 10000)
-     * @param _newTimeInDays: duration of being a validator, in days
-     * @dev Reverts if the node op doesn't have a bid with `_oldAuctionScore`.
+     * @param _bidId: bidId to update
+     * @param _newDiscountRate: the new discount rate (i.e the desired profit margin) in percentage (scale from 0 to 10000)
+     * @param _newTimeInDays: the new duration of being a validator, in days
+     * @dev Reverts if the node op doesn't have a bid with `_bidId`.
      * @dev Revert if `_newDiscountRate` or `_newTimeInDays` don't respect the values set by the byzantine.
      */
-    /*function getUpdateOneBidPrice(
+    function getUpdateBidCluster4Price(
         address _nodeOpAddr,
-        uint256 _oldAuctionScore,
+        bytes32 _bidId,
         uint16 _newDiscountRate,
         uint32 _newTimeInDays
-    ) 
-        external view returns (uint256);*/
+    ) external view returns (uint256);
 
     /**
-     * @notice  Update a bid of a node operator associated to `_oldAuctionScore`. The node op will have to pay more if he outbids. 
-     *          If he decreases his bid, the escrow contract will send him back the difference.
-     * @notice  The bid which will be updated will be the last bid with `_oldAuctionScore`
-     * @param _oldAuctionScore: auction score of the bid to update
-     * @param _newDiscountRate: new discount rate (i.e the desired profit margin) in percentage (scale from 0 to 10000)
-     * @param _newTimeInDays: new duration of being a validator, in days
-     * @dev Reverts if the node op doesn't have a bid with `_oldAuctionScore`.
-     * @dev Reverts if the transfer of the funds to the Escrow contract failed.
+     * @notice  Update a bid of a node operator's `_bidId`. The node op will have to pay more if he outbids. 
+     *          If he decreases his bid, the escrow contract will send him back the price difference.
+     * @param _bidId: bidId to update
+     * @param _newDiscountRate: the new discount rate (i.e the desired profit margin) in percentage (scale from 0 to 10000)
+     * @param _newTimeInDays: the new duration of being a validator, in days
+     * @dev Reverts if the node op doesn't have a bid with `_bidId`.
      * @dev Revert if `_newDiscountRate` or `_newTimeInDays` don't respect the values set by the byzantine.
+     * @dev Reverts if the transfer of the funds to the Escrow contract failed.
      */
-    /*function updateOneBid(
-        uint256 _oldAuctionScore,
+    function updateBidCluster4(
+        bytes32 _bidId,
         uint16 _newDiscountRate,
         uint32 _newTimeInDays
-    ) 
-        external payable returns (uint256);*/
+    ) external payable returns (bytes32);
 
     /**
      * @notice Allow a node operator to withdraw a specific bid (through its auction score).
@@ -324,4 +320,7 @@ interface IAuction {
 
     /// @dev Returned when the main auction tree is empty, and therefore when it's not possible to create a new DV
     error MainAuctionEmpty();
+
+    /// @dev Returned when the sender is not the bidder of the bid to update or withdraw
+    error SenderNotBidder();
 }
