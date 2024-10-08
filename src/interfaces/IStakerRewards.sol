@@ -3,6 +3,30 @@ pragma solidity ^0.8.20;
 
 interface IStakerRewards {
 
+    /* ============== STATE VARIABLES ============== */
+
+    /// @notice Checkpoint updated at every new event
+    struct Checkpoint {
+        uint256 updateTime;
+        uint256 totalVCs;
+        uint256 totalPendingRewards;
+        uint256 dailyRewardsPer32ETH; // Daily rewards distributed for every 32ETH staked
+    }
+
+    /// @notice Record every cluster at dvCreationCheckpoint
+    struct ClusterData {
+        uint256 activeTime; // Timestamp of the activation of the cluster, becomes a validator
+        uint256 exitTimestamp; // = activeTime + smallestVC * _ONE_DAY
+        uint32 smallestVC; // Smallest number of VCs among the nodeOp of a cluster
+        uint8 clusterSize;
+    }
+
+    /// @notice Record every StratVaultETH at dvActivationCheckpoint
+    struct VaultData {
+        uint256 lastUpdate;
+        uint256 numValidatorsInVault;
+    }
+
     /* ============== EXTERNAL FUNCTIONS ============== */
 
     /**
@@ -56,19 +80,19 @@ interface IStakerRewards {
      * @notice Returns the cluster data of a given clusterId
      * @param _clusterId The ID of the cluster
      */
-    function getClusterData(bytes32 _clusterId) external view returns (uint256, uint256, uint256, uint8);
+    function getClusterData(bytes32 _clusterId) external view returns (ClusterData memory);
 
     /**
      * @notice Function to get the checkpoint data
      * @return The checkpoint data
      */
-    function getCheckpointData() external view returns (uint256, uint256);
+    function getCheckpointData() external view returns (Checkpoint memory);
     
     /**
      * @notice Function to get the vault data for a given vault address
      * @param _vaultAddr Address of the StratVaultETH
      */
-    function getVaultData(address _vaultAddr) external view returns (uint256, uint256);
+    function getVaultData(address _vaultAddr) external view returns (VaultData memory);
 
     /* ============== ERRORS ============== */
 
