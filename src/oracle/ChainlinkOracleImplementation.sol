@@ -20,14 +20,19 @@ contract ChainlinkOracleImplementation is IOracle {
     error StalePrice();
     error PriceTooOld(uint256 timestamp);
 
-    uint256 public constant PRICE_PRECISION = 1e18;  // Standardized precision
     uint256 public constant MAX_DELAY = 1 hours;  // Maximum acceptable delay
+    address public ETH_USD_PROXY = address(0); // ETH/USD Price Feed on Holesky (TODO: Change to price feed when it is deployed)
 
     /// @notice Get the price of an asset from a Chainlink price feed
     /// @param asset The asset to get the price of (unused in this implementation but kept for interface compatibility)
     /// @param priceFeed The address of the Chainlink price feed
     /// @return price The price of the asset with 18 decimal places
     function getPrice(address asset, address priceFeed) external view override returns (uint256) {
+        // If asset is the special ETH address, use the ETH/USD proxy
+        if (asset == 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE) {
+            priceFeed = ETH_USD_PROXY;
+        }
+
         // Get price data from the feed
         AggregatorV3Interface feed = AggregatorV3Interface(priceFeed);
         

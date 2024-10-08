@@ -35,13 +35,6 @@ abstract contract ERC7535Upgradeable is Initializable, ERC20Upgradeable, IERC753
      * @dev Attempted to redeem more shares than the max amount for `receiver`.
      */
     error ERC7535ExceededMaxRedeem(address owner, uint256 shares, uint256 max);
-
-    /**
-     * @dev Public function for initializing the ERC7535 contract.
-     */
-    function initialize() public initializer() {
-        __ERC7535_init();
-    }
     
     /**
      * @dev Initializes the ERC7535 contract. Add calls for initializers of parent contracts here.

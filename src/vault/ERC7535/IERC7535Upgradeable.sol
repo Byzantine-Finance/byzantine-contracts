@@ -24,11 +24,6 @@ interface IERC7535Upgradeable is IERC20Upgradeable, IERC20MetadataUpgradeable {
     error WithdrawFailed();
 
     /**
-     * @dev Initializes the ERC7535 contract.
-     */
-    function initialize() external;
-
-    /**
      * @dev Returns the address of the underlying token used for the Vault for accounting, depositing, and withdrawing.
      *
      * - MUST be an ERC-20 token contract.
