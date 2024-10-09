@@ -92,6 +92,7 @@ contract Auction is
      * @param _timeInDays: duration of being part of a DV, in days
      * @param _auctionType: cluster type the node operator wants to join (dv4, dv7, private dv, ...)
      * @dev Revert if `_discountRate` or `_timeInDays` don't respect the minimum values set by Byzantine.
+     * @dev Reverts if the auction type is unknown
      */
     function getPriceToPay(
         address _nodeOpAddr,
@@ -122,10 +123,11 @@ contract Auction is
     }
 
     /**
-     * @notice Bid function to join a cluster of size 4. A call to that function will search the first 4 winners, calculate their average score, and put the virtual DV in the main auction.
-     * Every time a new bid modify the first 4 winners, it update the main auction by removing the previous virtual DV and adding the new one.
+     * @notice Bid function to join a cluster type specified by `_auctionType`. A call to that function will search the sub-auctions winners, calculate their average score, and put the virtual DV in the main auction.
+     * Every time a new bid modify the sub-auctions winners, it update the main auction by removing the previous virtual DV and adding the new one.
      * @param _discountRate The desired profit margin in percentage of the operator (scale from 0 to 10000)
      * @param _timeInDays Duration of being part of a DV, in days
+     * @param _auctionType cluster type the node operator wants to join (dv4, dv7, private dv, ...)
      * @return bidId The id of the bid
      * @dev The bid price is sent to an escrow smart contract. As long as the node operator doesn't win the auction, its bids stays in the escrow contract.
      * It is possible to ask the escrow contract to refund the bid if the operator wants to leave the protocol (call `withdrawBid`)
@@ -133,10 +135,12 @@ contract Auction is
      * @dev Reverts if the bidder is not whitelisted (permissionless DV will arrive later)
      * @dev Reverts if the discount rate is too high or the duration is too short
      * @dev Reverts if the ethers sent by the node op are not enough to pay for the bid(s) (and the bond). If too many ethers has been sent the function returns the excess to the sender.
+     * @dev Reverts if the auction type is unknown
      */
-    function bidCluster4(
+    function bid(
         uint16 _discountRate,
-        uint32 _timeInDays
+        uint32 _timeInDays,
+        AuctionType _auctionType
     ) external payable nonReentrant returns (bytes32 bidId) {
 
         // Only whitelisted node operators can bid
@@ -146,40 +150,53 @@ contract Auction is
         if (_discountRate > maxDiscountRate) revert DiscountRateTooHigh();
         if (_timeInDays < minDuration) revert DurationTooShort();
 
-        // Update `dv4AuctionNumNodeOps` if necessary
-        if (_nodeOpsDetails[msg.sender].numBidsCluster4 == 0) {
-            dv4AuctionNumNodeOps += 1;
-        }
-
         /// TODO: Get the reputation score of msg.sender
         uint32 reputationScore = 1;
 
-        // Calculate operator's bid price and score
-        uint256 dailyVcPrice = ByzantineAuctionMath.calculateVCPrice(expectedDailyReturnWei, _discountRate, _CLUSTER_SIZE_4);
-        uint256 bidPrice = ByzantineAuctionMath.calculateBidPrice(_timeInDays, dailyVcPrice);
-        uint256 auctionScore = ByzantineAuctionMath.calculateAuctionScore(dailyVcPrice, _timeInDays, reputationScore);
+        // Bid the corresponding sub-auction
+        uint256 dailyVcPrice;
+        uint256 bidPrice;
+        uint256 auctionScore;
 
-        // Calculate the bid ID (hash(msg.sender, timestamp, bidType))
-        bidId = keccak256(abi.encodePacked(msg.sender, block.timestamp, _CLUSTER_SIZE_4));
+        if (_auctionType == AuctionType.JOIN_CLUSTER_4) {
+            // Update `dv4AuctionNumNodeOps` if necessary
+            if (_nodeOpsDetails[msg.sender].numBidsCluster4 == 0) {
+                dv4AuctionNumNodeOps += 1;
+            }
 
-        // Insert the auction score in the cluster 4 sub-auction tree
-        _dv4AuctionTree.insert(bidId, auctionScore);
+            // Calculate operator's bid price and score
+            dailyVcPrice = ByzantineAuctionMath.calculateVCPrice(expectedDailyReturnWei, _discountRate, _CLUSTER_SIZE_4);
+            bidPrice = ByzantineAuctionMath.calculateBidPrice(_timeInDays, dailyVcPrice);
+            auctionScore = ByzantineAuctionMath.calculateAuctionScore(dailyVcPrice, _timeInDays, reputationScore);
 
-        // Add bid to the bids mapping
-        _bidDetails[bidId] = BidDetails({
-            auctionScore: auctionScore,
-            bidPrice: bidPrice,
-            nodeOp: msg.sender,
-            vcNumber: _timeInDays,
-            discountRate: _discountRate,
-            auctionType: AuctionType.JOIN_CLUSTER_4
-        });
-        // Increment the bid number of the node op
-        _nodeOpsDetails[msg.sender].numBidsCluster4 += 1;
+            // Calculate the bid ID (hash(msg.sender, timestamp, bidType))
+            bidId = keccak256(abi.encodePacked(msg.sender, block.timestamp, _CLUSTER_SIZE_4));
 
-        // Update main auction if necessary
-        if (auctionScore > _dv4LatestWinningInfo.lastestWinningScore && dv4AuctionNumNodeOps >= _CLUSTER_SIZE_4) {
-            _dv4UpdateMainAuction();
+            // Insert the auction score in the cluster 4 sub-auction tree
+            _dv4AuctionTree.insert(bidId, auctionScore);
+
+            // Increment the bid number of the node op
+            _nodeOpsDetails[msg.sender].numBidsCluster4 += 1;
+
+            // Add bid to the bids mapping
+            _bidDetails[bidId] = BidDetails({
+                auctionScore: auctionScore,
+                bidPrice: bidPrice,
+                nodeOp: msg.sender,
+                vcNumber: _timeInDays,
+                discountRate: _discountRate,
+                auctionType: AuctionType.JOIN_CLUSTER_4
+            });
+
+            // Update main auction if necessary
+            if (auctionScore > _dv4LatestWinningInfo.lastestWinningScore && dv4AuctionNumNodeOps >= _CLUSTER_SIZE_4) {
+                _dv4UpdateMainAuction();
+            }
+
+            emit BidPlaced(msg.sender, bidId, _discountRate, _timeInDays, bidPrice, auctionScore, AuctionType.JOIN_CLUSTER_4);
+
+        } else {
+            revert InvalidAuctionType();
         }
 
         // Calculate the total price to pay, verify it and send it to the escrow contract
@@ -193,7 +210,6 @@ contract Auction is
         _verifyEthSent(msg.value, priceToPay);
         _transferToEscrow(priceToPay);
 
-        emit BidPlaced(msg.sender, bidId, _discountRate, _timeInDays, bidPrice, auctionScore);
     }
 
     /**

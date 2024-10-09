@@ -83,28 +83,34 @@ contract AuctionTest is ByzantineDeployer {
         // Should revert if non-whitelisted
         vm.expectRevert(IAuction.NotWhitelisted.selector);
         vm.prank(alice);
-        auction.bidCluster4(10e2, 100);
+        auction.bid(10e2, 100, IAuction.AuctionType.JOIN_CLUSTER_4);
 
         // Should revert if discountRate too high
         vm.expectRevert(IAuction.DiscountRateTooHigh.selector);
         vm.prank(nodeOps[0]);
-        auction.bidCluster4(25e2, 200);
+        auction.bid(25e2, 200, IAuction.AuctionType.JOIN_CLUSTER_4);
 
         // Should revert if duration too short
         vm.expectRevert(IAuction.DurationTooShort.selector);
         vm.prank(nodeOps[0]);
-        auction.bidCluster4(10e2, 20);
+        auction.bid(10e2, 20, IAuction.AuctionType.JOIN_CLUSTER_4);
 
+        // Should revert if not enough ether sent
         vm.expectRevert(IAuction.NotEnoughEtherSent.selector);
         vm.prank(nodeOps[0]);
-        auction.bidCluster4{value: 0 ether}(10e2, 100);
+        auction.bid{value: 0 ether}(10e2, 100, IAuction.AuctionType.JOIN_CLUSTER_4);
+
+        // Should revert if auctionType is invalid
+        vm.expectRevert(IAuction.InvalidAuctionType.selector);
+        vm.prank(nodeOps[0]);
+        auction.bid{value: 20 ether}(10e2, 100, IAuction.AuctionType.JOIN_CLUSTER_7);
     }
 
     function testBid_RefundTheSkimmingEthers() external {
         // nodeOps[0] bids
         uint256 priceToPay = auction.getPriceToPay(nodeOps[0], 11e2, 99, IAuction.AuctionType.JOIN_CLUSTER_4);
         vm.prank(nodeOps[0]);
-        auction.bidCluster4{value: (priceToPay + 1 ether)}(11e2, 99);
+        auction.bid{value: (priceToPay + 1 ether)}(11e2, 99, IAuction.AuctionType.JOIN_CLUSTER_4);
 
         // Verify the balance of nodeOps[0]
         assertEq(nodeOps[0].balance, STARTING_BALANCE - priceToPay);
@@ -544,7 +550,7 @@ contract AuctionTest is ByzantineDeployer {
         // Get price to pay
         uint256 priceToPay = auction.getPriceToPay(_nodeOp, _discountRate, _timeInDays, IAuction.AuctionType.JOIN_CLUSTER_4);
         vm.prank(_nodeOp);
-        return   auction.bidCluster4{value: priceToPay}(_discountRate, _timeInDays);
+        return auction.bid{value: priceToPay}(_discountRate, _timeInDays, IAuction.AuctionType.JOIN_CLUSTER_4);
     }
 
     function _getBidIdAuctionScore(bytes32 _bidId) internal view returns (uint256) {

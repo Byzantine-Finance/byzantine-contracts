@@ -92,7 +92,8 @@ interface IAuction {
         uint16 discountRate,
         uint32 duration,
         uint256 bidPrice,
-        uint256 auctionScore
+        uint256 auctionScore,
+        AuctionType auctionType
     );
     
     /// @notice Emitted when a bid is updated
@@ -184,6 +185,7 @@ interface IAuction {
      * @param _timeInDays: duration of being part of a DV, in days
      * @param _auctionType: cluster type the node operator wants to join (dv4, dv7, private dv, ...)
      * @dev Revert if `_discountRate` or `_timeInDays` don't respect the minimum values set by Byzantine.
+     * @dev Revert if the auction type is unknown
      */
     function getPriceToPay(
         address _nodeOpAddr,
@@ -193,10 +195,11 @@ interface IAuction {
     ) external view returns (uint256);
 
     /**
-     * @notice Bid function to join a cluster of size 4. A call to that function will search the first 4 winners, calculate their average score, and put the virtual DV in the main auction.
-     * Every time a new bid modify the first 4 winners, it update the main auction by removing the previous virtual DV and adding the new one.
+     * @notice Bid function to join a cluster type specified by `_auctionType`. A call to that function will search the sub-auctions winners, calculate their average score, and put the virtual DV in the main auction.
+     * Every time a new bid modify the sub-auctions winners, it update the main auction by removing the previous virtual DV and adding the new one.
      * @param _discountRate The desired profit margin in percentage of the operator (scale from 0 to 10000)
      * @param _timeInDays Duration of being part of a DV, in days
+     * @param _auctionType cluster type the node operator wants to join (dv4, dv7, private dv, ...)
      * @return bidId The id of the bid
      * @dev The bid price is sent to an escrow smart contract. As long as the node operator doesn't win the auction, its bids stays in the escrow contract.
      * It is possible to ask the escrow contract to refund the bid if the operator wants to leave the protocol (call `withdrawBid`)
@@ -204,10 +207,12 @@ interface IAuction {
      * @dev Reverts if the bidder is not whitelisted (permissionless DV will arrive later)
      * @dev Reverts if the discount rate is too high or the duration is too short
      * @dev Reverts if the ethers sent by the node op are not enough to pay for the bid(s) (and the bond). If too many ethers has been sent the function returns the excess to the sender.
+     * @dev Reverts if the auction type is unknown
      */
-    function bidCluster4(
+    function bid(
         uint16 _discountRate,
-        uint32 _timeInDays
+        uint32 _timeInDays,
+        AuctionType _auctionType
     ) external payable returns (bytes32);
 
     /**
