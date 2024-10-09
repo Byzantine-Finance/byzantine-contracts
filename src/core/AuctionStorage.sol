@@ -62,10 +62,6 @@ abstract contract AuctionStorage is IAuction {
     uint16 public dv7AuctionNumNodeOps;
     /// @notice Maximum discount rate (i.e the max profit margin of node op) in percentage
     uint16 public maxDiscountRate;
-    /// @notice Number of validators in a cluster of size 4
-    uint8 public NUM_VALIDATORS_CLUSTER_4;
-    /// @notice Number of validators in a cluster of size 7
-    uint8 public NUM_VALIDATORS_CLUSTER_7;
 
     /// @notice Node operator address => node operator global details
     mapping(address => NodeOpGlobalDetails) internal _nodeOpsDetails;
