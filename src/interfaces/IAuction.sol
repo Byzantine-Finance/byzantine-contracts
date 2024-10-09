@@ -182,12 +182,14 @@ interface IAuction {
      * @param _nodeOpAddr: address of the node operator who will bid
      * @param _discountRate: The desired profit margin in percentage of the operator (scale from 0 to 10000)
      * @param _timeInDays: duration of being part of a DV, in days
+     * @param _auctionType: cluster type the node operator wants to join (dv4, dv7, private dv, ...)
      * @dev Revert if `_discountRate` or `_timeInDays` don't respect the minimum values set by Byzantine.
      */
-    function getPriceToPayCluster4(
+    function getPriceToPay(
         address _nodeOpAddr,
         uint16 _discountRate,
-        uint32 _timeInDays
+        uint32 _timeInDays,
+        AuctionType _auctionType
     ) external view returns (uint256);
 
     /**

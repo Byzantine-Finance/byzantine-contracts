@@ -90,21 +90,29 @@ contract Auction is
      * @param _nodeOpAddr: address of the node operator who will bid
      * @param _discountRate: The desired profit margin in percentage of the operator (scale from 0 to 10000)
      * @param _timeInDays: duration of being part of a DV, in days
+     * @param _auctionType: cluster type the node operator wants to join (dv4, dv7, private dv, ...)
      * @dev Revert if `_discountRate` or `_timeInDays` don't respect the minimum values set by Byzantine.
      */
-    function getPriceToPayCluster4(
+    function getPriceToPay(
         address _nodeOpAddr,
         uint16 _discountRate,
-        uint32 _timeInDays
+        uint32 _timeInDays,
+        AuctionType _auctionType
     ) external view returns (uint256) {
 
         // Verify the standing bid parameters
         if (_discountRate > maxDiscountRate) revert DiscountRateTooHigh();
         if (_timeInDays < minDuration) revert DurationTooShort();
 
-        // Calculate operator's bid price
-        uint256 dailyVcPrice = ByzantineAuctionMath.calculateVCPrice(expectedDailyReturnWei, _discountRate, _CLUSTER_SIZE_4);
-        uint256 bidPrice = ByzantineAuctionMath.calculateBidPrice(_timeInDays, dailyVcPrice);
+        // Calculate operator's bid price according to the auction type
+        uint256 dailyVcPrice;
+        uint256 bidPrice;   
+        if (_auctionType == AuctionType.JOIN_CLUSTER_4) {
+            dailyVcPrice = ByzantineAuctionMath.calculateVCPrice(expectedDailyReturnWei, _discountRate, _CLUSTER_SIZE_4);
+            bidPrice = ByzantineAuctionMath.calculateBidPrice(_timeInDays, dailyVcPrice);
+        } else {
+            revert InvalidAuctionType();
+        }
 
         // Calculate the total price to pay
         if (isWhitelisted(_nodeOpAddr)) {

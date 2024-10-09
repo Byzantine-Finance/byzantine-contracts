@@ -59,20 +59,23 @@ contract AuctionTest is ByzantineDeployer {
     //     assertFalse(auction.isWhitelisted(nodeOps[0]));
     // }
 
-    function test_getPriceToPayCluster4() external {
+    function test_getPriceToPay() external {
         // Should revert if discountRate too high
         vm.expectRevert(IAuction.DiscountRateTooHigh.selector);
-        auction.getPriceToPayCluster4(nodeOps[0], 25e2, 200);
+        auction.getPriceToPay(nodeOps[0], 25e2, 200, IAuction.AuctionType.JOIN_CLUSTER_4);
         // Should revert if duration too short
         vm.expectRevert(IAuction.DurationTooShort.selector);
-        auction.getPriceToPayCluster4(nodeOps[0], 10e2, 20);
+        auction.getPriceToPay(nodeOps[0], 10e2, 20, IAuction.AuctionType.JOIN_CLUSTER_4);
+        // Should revert if auctionType is invalid
+        vm.expectRevert(IAuction.InvalidAuctionType.selector);
+        auction.getPriceToPay(nodeOps[0], 10e2, 100, IAuction.AuctionType.JOIN_CLUSTER_7);
 
         // Test price to pay for a whitelisted nodeOp
-        uint256 priceToPayWhitelisted = auction.getPriceToPayCluster4(nodeOps[0], 10e2, 100);
+        uint256 priceToPayWhitelisted = auction.getPriceToPay(nodeOps[0], 10e2, 100, IAuction.AuctionType.JOIN_CLUSTER_4);
         assertEq(priceToPayWhitelisted, bidPrice_10e2_100);
 
         // Test price to pay for a non-whitelisted nodeOp
-        uint256 priceToPayNotWhitelisted = auction.getPriceToPayCluster4(alice, 10e2, 100);
+        uint256 priceToPayNotWhitelisted = auction.getPriceToPay(alice, 10e2, 100, IAuction.AuctionType.JOIN_CLUSTER_4);
         assertEq(priceToPayNotWhitelisted, bidPrice_10e2_100 + BOND);
     }
 
@@ -99,7 +102,7 @@ contract AuctionTest is ByzantineDeployer {
 
     function testBid_RefundTheSkimmingEthers() external {
         // nodeOps[0] bids
-        uint256 priceToPay = auction.getPriceToPayCluster4(nodeOps[0], 11e2, 99);
+        uint256 priceToPay = auction.getPriceToPay(nodeOps[0], 11e2, 99, IAuction.AuctionType.JOIN_CLUSTER_4);
         vm.prank(nodeOps[0]);
         auction.bidCluster4{value: (priceToPay + 1 ether)}(11e2, 99);
 
@@ -539,7 +542,7 @@ contract AuctionTest is ByzantineDeployer {
     ) internal returns (bytes32) {
         vm.warp(block.timestamp + 1);
         // Get price to pay
-        uint256 priceToPay = auction.getPriceToPayCluster4(_nodeOp, _discountRate, _timeInDays);
+        uint256 priceToPay = auction.getPriceToPay(_nodeOp, _discountRate, _timeInDays, IAuction.AuctionType.JOIN_CLUSTER_4);
         vm.prank(_nodeOp);
         return   auction.bidCluster4{value: priceToPay}(_discountRate, _timeInDays);
     }
