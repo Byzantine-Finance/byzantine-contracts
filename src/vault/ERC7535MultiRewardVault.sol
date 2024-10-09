@@ -21,23 +21,8 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
 
     /* ============== STATE VARIABLES ============== */
 
-    /// @notice Struct to store token information
-    struct TokenInfo {
-        address priceFeed;
-        uint8 decimals;
-    }
-
-    /// @notice Mapping of asset token address to its information
-    mapping(IERC20Upgradeable => TokenInfo) public assetInfo;
-
-    /// @notice Mapping of reward token address to its information
-    mapping(IERC20Upgradeable => TokenInfo) public rewardInfo;
-
-    // /// @notice List of asset tokens
-    // IERC20Upgradeable[] public assetTokens;
-
     /// @notice List of reward tokens
-    IERC20Upgradeable[] public rewardTokens;
+    address[] public rewardTokens;
 
     /// @notice Oracle implementation
     IOracle public oracle;
@@ -48,12 +33,9 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
     error InvalidAddress();
 
     /* ============== EVENTS ============== */
-
-    //event AssetTokenAdded(IERC20Upgradeable indexed token, address priceFeed, uint8 decimals);
-    event RewardTokenAdded(IERC20Upgradeable indexed token, address priceFeed, uint8 decimals);
-    event PriceFeedUpdated(IERC20Upgradeable indexed token, address newPriceFeed);
+    event RewardTokenAdded(address indexed token);
     event OracleUpdated(address newOracle);
-    event RewardTokenWithdrawn(address indexed receiver, IERC20Upgradeable indexed rewardToken, uint256 amount);
+    event RewardTokenWithdrawn(address indexed receiver, address indexed rewardToken, uint256 amount);
     
     /* ============== CONSTRUCTOR & INITIALIZER ============== */
 
@@ -133,62 +115,17 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
         return assets;
     }
 
-    // /**
-    //  * @notice Adds an asset token to the vault.
-    //  * @param _token The asset token to add.
-    //  * @param _priceFeed The price feed address for the token.
-    //  */ 
-    // function addAssetToken(IERC20Upgradeable _token, address _priceFeed) external onlyOwner {
-    //     if (assetInfo[_token].priceFeed != address(0)) revert TokenAlreadyAdded();
-        
-    //     uint8 decimals = IERC20MetadataUpgradeable(address(_token)).decimals();
-    //     assetInfo[_token] = TokenInfo({
-    //         priceFeed: _priceFeed,
-    //         decimals: decimals
-    //     });
-    //     assetTokens.push(_token);
-
-    //     emit AssetTokenAdded(_token, _priceFeed, decimals);
-    // }
-
     /**
      * @notice Adds a reward token to the vault.
      * @param _token The reward token to add.
-     * @param _priceFeed The price feed address for the token.
      */
-    function addRewardToken(IERC20Upgradeable _token, address _priceFeed) external onlyOwner {
-        if (rewardInfo[_token].priceFeed != address(0)) revert TokenAlreadyAdded();
-        
-        uint8 decimals = IERC20MetadataUpgradeable(address(_token)).decimals();
-        rewardInfo[_token] = TokenInfo({
-            priceFeed: _priceFeed,
-            decimals: decimals
-        });
+    function addRewardToken(address _token) external onlyOwner {
+        // Check if the token is already in the rewardTokens array
+        for (uint i = 0; i < rewardTokens.length; i++) {
+            if (rewardTokens[i] == _token) revert TokenAlreadyAdded();
+        }
         rewardTokens.push(_token);
-
-        emit RewardTokenAdded(_token, _priceFeed, decimals);
-    }
-
-    /**
-     * @notice Updates the oracle address for an asset token.
-     * @param _token The asset token to update.
-     * @param _newPriceFeed The new price feed address for the token.
-     */
-    function updateAssetPriceFeed(IERC20Upgradeable _token, address _newPriceFeed) external onlyOwner {
-        if (assetInfo[_token].priceFeed == address(0)) revert InvalidAddress();
-        assetInfo[_token].priceFeed = _newPriceFeed;
-        emit PriceFeedUpdated(_token, _newPriceFeed);
-    }
-
-    /**
-     * @notice Updates the oracle address for a reward token.
-     * @param _token The reward token to update.
-     * @param _newPriceFeed The new price feed address for the token.
-     */
-    function updateRewardPriceFeed(IERC20Upgradeable _token, address _newPriceFeed) external onlyOwner {
-        if (rewardInfo[_token].priceFeed == address(0)) revert InvalidAddress();
-        rewardInfo[_token].priceFeed = _newPriceFeed;
-        emit PriceFeedUpdated(_token, _newPriceFeed);
+        emit RewardTokenAdded(_token);
     }
 
     /**
@@ -219,10 +156,9 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
         
         // Calculate value of reward tokens, add them to the total value
         for (uint i = 0; i < rewardTokens.length; i++) {
-            IERC20Upgradeable token = rewardTokens[i];
-            uint256 balance = token.balanceOf(address(this));
-            TokenInfo memory tokenInfo = rewardInfo[token];
-            uint256 price = oracle.getPrice(address(token), tokenInfo.priceFeed);
+            address token = rewardTokens[i];
+            uint256 balance = IERC20Upgradeable(token).balanceOf(address(this));
+            uint256 price = oracle.getPrice(address(token), address(0));
             totalValue += (balance * price);
         }
         
@@ -272,11 +208,11 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
     function _distributeRewards(address receiver, uint256 sharesBurned) internal {
         uint256 totalShares = totalSupply();
         for (uint i = 0; i < rewardTokens.length; i++) {
-            IERC20Upgradeable rewardToken = rewardTokens[i];
-            uint256 rewardBalance = rewardToken.balanceOf(address(this));
+            address rewardToken = rewardTokens[i];
+            uint256 rewardBalance = IERC20Upgradeable(rewardToken).balanceOf(address(this));
             uint256 rewardAmount = (rewardBalance * sharesBurned) / totalShares;
             if (rewardAmount > 0) {
-                rewardToken.safeTransfer(receiver, rewardAmount);
+                IERC20Upgradeable(rewardToken).safeTransfer(receiver, rewardAmount);
                 emit RewardTokenWithdrawn(receiver, rewardToken, rewardAmount);
             }
         }

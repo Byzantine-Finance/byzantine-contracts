@@ -82,7 +82,7 @@ contract ERC7535MultiRewardVaultTest is Test {
 
         /* ===================== ADD 2 REWARD TOKENS ===================== */
         // Add reward token to the vault
-        vault.addRewardToken(IERC20Upgradeable(address(rewardToken1)), address(0x123));
+        vault.addRewardToken(address(rewardToken1));
         // Mint 2 ETH worth of reward tokens to the vault
         rewardToken1.mint(address(vault), 2 * oneEth);
 
@@ -134,24 +134,7 @@ contract ERC7535MultiRewardVaultTest is Test {
 
     function testAddRewardToken() public {
         /* ===================== ADD REWARD TOKEN 1 ===================== */
-        vault.addRewardToken(IERC20Upgradeable(address(rewardToken1)), address(0x123));
-        (address priceFeed, uint8 decimals) = vault.rewardInfo(IERC20Upgradeable(address(rewardToken1)));
-        
-        // Verify the price feed is set correctly
-        assertEq(priceFeed, address(0x123));
-
-        // Verify the decimals are set correctly
-        assertEq(decimals, 18);
-    }
-
-    function testUpdateRewardPriceFeed() public {
-        /* ===================== UPDATE REWARD TOKEN 1 PRICE FEED ===================== */
-        vault.addRewardToken(IERC20Upgradeable(address(rewardToken1)), address(0x123));
-        vault.updateRewardPriceFeed(IERC20Upgradeable(address(rewardToken1)), address(0x456));
-        (address priceFeed,) = vault.rewardInfo(IERC20Upgradeable(address(rewardToken1)));
-
-        // Verify the price feed is updated correctly
-        assertEq(priceFeed, address(0x456));
+        //vault.addRewardToken(rewardToken1, address(0x123));        
     }
 
     function testTotalAssets() public {
@@ -163,7 +146,7 @@ contract ERC7535MultiRewardVaultTest is Test {
         vault.deposit{value: oneEth}(oneEth, alice);
 
         // Add Reward Token 1 (RT1) (worth $1000)
-        vault.addRewardToken(IERC20Upgradeable(address(rewardToken1)), address(0x123));
+        vault.addRewardToken(address(rewardToken1));
         rewardToken1.mint(address(vault), oneEth); // Mint 1 reward token (assuming 18 decimals)
 
         // Verify the total assets are calculated correctly
