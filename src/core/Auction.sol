@@ -300,25 +300,27 @@ contract Auction is
             _dv4AuctionTree.remove(_bidId, bidToUpdate.auctionScore);
             _dv4AuctionTree.insert(newBidId, newAuctionScore);
 
+            // Update the bids mapping
+            delete _bidDetails[_bidId];
+            _bidDetails[newBidId] = BidDetails({
+                auctionScore: newAuctionScore,
+                bidPrice: newBidPrice,
+                nodeOp: msg.sender,
+                vcNumber: _newTimeInDays,
+                discountRate: _newDiscountRate,
+                auctionType: AuctionType.JOIN_CLUSTER_4
+            });
+
+            // Update main auction if:
+            //      1. The new bid auction score is higher than the current sub-auction latest winning score
+            //      2. The updated auction score was among the sub-auction winning bids
+            if ((newAuctionScore > _dv4LatestWinningInfo.lastestWinningScore || bidToUpdate.auctionScore > _dv4LatestWinningInfo.lastestWinningScore) && dv4AuctionNumNodeOps >= _CLUSTER_SIZE_4) {
+                _dv4UpdateMainAuction();
+            }
+
         } else {
 
             revert InvalidAuctionType();
-        }
-
-        // Update the bids mapping
-        delete _bidDetails[_bidId];
-        _bidDetails[newBidId] = BidDetails({
-            auctionScore: newAuctionScore,
-            bidPrice: newBidPrice,
-            nodeOp: msg.sender,
-            vcNumber: _newTimeInDays,
-            discountRate: _newDiscountRate,
-            auctionType: bidToUpdate.auctionType
-        });
-
-        // Update main auction if necessary
-        if (bidToUpdate.auctionType == AuctionType.JOIN_CLUSTER_4 && newAuctionScore > _dv4LatestWinningInfo.lastestWinningScore && dv4AuctionNumNodeOps >= _CLUSTER_SIZE_4) {
-            _dv4UpdateMainAuction();
         }
 
         // Verify the price difference between the old and new bid

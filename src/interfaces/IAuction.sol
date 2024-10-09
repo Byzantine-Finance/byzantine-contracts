@@ -7,6 +7,7 @@ interface IAuction {
 
     /// @notice Defines the types of auctions available
     enum AuctionType {
+        NULL,
         JOIN_CLUSTER_4,
         JOIN_CLUSTER_7
     }

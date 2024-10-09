@@ -255,125 +255,118 @@ contract AuctionTest is ByzantineDeployer {
 
     }
 
-    // function testUpdateBid_RevertWhen_WrongAuctionScore_And_WrongBidParameters() external {
-    //     // nodeOps[0] bids
-    //     (uint16[] memory discountRate, uint32[] memory time) = _createOneBidParamArray(11e2, 200);
-    //     uint256[] memory auctionScore = _nodeOpBid(NodeOpBid(nodeOps[0], discountRate, time));
+    function test_getUpdateBidPrice() external {
+        // 6 nodeOps bid, 11 bids in total
+        bytes32[] memory bidIds = _createMultipleBids();
 
-    //     vm.startPrank(nodeOps[0]);
-    //     // nodeOps[0] updates its bid with wrong discountRate
-    //     vm.expectRevert(IAuction.DiscountRateTooHigh.selector);
-    //     auction.updateOneBid{value: 8 ether}(auctionScore[0], 25e2, 200);
+        // Sould revert if `nodeOp` is not the owner of `bidId`
+        vm.expectRevert(IAuction.SenderNotBidder.selector);
+        auction.getUpdateBidPrice(nodeOps[2], bidIds[0], 10e2, 100);
 
-    //     // nodeOps[0] updates its bid with wrong time
-    //     vm.expectRevert(IAuction.DurationTooShort.selector);
-    //     auction.updateOneBid{value: 8 ether}(auctionScore[0], 11e2, 10);
+        // Should revert if discountRate too high
+        vm.expectRevert(IAuction.DiscountRateTooHigh.selector);
+        auction.getUpdateBidPrice(nodeOps[0], bidIds[0], 30e2, 100);
 
-    //     // nodeOps[0] updates its bid with wrong auctionScore
-    //     vm.expectRevert(bytes("Wrong node op auctionScore"));
-    //     auction.updateOneBid{value: 8 ether}(++auctionScore[0], 12e2, 200);
+        // Should revert if duration too short
+        vm.expectRevert(IAuction.DurationTooShort.selector);
+        auction.getUpdateBidPrice(nodeOps[0], bidIds[0], 10e2, 10);
 
-    //     vm.stopPrank();
-    // }
+        // Test update bid price when outBidding
+        uint256 priceToAdd = auction.getUpdateBidPrice(nodeOps[5], bidIds[10], 10e2, 100);
+        assertEq(priceToAdd, bidPrice_10e2_100 - _getBidIdBidPrice(bidIds[10]));
 
-    // function testUpdateBid_Outbid_RevertWhen_NotEnoughEthSent() external {
-    //     // nodeOps[9] bids
-    //     (uint16[] memory discountRate, uint32[] memory time) = _createOneBidParamArray(11e2, 200);
-    //     uint256[] memory auctionScore = _nodeOpBid(NodeOpBid(nodeOps[9], discountRate, time));
+        // Test update bid price when downBidding
+        priceToAdd = auction.getUpdateBidPrice(nodeOps[0], bidIds[0], 15e2, 50);
+        assertEq(priceToAdd, 0);
+    }
 
-    //     // nodeOps[9] updates its bid
-    //     uint256 amountToAdd = auction.getUpdateOneBidPrice(nodeOps[9], auctionScore[0], 5e2, 200);
-    //     vm.prank(nodeOps[9]);
-    //     vm.expectRevert(IAuction.NotEnoughEtherSent.selector);
-    //     auction.updateOneBid{value: (amountToAdd - 0.001 ether)}(auctionScore[0], 5e2, 200);
-    // }
+    function testUpdateBid_RevertCorrectly() external {
+        // 6 nodeOps bid, 11 bids in total
+        bytes32[] memory bidIds = _createMultipleBids();
 
-    // function testUpdateBid_Outbid_RefundTheSkimmingEthers() external {
-    //     // Verify the initial balance of nodeOps[9]
-    //     assertEq(nodeOps[9].balance, STARTING_BALANCE);
+        // Sould revert if `nodeOp` is not the owner of `bidId`
+        vm.expectRevert(IAuction.SenderNotBidder.selector);
+        auction.updateBid(bidIds[0], 10e2, 100);
 
-    //     // nodeOps[9] bids
-    //     uint256[] memory auctionScore = _nodeOpBid(NodeOpBid(nodeOps[9], one_DiscountRates, one_TimesInDays));
+        // Should revert if discountRate too high
+        vm.expectRevert(IAuction.DiscountRateTooHigh.selector);
+        vm.prank(nodeOps[0]);
+        auction.updateBid(bidIds[0], 30e2, 100);
 
-    //     // Verify the balance of nodeOps[9] after bidding
-    //     assertEq(nodeOps[9].balance, STARTING_BALANCE - bidPrice_one_Bid[0]);
-    //     // Verify the balance of escrow contract after nodeOps[9] bid
-    //     assertEq(address(escrow).balance, bidPrice_one_Bid[0]);
+        // Should revert if duration too short
+        vm.expectRevert(IAuction.DurationTooShort.selector);
+        vm.prank(nodeOps[0]);
+        auction.updateBid(bidIds[0], 10e2, 10);
+    }
 
-    //     // nodeOps[9] updates its bid (outbids)
-    //     uint256 amountToAdd = auction.getUpdateOneBidPrice(nodeOps[9], auctionScore[0], 10e2, 200);
-    //     vm.prank(nodeOps[9]);
-    //     auctionScore[0] = auction.updateOneBid{value: (amountToAdd + 2 ether)}(auctionScore[0], 10e2, 200);
+    function test_updateBid_RefundSkimmingEthers() external {
+        // 6 nodeOps bid, 11 bids in total
+        bytes32[] memory bidIds = _createMultipleBids();
 
-    //     // Verify the balance of nodeOps[9] after updating its bid
-    //     assertEq(nodeOps[9].balance, STARTING_BALANCE - (bidPrice_one_Bid[0] + amountToAdd));
-    //     // Verify the balance of escrow contract after nodeOps[9] updates its bid
-    //     assertEq(address(escrow).balance, bidPrice_one_Bid[0] + amountToAdd);
+        // OutBidding and sending to many ETH
+        vm.prank(nodeOps[5]);
+        auction.updateBid{value: 50 ether}(bidIds[10], 10e2, 100);
+        assertEq(nodeOps[5].balance, STARTING_BALANCE - bidPrice_10e2_100);
 
-    //     // nodeOps[9] decreases its bid
-    //     uint256 amountToAdd2 = auction.getUpdateOneBidPrice(nodeOps[9], auctionScore[0], 10e2, 35); // 0 ether
-    //     vm.prank(nodeOps[9]);
-    //     auction.updateOneBid{value: amountToAdd2 + 0.001 ether}(auctionScore[0], 10e2, 35);
-    //     // Verify if nodeOps[9] has been refunded
-    //     (uint16[] memory discountRate, uint32[] memory time) = _createOneBidParamArray(10e2, 35);
-    //     uint256 refundAmount = (bidPrice_one_Bid[0] + amountToAdd) - auction.getPriceToPay(nodeOps[9], discountRate, time); // nodeOps[9] is whitelisted
-    //     assertEq(nodeOps[9].balance, STARTING_BALANCE - (bidPrice_one_Bid[0] + amountToAdd + amountToAdd2) + refundAmount);
-    //     // Verify the balance of escrow contract after nodeOps[9] updates its bid
-    //     assertEq(address(escrow).balance, bidPrice_one_Bid[0] + amountToAdd - refundAmount);
-    // }
+        // DownBidding and sending to many ETH
+        vm.prank(nodeOps[3]);
+        auction.updateBid{value: 50 ether}(bidIds[8], 10e2, 100);
+        assertEq(nodeOps[3].balance, STARTING_BALANCE - bidPrice_10e2_100);
+    }
 
-    // function testUpdateBid_NodeOpAuctionDetails() external {
-    //     // nodeOps[9] bids
-    //     uint256[] memory auctionScoreNodeOp9 = _nodeOpBid(NodeOpBid(nodeOps[9], one_DiscountRates, one_TimesInDays));
+    function test_updateBid_BidDetails() external {
+        // 6 nodeOps bid, 11 bids in total
+        bytes32[] memory bidIds = _createMultipleBids();
 
-    //     // nodeOps[9] updates its bid
-    //     uint256 newAuctionScoreNodeOp9 = _nodeOpUpdateBid(nodeOps[9], auctionScoreNodeOp9[0], 10e2, 60);
+        // nodeOps[3] updates its bid
+        bytes32 newBidId = _nodeOpUpdateBid(nodeOps[3], bidIds[8], 1375, 129);
 
-    //     // Verify number of bids of nodeOps[9]
-    //     assertEq(auction.numNodeOpsInAuction(), 1);
-    //     assertEq(auction.getNodeOpBidNumber(nodeOps[9]), 1);
+        // Verify updated bidDetails mapping has been deleted
+        assertEq(auction.getBidDetails(bidIds[8]).vcNumber, 0);
 
-    //     // Verify auctionScoreNodeOp9[0] is not in nodeOps[9] mapping
-    //     assertEq(auction.getNodeOpAuctionScoreBidPrices(nodeOps[9], auctionScoreNodeOp9[0]).length, 0);
-    //     assertEq(auction.getNodeOpAuctionScoreVcs(nodeOps[9], auctionScoreNodeOp9[0]).length, 0);
+        // Verify the new bidId has been added to the bidDetails mapping
+        IAuction.BidDetails memory newBidDetails = auction.getBidDetails(newBidId);
+        assertEq(newBidDetails.auctionScore, auctionScore_1375_129);
+        assertEq(newBidDetails.bidPrice, bidPrice_1375_129);
+        assertEq(newBidDetails.nodeOp, nodeOps[3]);
+        assertEq(newBidDetails.vcNumber, 129);
+        assertEq(newBidDetails.discountRate, 1375);
+        assertEq(uint256(newBidDetails.auctionType), uint256(IAuction.AuctionType.JOIN_CLUSTER_4));
+    }
 
-    //     // Verify newAuctionScoreNodeOp9 in nodeOps[9] mapping
-    //     uint256[] memory newBidPrice = auction.getNodeOpAuctionScoreBidPrices(nodeOps[9], newAuctionScoreNodeOp9);
-    //     assertEq(newBidPrice.length, 1);
-    //     assertEq(newBidPrice[0], 43791780821917800);
-    //     uint32[] memory newVc = auction.getNodeOpAuctionScoreVcs(nodeOps[9], newAuctionScoreNodeOp9);
-    //     assertEq(newVc.length, 1);
-    //     assertEq(newVc[0], 60);
+    function test_updateBid_updateMainAuction() external {
+        // 6 nodeOps bid, 11 bids in total
+        bytes32[] memory bidIds = _createMultipleBids();
 
-    //     // nodeOps[5] bids five times
-    //     uint256[] memory auctionScoreNodeOp5 = _nodeOpBid(NodeOpBid(nodeOps[5], five_SameDiffDiscountRates, five_SameDiffTimesInDays));
+        /* ============= Number 1 (nodeOps[3]) downbids to exit the winner set ============= */
 
-    //     // nodeOps[5] updates its first bid
-    //     uint256 newAuctionScoreNodeOp5 = _nodeOpUpdateBid(nodeOps[5], auctionScoreNodeOp5[0], 10e2, 60);
+        bytes32 newBidId1 = _nodeOpUpdateBid(nodeOps[3], bidIds[8], 5e2, 149);
 
-    //     // Verify number of bids of nodeOps[5]
-    //     assertEq(auction.numNodeOpsInAuction(), 2);
-    //     assertEq(auction.getNodeOpBidNumber(nodeOps[5]), 5);
+        // Get the winning cluster Id
+        (bytes32 winningClusterId,) = auction.getWinningCluster();
+        address[] memory nodesAddr = _getClusterIdNodeAddr(winningClusterId);
+        assertEq(nodesAddr.length, 4);
+        assertEq(nodesAddr[0], nodeOps[0]);
+        assertEq(nodesAddr[1], nodeOps[1]);
+        assertEq(nodesAddr[2], nodeOps[4]);
+        assertEq(nodesAddr[3], nodeOps[2]);
 
-    //     // Verify auctionScoreNodeOp5[0] mappings
-    //     assertEq(auction.getNodeOpAuctionScoreBidPrices(nodeOps[5], auctionScoreNodeOp5[0]).length, 2);
-    //     assertEq(auction.getNodeOpAuctionScoreVcs(nodeOps[5], auctionScoreNodeOp5[0]).length, 2);
+        // Verify updated bidId mapping has been deleted
+        assertEq(auction.getBidDetails(bidIds[8]).vcNumber, 0);
 
-    //     // Verify newAuctionScoreNodeOp5 in nodeOps[5] mapping
-    //     uint256[] memory newBidPriceNodeOp5 = auction.getNodeOpAuctionScoreBidPrices(nodeOps[5], newAuctionScoreNodeOp5);
-    //     assertEq(newBidPriceNodeOp5.length, 1);
-    //     assertEq(newBidPriceNodeOp5[0], 43791780821917800);
-    //     uint32[] memory newVcNodeOp5 = auction.getNodeOpAuctionScoreVcs(nodeOps[5], newAuctionScoreNodeOp5);
-    //     assertEq(newVcNodeOp5.length, 1);
-    //     assertEq(newVcNodeOp5[0], 60);
+        /* ============= Number last (nodeOps[5]) outbids to be in the winner set ============= */
+        bytes32 newBidId2 = _nodeOpUpdateBid(nodeOps[5], bidIds[10], 2e2, 500);
 
-    //     // nodeOps[5] updates its last bid
-    //     _nodeOpUpdateBid(nodeOps[5], auctionScoreNodeOp5[4], 5e2, 30);
+        // Get the winning cluster Id
+        (winningClusterId,) = auction.getWinningCluster();
+        nodesAddr = _getClusterIdNodeAddr(winningClusterId);
+        assertEq(nodesAddr.length, 4);
+        assertEq(nodesAddr[0], nodeOps[5]);
+        assertEq(nodesAddr[1], nodeOps[0]);
+        assertEq(nodesAddr[2], nodeOps[1]);
+        assertEq(nodesAddr[3], nodeOps[4]);
 
-    //     // Verify auctionScoreNodeOp5[0] mappings
-    //     assertEq(auction.getNodeOpAuctionScoreBidPrices(nodeOps[5], auctionScoreNodeOp5[0]).length, 3);
-    //     assertEq(auction.getNodeOpAuctionScoreVcs(nodeOps[5], auctionScoreNodeOp5[0]).length, 3);
-    // }
+    }
 
     // function testWithdrawBid_RevertWhen_WrongAuctionScore() external {
     //     // nodeOps[9] bids
@@ -553,6 +546,23 @@ contract AuctionTest is ByzantineDeployer {
         return auction.bid{value: priceToPay}(_discountRate, _timeInDays, IAuction.AuctionType.JOIN_CLUSTER_4);
     }
 
+    function _nodeOpUpdateBid(
+        address _nodeOp,
+        bytes32 _bidId,
+        uint16 _newDiscountRate,
+        uint32 _newTimeInDays
+    ) internal returns (bytes32) {
+        // Get price to pay
+        uint256 priceToAdd = auction.getUpdateBidPrice(_nodeOp, _bidId, _newDiscountRate, _newTimeInDays);
+        vm.prank(_nodeOp);
+        return auction.updateBid{value: priceToAdd}(_bidId, _newDiscountRate, _newTimeInDays);
+    }
+
+    // function _nodeOpWithdrawBid(address _nodeOp) internal {
+    //     vm.prank(_nodeOp);
+    //     auction.withdrawBid();
+    // }
+
     function _getBidIdAuctionScore(bytes32 _bidId) internal view returns (uint256) {
         IAuction.BidDetails memory bidDetails = auction.getBidDetails(_bidId);
         return bidDetails.auctionScore;
@@ -566,6 +576,15 @@ contract AuctionTest is ByzantineDeployer {
     function _getBidIdBidPrice(bytes32 _bidId) internal view returns (uint256) {
         IAuction.BidDetails memory bidDetails = auction.getBidDetails(_bidId);
         return bidDetails.bidPrice;
+    }
+
+    function _getClusterIdNodeAddr(bytes32 _clusterId) internal view returns (address[] memory) {
+        IAuction.NodeDetails[] memory nodes = auction.getClusterDetails(_clusterId).nodes;
+        address[] memory nodesAddr = new address[](nodes.length);
+        for (uint256 i = 0; i < nodes.length; i++) {
+            nodesAddr[i] = _getBidIdNodeAddr(nodes[i].bidId);
+        }
+        return nodesAddr;
     }
 
     function _calculateAvgAuctionScore(uint256[] memory _auctionScores) internal pure returns (uint256) {
@@ -586,23 +605,6 @@ contract AuctionTest is ByzantineDeployer {
     ) internal pure returns (bytes32) {
         return keccak256(abi.encodePacked(_timestamp, _averageAuctionScore, _addresses));
     }
-
-    // function _nodeOpUpdateBid(
-    //     address _nodeOp,
-    //     uint256 _auctionScore,
-    //     uint16 _newDiscountRate,
-    //     uint32 _newTimeInDays
-    // ) internal returns (uint256) {
-    //     // Get price to pay
-    //     uint256 priceToPay = auction.getUpdateOneBidPrice(_nodeOp, _auctionScore, _newDiscountRate, _newTimeInDays);
-    //     vm.prank(_nodeOp);
-    //     return auction.updateOneBid{value: priceToPay}(_auctionScore, _newDiscountRate, _newTimeInDays);
-    // }
-
-    // function _nodeOpWithdrawBid(address _nodeOp) internal {
-    //     vm.prank(_nodeOp);
-    //     auction.withdrawBid();
-    // }
 
     function _createMultipleBids() internal returns (bytes32[] memory) {
         bytes32[] memory bidIds = new bytes32[](11);
