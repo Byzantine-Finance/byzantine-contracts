@@ -3,20 +3,11 @@
 pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
-import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 import "../src/vault/ERC7535MultiRewardVault.sol";
-import "../src/interfaces/IOracle.sol";
-import "./mocks/EmptyContract.sol";
+import "./mocks/MockOracle.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
  
-contract MockOracle is IOracle {
-    function getPrice(address) external pure override returns (uint256) {
-        // Return $1000 USD with 18 decimal places
-        return 1000 * 1e18;
-    }
-}
-
 contract MockERC20 is ERC20 {
     constructor(string memory name, string memory symbol) ERC20(name, symbol) {}
 
