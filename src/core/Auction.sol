@@ -314,7 +314,7 @@ contract Auction is
             // Update main auction if:
             //      1. The new bid auction score is higher than the current sub-auction latest winning score
             //      2. The updated auction score was among the sub-auction winning bids
-            if ((newAuctionScore > _dv4LatestWinningInfo.lastestWinningScore || bidToUpdate.auctionScore > _dv4LatestWinningInfo.lastestWinningScore) && dv4AuctionNumNodeOps >= _CLUSTER_SIZE_4) {
+            if ((newAuctionScore > _dv4LatestWinningInfo.lastestWinningScore || bidToUpdate.auctionScore >= _dv4LatestWinningInfo.lastestWinningScore) && dv4AuctionNumNodeOps >= _CLUSTER_SIZE_4) {
                 _dv4UpdateMainAuction();
             }
 
@@ -344,45 +344,53 @@ contract Auction is
     }
 
     /**
-     * @notice Allow a node operator to withdraw a specific bid (through its auction score).
+     * @notice Allow a node operator to withdraw a specific bid (through its bidId).
      * The withdrawer will be refund its bid price plus (the bond of he paid it).
-     * @param _auctionScore: auction score of the bid to withdraw. Will withdraw the last bid with this score.
+     * @param _bidId: bidId of the bid to withdraw.
+     * @dev Reverts if the node op doesn't have a bid with `_bidId`.
      */
-    /*function withdrawBid(uint256 _auctionScore) external {
-        // Verify if the sender has at least a bid with `_auctionScore`
-        require (getNodeOpAuctionScoreBidPrices(msg.sender, _auctionScore).length > 0, "Wrong node op auctionScore");
+    function withdrawBid(bytes32 _bidId) external {
+        // Verify if the sender withdraw one of its bids
+        if (_bidDetails[_bidId].nodeOp != msg.sender) revert SenderNotBidder();
 
-        // Convert msg.sender address in bytes32
-        bytes32 bidder = bytes32(uint256(uint160(msg.sender)));
+        // Get the bid to withdraw details
+        BidDetails memory bidToWithdraw = _bidDetails[_bidId];
 
-        // Get the number of bids with this `_auctionScore`
-        uint256 numSameBids = getNodeOpAuctionScoreBidPrices(msg.sender, _auctionScore).length;
+        // Find the bid's sub-auction tree
+        if (bidToWithdraw.auctionType == AuctionType.JOIN_CLUSTER_4) {
+            // Decrement the bid number of the node op
+            _nodeOpsDetails[msg.sender].numBidsCluster4 -= 1;
+            // Update `dv4AuctionNumNodeOps` if necessary
+            if (_nodeOpsDetails[msg.sender].numBidsCluster4 == 0) --dv4AuctionNumNodeOps;
 
-        // Get last bid price associated to `_auctionScore`. That bid will be updated
-        uint256 bidToRefund = _nodeOpsInfo[msg.sender].auctionScoreToBidPrices[_auctionScore][numSameBids - 1];
+            // Remove the bid from the sub-auction tree
+            _dv4AuctionTree.remove(_bidId, bidToWithdraw.auctionScore);
 
-        // Update auction tree (if necessary) and node ops details mappings
-        if (numSameBids == 1) {
-            _auctionTree.remove(bidder, _auctionScore);
-            delete _nodeOpsInfo[msg.sender].auctionScoreToBidPrices[_auctionScore];
-            delete _nodeOpsInfo[msg.sender].auctionScoreToVcNumbers[_auctionScore];
+            // delete the bid from the bids mapping
+            delete _bidDetails[_bidId];
+
+            // Update main auction if necessary
+            if (bidToWithdraw.auctionScore >= _dv4LatestWinningInfo.lastestWinningScore && dv4AuctionNumNodeOps >= _CLUSTER_SIZE_4) {
+                _dv4UpdateMainAuction();
+            }
+
         } else {
-            _nodeOpsInfo[msg.sender].auctionScoreToBidPrices[_auctionScore].pop();
-            _nodeOpsInfo[msg.sender].auctionScoreToVcNumbers[_auctionScore].pop();
+
+            revert InvalidAuctionType();
         }
-        _nodeOpsInfo[msg.sender].numBids -= 1;
-        // Decrease the number of node ops in the auction if the winner has no more bids
-        if (_nodeOpsInfo[msg.sender].numBids == 0) --numNodeOpsInAuction;
 
         // Ask the Escrow contract to refund the node op
         if (isWhitelisted(msg.sender)) {
-            escrow.refund(msg.sender, bidToRefund);
+            escrow.refund(msg.sender, bidToWithdraw.bidPrice);
+        } else if (_nodeOpsDetails[msg.sender].numBonds > 0) {
+            _nodeOpsDetails[msg.sender].numBonds -= 1;
+            escrow.refund(msg.sender, bidToWithdraw.bidPrice + _BOND);
         } else {
-            escrow.refund(msg.sender, bidToRefund + _BOND);
+            escrow.refund(msg.sender, bidToWithdraw.bidPrice);
         }
 
-        emit BidWithdrawn(msg.sender, _auctionScore);
-    }*/
+        emit BidWithdrawn(msg.sender, _bidId);
+    }
 
     /**
      * @notice Update the status of a cluster

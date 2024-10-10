@@ -252,11 +252,12 @@ interface IAuction {
     ) external payable returns (bytes32);
 
     /**
-     * @notice Allow a node operator to withdraw a specific bid (through its auction score).
+     * @notice Allow a node operator to withdraw a specific bid (through its bidId).
      * The withdrawer will be refund its bid price plus (the bond of he paid it).
-     * @param _auctionScore: auction score of the bid to withdraw. Will withdraw the last bid with this score.
+     * @param _bidId: bidId of the bid to withdraw.
+     * @dev Reverts if the node op doesn't have a bid with `_bidId`.
      */
-    // function withdrawBid(uint256 _auctionScore) external;
+    function withdrawBid(bytes32 _bidId) external;
 
     /**
      * @notice Update the status of a cluster

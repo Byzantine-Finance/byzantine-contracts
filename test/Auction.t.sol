@@ -381,50 +381,64 @@ contract AuctionTest is ByzantineDeployer {
 
     }
 
-    // function testWithdrawBid_RevertWhen_WrongAuctionScore() external {
-    //     // nodeOps[9] bids
-    //     uint256[] memory auctionScoreNodeOp9 = _nodeOpBid(NodeOpBid(nodeOps[9], one_DiscountRates, one_TimesInDays));
-    //     vm.expectRevert(bytes("Wrong node op auctionScore"));
-    //     vm.prank(nodeOps[9]);
-    //     auction.withdrawBid(++auctionScoreNodeOp9[0]);
-    // }
+    function testWithdrawBid_RevertWhen_SenderNotBidder() external {
+        // 6 nodeOps bid, 11 bids in total
+        bytes32[] memory bidIds = _createMultipleBids();
 
-    // function testWithdrawBid() external {
-    //     // nodeOps[9] bids
-    //     uint256[] memory auctionScoreNodeOp9 = _nodeOpBid(NodeOpBid(nodeOps[9], one_DiscountRates, one_TimesInDays));
-    //     // nodeOps[9] withdraw its bid
-    //     vm.prank(nodeOps[9]);
-    //     auction.withdrawBid(auctionScoreNodeOp9[0]);
+        // Should revert if nodeOps[8] tries to withdraw nodeOps[0]'s bid
+        vm.expectRevert(IAuction.SenderNotBidder.selector);
+        vm.prank(nodeOps[8]);
+        auction.withdrawBid(bidIds[0]);
+    }
 
-    //     // Verify number of bids of nodeOps[9]
-    //     assertEq(auction.numNodeOpsInAuction(), 0);
-    //     assertEq(auction.getNodeOpBidNumber(nodeOps[9]), 0);
+    function testWithdrawBid() external {
+        // 6 nodeOps bid, 11 bids in total
+        bytes32[] memory bidIds = _createMultipleBids();
 
-    //     // Verify auctionScoreNodeOp9[0] is not in nodeOps[9] mapping
-    //     assertEq(auction.getNodeOpAuctionScoreBidPrices(nodeOps[9], auctionScoreNodeOp9[0]).length, 0);
-    //     assertEq(auction.getNodeOpAuctionScoreVcs(nodeOps[9], auctionScoreNodeOp9[0]).length, 0);
+        /* ============= nodeOps[0] withdraw one of its bid ============= */
 
-    //     // Verify nodeOps[9] balance
-    //     assertEq(nodeOps[9].balance, STARTING_BALANCE);
+        vm.prank(nodeOps[0]);
+        auction.withdrawBid(bidIds[0]);
 
-    //     // nodeOps[5] bids five times
-    //     uint256[] memory auctionScoreNodeOp5 = _nodeOpBid(NodeOpBid(nodeOps[5], five_SameDiffDiscountRates, five_SameDiffTimesInDays));
-    //     // nodeOps[5] withdraw its bid
-    //     vm.prank(nodeOps[5]);
-    //     auction.withdrawBid(auctionScoreNodeOp5[0]);
+        IAuction.NodeOpGlobalDetails memory nodeOpDetails = auction.getNodeOpDetails(nodeOps[0]);
+        // Verify number of bids of nodeOps[0]
+        assertEq(nodeOpDetails.numBidsCluster4, 1);
+        // Verify the number of DV
+        assertEq(auction.getNumDVInAuction(), 1);
+        // Verify the number of node ops in dv4
+        assertEq(auction.dv4AuctionNumNodeOps(), 6);
 
-    //     // Verify number of bids of nodeOps[5]
-    //     assertEq(auction.numNodeOpsInAuction(), 1);
-    //     assertEq(auction.getNodeOpBidNumber(nodeOps[5]), 4);
+        // Verify bidIds[0] has been deleted
+        IAuction.BidDetails memory bidDetails = auction.getBidDetails(bidIds[0]);
+        assertEq(bidDetails.nodeOp, address(0));
 
-    //     // Verify auctionScoreNodeOp5[0] is not in nodeOps[5] mapping
-    //     assertEq(auction.getNodeOpAuctionScoreBidPrices(nodeOps[5], auctionScoreNodeOp5[0]).length, 2);
-    //     assertEq(auction.getNodeOpAuctionScoreVcs(nodeOps[5], auctionScoreNodeOp5[0]).length, 2);
+        /* ============= nodeOps[0] withdraw its last bid ============= */
 
-    //     // Verify nodeOps[5] balance
-    //     uint256 remainingBidPrice = 2 * (bidPrices_five_SameDiffBids[2] + bidPrices_five_SameDiffBids[3]);
-    //     assertEq(nodeOps[5].balance, STARTING_BALANCE - (remainingBidPrice + 4 * BOND));
-    // }
+        vm.prank(nodeOps[0]);
+        auction.withdrawBid(bidIds[1]);
+
+        nodeOpDetails = auction.getNodeOpDetails(nodeOps[0]);
+        // Verify number of bids of nodeOps[0]
+        assertEq(nodeOpDetails.numBidsCluster4, 0);
+        // Verify the number of DV
+        assertEq(auction.getNumDVInAuction(), 1);
+        // Verify the number of node ops in dv4
+        assertEq(auction.dv4AuctionNumNodeOps(), 5);
+
+        // Verify nodeOps[0] balance
+        assertEq(nodeOps[0].balance, STARTING_BALANCE);
+
+        /* ============= Verify winning cluster when nodeOps[0] is out ============= */
+
+        // Get the winning cluster Id
+        (bytes32 winningClusterId,) = auction.getWinningCluster();
+        address[] memory nodesAddr = _getClusterIdNodeAddr(winningClusterId);
+        assertEq(nodesAddr[0], nodeOps[3]);
+        assertEq(nodesAddr[1], nodeOps[1]);
+        assertEq(nodesAddr[2], nodeOps[4]);
+        assertEq(nodesAddr[3], nodeOps[2]);
+
+    }
 
     function test_UpdateAuctionParam() external {
         // Update auction configuration
@@ -570,11 +584,6 @@ contract AuctionTest is ByzantineDeployer {
         vm.prank(_nodeOp);
         return auction.updateBid{value: priceToAdd}(_bidId, _newDiscountRate, _newTimeInDays);
     }
-
-    // function _nodeOpWithdrawBid(address _nodeOp) internal {
-    //     vm.prank(_nodeOp);
-    //     auction.withdrawBid();
-    // }
 
     function _getBidIdAuctionScore(bytes32 _bidId) internal view returns (uint256) {
         IAuction.BidDetails memory bidDetails = auction.getBidDetails(_bidId);
