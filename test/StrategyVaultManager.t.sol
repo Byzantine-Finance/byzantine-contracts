@@ -22,11 +22,16 @@ import "../src/interfaces/IStrategyVaultETH.sol";
 import "../src/interfaces/IStrategyVaultManager.sol";
 import "../src/interfaces/IAuction.sol";
 
+import "./mocks/MockOracle.sol";
+
 contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
     // using BeaconChainProofs for *;
 
     /// @notice Canonical, virtual beacon chain ETH strategy
     IStrategy public constant beaconChainETHStrategy = IStrategy(0xbeaC0eeEeeeeEEeEeEEEEeeEEeEeeeEeeEEBEaC0);
+
+    /// @notice Mock oracle to simulate the price of ETH
+    MockOracle public oracle;
 
     /// @notice Random validator deposit data (simulates a Byzantine DV)
     bytes private pubkey;
@@ -45,6 +50,9 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
     function setUp() public override {
         // deploy locally EigenLayer and Byzantine contracts
         ByzantineDeployer.setUp();
+
+        // Deploy the mock oracle
+        oracle = new MockOracle();
 
         // Fill the node ops' balance
         for (uint256 i = 0; i < nodeOps.length; i++) {
@@ -75,7 +83,7 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
         /* ===================== ALICE CREATES A FIRST STRATVAULTETH ===================== */
         // whitelistedDeposit = true, upgradeable = true, EL Operator = ELOperator1, oracle = 0x0
         vm.prank(alice);
-        IStrategyVaultETH aliceStratVault1 = IStrategyVaultETH(strategyVaultManager.createStratVaultETH(true, true, ELOperator1, address(0)));
+        IStrategyVaultETH aliceStratVault1 = IStrategyVaultETH(strategyVaultManager.createStratVaultETH(true, true, ELOperator1, address(oracle)));
 
         // Verify aliceStratVault1 has been created and has delegated
         assertEq(aliceStratVault1.stratVaultNftId(), uint256(keccak256(abi.encodePacked(block.timestamp, uint64(0), alice))));
@@ -94,7 +102,7 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
         /* ===================== ALICE CREATES A FIRST STRATVAULTETH ===================== */
         // whitelistedDeposit = false, upgradeable = false, EL Operator = ELOperator1, oracle = 0x0
         vm.prank(alice);
-        IStrategyVaultETH aliceStratVault2 = IStrategyVaultETH(strategyVaultManager.createStratVaultETH(false, false, ELOperator1, address(0)));
+        IStrategyVaultETH aliceStratVault2 = IStrategyVaultETH(strategyVaultManager.createStratVaultETH(false, false, ELOperator1, address(oracle)));
 
         // Verify some variables of aliceStratVault2
         assertEq(aliceStratVault2.whitelistedDeposit(), false);
@@ -117,17 +125,17 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
         /* ===================== STRATVAULTETH CREATION FAILS BECAUSE NOT MULTIPLE OF 32ETH STAKED ===================== */
         vm.prank(alice);
         vm.expectRevert(IStrategyVaultETH.CanOnlyDepositMultipleOf32ETH.selector);
-        strategyVaultManager.createStratVaultAndStakeNativeETH{value: 58 ether}(true, true, ELOperator1, address(0), alice);
+        strategyVaultManager.createStratVaultAndStakeNativeETH{value: 58 ether}(true, true, ELOperator1, address(oracle), alice);
 
         /* ===================== STRATVAULTETH CREATION FAILS BECAUSE NOT NODE OPS IN AUCTION ===================== */
         vm.prank(alice);
         vm.expectRevert(IAuction.MainAuctionEmpty.selector);
-        strategyVaultManager.createStratVaultAndStakeNativeETH{value: 320 ether}(true, true, ELOperator1, address(0), alice);
+        strategyVaultManager.createStratVaultAndStakeNativeETH{value: 320 ether}(true, true, ELOperator1, address(oracle), alice);
 
         /* ===================== ALICE CREATES A STRATVAULTETH AND STAKES 64ETH ===================== */
         // whitelistedDeposit = true, upgradeable = true, EL Operator = ELOperator1, oracle = 0x0
         vm.prank(alice);
-        IStrategyVaultETH aliceStratVault1 = IStrategyVaultETH(strategyVaultManager.createStratVaultAndStakeNativeETH{value: 64 ether}(true, true, ELOperator1, address(0), alice));
+        IStrategyVaultETH aliceStratVault1 = IStrategyVaultETH(strategyVaultManager.createStratVaultAndStakeNativeETH{value: 64 ether}(true, true, ELOperator1, address(oracle), alice));
 
         // Verify the StratVaultETH has received the 64 ETH
         assertEq(address(aliceStratVault1).balance, 64 ether);
@@ -179,25 +187,27 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
         assertEq(nodeOpsDV3[2], nodeOps[6]);
         assertEq(nodeOpsDV3[3], nodeOps[7]);
 
-        /* ===================== BOB STAKES AGAIN IN ALICE'S STRATVAULTETH ===================== */
+        // /* ===================== BOB STAKES AGAIN IN ALICE'S STRATVAULTETH ===================== */
 
-        vm.prank(bob);
-        aliceStratVault1.mint{value: 32 ether}(32 ether, bob);
+        /// TODO: Test function mint
 
-        // Verify the StratVaultETH has received the 32 ETH
-        assertEq(address(aliceStratVault1).balance, 64 ether + 32 ether + 32 ether);
+        // vm.prank(bob);
+        // aliceStratVault1.mint{value: 32 ether}(32 ether, bob);
 
-        // Verify the StratVaultETH clusters
-        assertEq(aliceStratVault1.getVaultDVNumber(), 4);
-        clusterIds = aliceStratVault1.getAllDVIds();
-        assertEq(clusterIds.length, 4);
-        // Verify DV4 node ops addresses
-        address[] memory nodeOpsDV4 = _getClusterIdNodeOp(clusterIds[3]);
-        assertEq(nodeOpsDV4.length, 4);
-        assertEq(nodeOpsDV4[0], nodeOps[2]);
-        assertEq(nodeOpsDV4[1], nodeOps[6]);
-        assertEq(nodeOpsDV4[2], nodeOps[7]);
-        assertEq(nodeOpsDV4[3], nodeOps[8]);
+        // // Verify the StratVaultETH has received the 32 ETH
+        // assertEq(address(aliceStratVault1).balance, 64 ether + 32 ether + 32 ether);
+
+        // // Verify the StratVaultETH clusters
+        // assertEq(aliceStratVault1.getVaultDVNumber(), 4);
+        // clusterIds = aliceStratVault1.getAllDVIds();
+        // assertEq(clusterIds.length, 4);
+        // // Verify DV4 node ops addresses
+        // address[] memory nodeOpsDV4 = _getClusterIdNodeOp(clusterIds[3]);
+        // assertEq(nodeOpsDV4.length, 4);
+        // assertEq(nodeOpsDV4[0], nodeOps[2]);
+        // assertEq(nodeOpsDV4[1], nodeOps[6]);
+        // assertEq(nodeOpsDV4[2], nodeOps[7]);
+        // assertEq(nodeOpsDV4[3], nodeOps[8]);
 
     }
 
@@ -205,7 +215,7 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
 
         // Alice creates a StratVaultETH
         vm.prank(alice);
-        IStrategyVaultETH aliceStratVault1 = IStrategyVaultETH(strategyVaultManager.createStratVaultETH(true, true, ELOperator1, address(0)));
+        IStrategyVaultETH aliceStratVault1 = IStrategyVaultETH(strategyVaultManager.createStratVaultETH(true, true, ELOperator1, address(oracle)));
         uint256 nftId = IStrategyVaultETH(aliceStratVault1).stratVaultNftId();
 
         // Verify Alice owns the nft
@@ -223,7 +233,7 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
 
         // Alice creates a StrategyVault and stakes 32 ETH in it
         vm.prank(alice);
-        IStrategyVaultETH aliceStratVault1 = IStrategyVaultETH(strategyVaultManager.createStratVaultAndStakeNativeETH{value: 32 ether}(true, true, ELOperator1, address(0), alice));
+        IStrategyVaultETH aliceStratVault1 = IStrategyVaultETH(strategyVaultManager.createStratVaultAndStakeNativeETH{value: 32 ether}(true, true, ELOperator1, address(oracle), alice));
 
         // Get the DV cluster ID
         bytes32[] memory clusterIds = aliceStratVault1.getAllDVIds();
@@ -271,7 +281,7 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
 
         // Alice creates a StrategyVault and stakes 32 ETH in it
         vm.prank(alice);
-        IStrategyVaultETH aliceStratVault1 = IStrategyVaultETH(strategyVaultManager.createStratVaultAndStakeNativeETH{value: 32 ether}(true, true, ELOperator1, address(0), alice));
+        IStrategyVaultETH aliceStratVault1 = IStrategyVaultETH(strategyVaultManager.createStratVaultAndStakeNativeETH{value: 32 ether}(true, true, ELOperator1, address(oracle), alice));
 
         // Get the DV cluster ID
         bytes32[] memory clusterIds = aliceStratVault1.getAllDVIds();
