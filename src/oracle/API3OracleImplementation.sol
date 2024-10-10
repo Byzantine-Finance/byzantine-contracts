@@ -21,7 +21,7 @@ contract API3OracleImplementation is IOracle, Ownable {
     error InvalidAsset();
 
     uint256 public constant MAX_DELAY = 1 hours;  // Maximum acceptable delay
-    address public ETH_USD_PROXY = 0xa47Fd122b11CdD7aad7c3e8B740FB91D83Ce43D1; // ETH/USD Proxy on Holesky
+    address public constant ETH_USD_PROXY = 0xa47Fd122b11CdD7aad7c3e8B740FB91D83Ce43D1; // ETH/USD Proxy on Holesky
 
     /// @notice Get the price of an asset from an API3 dAPI
     /// @param asset The asset to get the price of
@@ -47,9 +47,4 @@ contract API3OracleImplementation is IOracle, Ownable {
         return uint256(int256(value));
     }
 
-    /// @notice Set the ETH/USD proxy address
-    /// @param _newProxy The new proxy address
-    function setETHUSDProxy(address _newProxy) external onlyOwner {
-        ETH_USD_PROXY = _newProxy;
-    }
 }
