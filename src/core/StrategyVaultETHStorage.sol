@@ -64,11 +64,14 @@ abstract contract StrategyVaultETHStorage is IStrategyVaultETH {
     /// @notice Whether the strategy is upgradeable (i.e can delegate to a different operator)
     bool public upgradeable;
 
+    /// @notice Amount of ETH in the vault. Includes deposits from stakers as well as the accumulated Proof of Stake rewards.
+    uint256 public amountOfETH;
+
     /**
      * @dev This empty reserved space is put in place to allow future versions to add new
      * variables without shifting down storage in the inheritance chain.
      * See https://docs.openzeppelin.com/upgrades-plugins/1.x/writing-upgradeable#modifying-your-contracts
      */
-    uint256[44] private __gap;
+    uint256[43] private __gap;
 
 }

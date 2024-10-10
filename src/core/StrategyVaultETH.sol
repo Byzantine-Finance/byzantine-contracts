@@ -82,7 +82,7 @@ contract StrategyVaultETH is StrategyVaultETHStorage, ERC7535MultiRewardVault {
        bool _whitelistedDeposit,
        bool _upgradeable,
        address _oracle
-    ) external initializer {
+    ) external override initializer {
 
         // Initialize parent contracts (ERC7535MultiRewardVault)
         __ERC7535MultiRewardVault_init(_oracle);
@@ -126,6 +126,7 @@ contract StrategyVaultETH is StrategyVaultETHStorage, ERC7535MultiRewardVault {
      */
     function deposit(uint256 assets, address receiver) public override(ERC7535MultiRewardVault, IERC7535Upgradeable) payable checkWhitelist returns (uint256) {
         _triggerAuction();
+        amountOfETH += assets;
         return super.deposit(assets, receiver);
     }
 
@@ -140,7 +141,9 @@ contract StrategyVaultETH is StrategyVaultETHStorage, ERC7535MultiRewardVault {
      */
     function mint(uint256 shares, address receiver) public override(ERC7535MultiRewardVault, IERC7535Upgradeable) payable checkWhitelist returns (uint256) {
         _triggerAuction();
-        return super.mint(shares, receiver);
+        uint256 assets = super.mint(shares, receiver);
+        amountOfETH += assets;
+        return assets;
     }
 
     /**
@@ -191,7 +194,7 @@ contract StrategyVaultETH is StrategyVaultETHStorage, ERC7535MultiRewardVault {
         delegationManager.queueWithdrawals(queuedWithdrawalParams);
 
         // Calculate the withdrawal delay
-        uint256 withdrawalDelay = delegationManager.getWithdrawalDelay(strategies);
+        //uint256 withdrawalDelay = delegationManager.getWithdrawalDelay(strategies);
 
         // Setup scheduled function call for finishWithdrawETH after withdrawal delay is finished.
         // TODO
@@ -353,5 +356,11 @@ contract StrategyVaultETH is StrategyVaultETHStorage, ERC7535MultiRewardVault {
 
     function _burnVaultShares(uint256 amount, address receiver) internal {
         super.withdraw(amount, receiver, msg.sender);
+        amountOfETH -= amount;
+    }
+
+    // Returns the manually tracked amountOfETH instead of relying in address(this).balance
+    function _getETHBalance() internal view override returns (uint256) {
+        return amountOfETH;
     }
 }
