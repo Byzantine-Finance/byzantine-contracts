@@ -118,6 +118,19 @@ contract AuctionTest is ByzantineDeployer {
         assertEq(address(escrow).balance, priceToPay);
     }
 
+    function test_NodeOpDetails() external {
+        // 6 nodeOps bid, 11 bids in total
+        bytes32[] memory bidIds = _createMultipleBids();
+
+        // Check nodeOps[0] details
+        IAuction.NodeOpGlobalDetails memory nodeOpDetails = auction.getNodeOpDetails(nodeOps[0]);
+        assertEq(nodeOpDetails.reputationScore, 0);
+        assertEq(nodeOpDetails.numBonds, 0);
+        assertEq(nodeOpDetails.numBidsCluster4, 2);
+        assertEq(nodeOpDetails.numBidsCluster7, 0);
+        assertEq(nodeOpDetails.isWhitelisted, true);
+    }
+
     function test_BidDetails() external {
         // First bid parameters: 10%, 100 days
         bytes32 bid0Id = _bidCluster4(nodeOps[0], 10e2, 100);

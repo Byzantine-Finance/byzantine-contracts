@@ -413,6 +413,11 @@ contract Auction is
         return _nodeOpsDetails[_nodeOpAddr].isWhitelisted;
     }
 
+    /// @notice Returns the globaldetails of a specific node operator
+    function getNodeOpDetails(address _nodeOpAddr) public view returns (NodeOpGlobalDetails memory) {
+        return _nodeOpsDetails[_nodeOpAddr];
+    }
+
     /// @notice Returns the number of DVs in the main auction
     function getNumDVInAuction() public view returns (uint256) {
         return _mainAuctionTree.count();

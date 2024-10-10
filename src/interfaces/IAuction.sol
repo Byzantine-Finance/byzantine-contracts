@@ -145,6 +145,9 @@ interface IAuction {
     /// @notice Returns true if `_nodeOpAddr` is whitelisted, false otherwise.
     function isWhitelisted(address _nodeOpAddr) external view returns (bool);
 
+    /// @notice Returns the globaldetails of a specific node operator
+    function getNodeOpDetails(address _nodeOpAddr) external view returns (NodeOpGlobalDetails memory);
+
     /// @notice Returns the number of DVs in the main auction
     function getNumDVInAuction() external view returns (uint256);
 
