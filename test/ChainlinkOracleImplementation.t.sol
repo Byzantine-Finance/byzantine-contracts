@@ -53,7 +53,7 @@ contract ChainlinkOracleImplementationTest is Test {
         mockAggregator.setUpdatedAt(block.timestamp);
         mockAggregator.setDecimals(8);
 
-        uint256 price = oracle.getPrice(address(0), address(mockAggregator));
+        uint256 price = oracle.getPrice(address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE));
         assertEq(price, 100 * 1e18);
     }
 
@@ -63,7 +63,7 @@ contract ChainlinkOracleImplementationTest is Test {
         mockAggregator.setDecimals(8);
 
         vm.expectRevert(ChainlinkOracleImplementation.InvalidPrice.selector);
-        oracle.getPrice(address(0), address(mockAggregator));
+        oracle.getPrice(address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE));
     }
 
     function testRoundNotComplete() public {
@@ -72,7 +72,7 @@ contract ChainlinkOracleImplementationTest is Test {
         mockAggregator.setDecimals(8);
 
         vm.expectRevert(ChainlinkOracleImplementation.RoundNotComplete.selector);
-        oracle.getPrice(address(0), address(mockAggregator));
+        oracle.getPrice(address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE));
     }
 
     function testStalePrice() public {
@@ -84,7 +84,7 @@ contract ChainlinkOracleImplementationTest is Test {
         vm.warp(block.timestamp + 59 minutes);
 
         // This should not revert
-        uint256 price = oracle.getPrice(address(0), address(mockAggregator));
+        uint256 price = oracle.getPrice(address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE));
         assertEq(price, 100 * 1e18);
 
         // Move time forward to exceed the staleness threshold
@@ -92,7 +92,7 @@ contract ChainlinkOracleImplementationTest is Test {
 
         // This should revert with PriceTooOld
         vm.expectRevert(abi.encodeWithSelector(ChainlinkOracleImplementation.PriceTooOld.selector, block.timestamp - 61 minutes));
-        oracle.getPrice(address(0), address(mockAggregator));
+        oracle.getPrice(address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE));
     }
 
     function testPriceTooOld() public {
@@ -113,7 +113,7 @@ contract ChainlinkOracleImplementationTest is Test {
 
         // Expect revert with PriceTooOld error
         vm.expectRevert(abi.encodeWithSelector(ChainlinkOracleImplementation.PriceTooOld.selector, updatedAt));
-        oracle.getPrice(address(0), address(mockAggregator));
+        oracle.getPrice(address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE));
     }
 
     function testDifferentDecimals() public {
@@ -122,21 +122,21 @@ contract ChainlinkOracleImplementationTest is Test {
         mockAggregator.setUpdatedAt(block.timestamp);
         mockAggregator.setDecimals(6);
 
-        uint256 price = oracle.getPrice(address(0), address(mockAggregator));
+        uint256 price = oracle.getPrice(address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE));
         assertEq(price, 100 * 1e18);
 
         // Test with 18 decimals
         mockAggregator.setPrice(100 * 1e18);
         mockAggregator.setDecimals(18);
 
-        price = oracle.getPrice(address(0), address(mockAggregator));
+        price = oracle.getPrice(address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE));
         assertEq(price, 100 * 1e18);
 
         // Test with 20 decimals
         mockAggregator.setPrice(100 * 1e20);
         mockAggregator.setDecimals(20);
 
-        price = oracle.getPrice(address(0), address(mockAggregator));
+        price = oracle.getPrice(address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE));
         assertEq(price, 100 * 1e18);
     }
 }
