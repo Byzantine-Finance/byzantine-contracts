@@ -315,9 +315,9 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
     ) internal returns (bytes32) {
         vm.warp(block.timestamp + 1);
         // Get price to pay
-        uint256 priceToPay = auction.getPriceToPayCluster4(_nodeOp, _discountRate, _timeInDays);
+        uint256 priceToPay = auction.getPriceToPay(_nodeOp, _discountRate, _timeInDays, IAuction.AuctionType.JOIN_CLUSTER_4);
         vm.prank(_nodeOp);
-        return   auction.bidCluster4{value: priceToPay}(_discountRate, _timeInDays);
+        return   auction.bid{value: priceToPay}(_discountRate, _timeInDays, IAuction.AuctionType.JOIN_CLUSTER_4);
     }
 
     function _createMultipleBids() internal returns (bytes32[] memory) {

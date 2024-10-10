@@ -67,9 +67,6 @@ contract Auction is
         _clusterDetails[winningClusterId].status = ClusterStatus.IN_CREATION;
         ClusterDetails memory winningClusterDetails = getClusterDetails(winningClusterId);
 
-        // Transfer the winning bids price to the StakerReward contract
-        _transferBidToStakerReward(winningClusterDetails.nodes);
-
         // Remove the winning cluster from the main auction tree
         _mainAuctionTree.remove(winningClusterId, winningAvgAuctionScore);
 
@@ -80,10 +77,8 @@ contract Auction is
         address splitAddr = pushSplitFactory.createSplit(splitParams, owner(), owner());
         _clusterDetails[winningClusterId].splitAddr = splitAddr;
 
-        // If winning cluster is a newly created DV4, update dv4 sub-auction tree
-        if (_bidDetails[winningClusterDetails.nodes[0].bidId].auctionType == AuctionType.JOIN_CLUSTER_4) {
-            _mainUdateDv4SubAuction(winningClusterDetails.nodes, winningClusterId);
-        }
+        // Update the corresponding sub-auction tree
+        _mainUdateSubAuction(winningClusterDetails.nodes, winningClusterId, _bidDetails[winningClusterDetails.nodes[0].bidId].auctionType);
 
         emit ClusterCreated(winningClusterId, winningAvgAuctionScore, splitAddr);
 
@@ -95,21 +90,30 @@ contract Auction is
      * @param _nodeOpAddr: address of the node operator who will bid
      * @param _discountRate: The desired profit margin in percentage of the operator (scale from 0 to 10000)
      * @param _timeInDays: duration of being part of a DV, in days
+     * @param _auctionType: cluster type the node operator wants to join (dv4, dv7, private dv, ...)
      * @dev Revert if `_discountRate` or `_timeInDays` don't respect the minimum values set by Byzantine.
+     * @dev Reverts if the auction type is unknown
      */
-    function getPriceToPayCluster4(
+    function getPriceToPay(
         address _nodeOpAddr,
         uint16 _discountRate,
-        uint32 _timeInDays
+        uint32 _timeInDays,
+        AuctionType _auctionType
     ) external view returns (uint256) {
 
         // Verify the standing bid parameters
         if (_discountRate > maxDiscountRate) revert DiscountRateTooHigh();
         if (_timeInDays < minDuration) revert DurationTooShort();
 
-        // Calculate operator's bid price
-        uint256 dailyVcPrice = ByzantineAuctionMath.calculateVCPrice(expectedDailyReturnWei, _discountRate, _CLUSTER_SIZE_4);
-        uint256 bidPrice = ByzantineAuctionMath.calculateBidPrice(_timeInDays, dailyVcPrice);
+        // Calculate operator's bid price according to the auction type
+        uint256 dailyVcPrice;
+        uint256 bidPrice;   
+        if (_auctionType == AuctionType.JOIN_CLUSTER_4) {
+            dailyVcPrice = ByzantineAuctionMath.calculateVCPrice(expectedDailyReturnWei, _discountRate, _CLUSTER_SIZE_4);
+            bidPrice = ByzantineAuctionMath.calculateBidPrice(_timeInDays, dailyVcPrice);
+        } else {
+            revert InvalidAuctionType();
+        }
 
         // Calculate the total price to pay
         if (isWhitelisted(_nodeOpAddr)) {
@@ -119,10 +123,11 @@ contract Auction is
     }
 
     /**
-     * @notice Bid function to join a cluster of size 4. A call to that function will search the first 4 winners, calculate their average score, and put the virtual DV in the main auction.
-     * Every time a new bid modify the first 4 winners, it update the main auction by removing the previous virtual DV and adding the new one.
+     * @notice Bid function to join a cluster type specified by `_auctionType`. A call to that function will search the sub-auctions winners, calculate their average score, and put the virtual DV in the main auction.
+     * Every time a new bid modify the sub-auctions winners, it update the main auction by removing the previous virtual DV and adding the new one.
      * @param _discountRate The desired profit margin in percentage of the operator (scale from 0 to 10000)
      * @param _timeInDays Duration of being part of a DV, in days
+     * @param _auctionType cluster type the node operator wants to join (dv4, dv7, private dv, ...)
      * @return bidId The id of the bid
      * @dev The bid price is sent to an escrow smart contract. As long as the node operator doesn't win the auction, its bids stays in the escrow contract.
      * It is possible to ask the escrow contract to refund the bid if the operator wants to leave the protocol (call `withdrawBid`)
@@ -130,10 +135,12 @@ contract Auction is
      * @dev Reverts if the bidder is not whitelisted (permissionless DV will arrive later)
      * @dev Reverts if the discount rate is too high or the duration is too short
      * @dev Reverts if the ethers sent by the node op are not enough to pay for the bid(s) (and the bond). If too many ethers has been sent the function returns the excess to the sender.
+     * @dev Reverts if the auction type is unknown
      */
-    function bidCluster4(
+    function bid(
         uint16 _discountRate,
-        uint32 _timeInDays
+        uint32 _timeInDays,
+        AuctionType _auctionType
     ) external payable nonReentrant returns (bytes32 bidId) {
 
         // Only whitelisted node operators can bid
@@ -143,40 +150,53 @@ contract Auction is
         if (_discountRate > maxDiscountRate) revert DiscountRateTooHigh();
         if (_timeInDays < minDuration) revert DurationTooShort();
 
-        // Update `dv4AuctionNumNodeOps` if necessary
-        if (_nodeOpsDetails[msg.sender].numBidsCluster4 == 0) {
-            dv4AuctionNumNodeOps += 1;
-        }
-
         /// TODO: Get the reputation score of msg.sender
         uint32 reputationScore = 1;
 
-        // Calculate operator's bid price and score
-        uint256 dailyVcPrice = ByzantineAuctionMath.calculateVCPrice(expectedDailyReturnWei, _discountRate, _CLUSTER_SIZE_4);
-        uint256 bidPrice = ByzantineAuctionMath.calculateBidPrice(_timeInDays, dailyVcPrice);
-        uint256 auctionScore = ByzantineAuctionMath.calculateAuctionScore(dailyVcPrice, _timeInDays, reputationScore);
+        // Bid the corresponding sub-auction
+        uint256 dailyVcPrice;
+        uint256 bidPrice;
+        uint256 auctionScore;
 
-        // Calculate the bid ID (hash(msg.sender, timestamp, bidType))
-        bidId = keccak256(abi.encodePacked(msg.sender, block.timestamp, _CLUSTER_SIZE_4));
+        if (_auctionType == AuctionType.JOIN_CLUSTER_4) {
+            // Update `dv4AuctionNumNodeOps` if necessary
+            if (_nodeOpsDetails[msg.sender].numBidsCluster4 == 0) {
+                dv4AuctionNumNodeOps += 1;
+            }
 
-        // Insert the auction score in the cluster 4 sub-auction tree
-        _dv4AuctionTree.insert(bidId, auctionScore);
+            // Calculate operator's bid price and score
+            dailyVcPrice = ByzantineAuctionMath.calculateVCPrice(expectedDailyReturnWei, _discountRate, _CLUSTER_SIZE_4);
+            bidPrice = ByzantineAuctionMath.calculateBidPrice(_timeInDays, dailyVcPrice);
+            auctionScore = ByzantineAuctionMath.calculateAuctionScore(dailyVcPrice, _timeInDays, reputationScore);
 
-        // Add bid to the bids mapping
-        _bidDetails[bidId] = BidDetails({
-            auctionScore: auctionScore,
-            bidPrice: bidPrice,
-            nodeOp: msg.sender,
-            vcNumber: _timeInDays, /// TODO: Split the VC among the different validators (or do it in another contract)
-            discountRate: _discountRate,
-            auctionType: AuctionType.JOIN_CLUSTER_4
-        });
-        // Increment the bid number of the node op
-        _nodeOpsDetails[msg.sender].numBidsCluster4 += 1;
+            // Calculate the bid ID (hash(msg.sender, timestamp, bidType))
+            bidId = keccak256(abi.encodePacked(msg.sender, block.timestamp, _CLUSTER_SIZE_4));
 
-        // Update main auction if necessary
-        if (auctionScore > _dv4LatestWinningInfo.lastestWinningScore && dv4AuctionNumNodeOps >= _CLUSTER_SIZE_4) {
-            _dv4UpdateMainAuction();
+            // Insert the auction score in the cluster 4 sub-auction tree
+            _dv4AuctionTree.insert(bidId, auctionScore);
+
+            // Increment the bid number of the node op
+            _nodeOpsDetails[msg.sender].numBidsCluster4 += 1;
+
+            // Add bid to the bids mapping
+            _bidDetails[bidId] = BidDetails({
+                auctionScore: auctionScore,
+                bidPrice: bidPrice,
+                nodeOp: msg.sender,
+                vcNumber: _timeInDays,
+                discountRate: _discountRate,
+                auctionType: AuctionType.JOIN_CLUSTER_4
+            });
+
+            // Update main auction if necessary
+            if (auctionScore > _dv4LatestWinningInfo.lastestWinningScore && dv4AuctionNumNodeOps >= _CLUSTER_SIZE_4) {
+                _dv4UpdateMainAuction();
+            }
+
+            emit BidPlaced(msg.sender, bidId, _discountRate, _timeInDays, bidPrice, auctionScore, AuctionType.JOIN_CLUSTER_4);
+
+        } else {
+            revert InvalidAuctionType();
         }
 
         // Calculate the total price to pay, verify it and send it to the escrow contract
@@ -190,181 +210,187 @@ contract Auction is
         _verifyEthSent(msg.value, priceToPay);
         _transferToEscrow(priceToPay);
 
-        emit BidPlaced(msg.sender, bidId, _discountRate, _timeInDays, bidPrice, auctionScore);
     }
 
     /**
-     * @notice Fonction to determine the price to add in the protocol if the node operator outbids. Returns 0 if he decreases its bid.
-     * @notice The bid which will be updated will be the last bid with `_oldAuctionScore`
+     * @notice Fonction to determine the price to add if the node operator outbids. Returns 0 if he downbids.
      * @param _nodeOpAddr: address of the node operator updating its bid
-     * @param _oldAuctionScore: auction score of the bid to update
-     * @param _newDiscountRate: discount rate (i.e the desired profit margin) in percentage (scale from 0 to 10000)
-     * @param _newTimeInDays: duration of being a validator, in days
-     * @dev Reverts if the node op doesn't have a bid with `_oldAuctionScore`.
+     * @param _bidId: bidId to update
+     * @param _newDiscountRate: the new discount rate (i.e the desired profit margin) in percentage (scale from 0 to 10000)
+     * @param _newTimeInDays: the new duration of being a validator, in days
+     * @dev Reverts if the node op doesn't have a bid with `_bidId`.
      * @dev Revert if `_newDiscountRate` or `_newTimeInDays` don't respect the values set by the byzantine.
      */
-    /*function getUpdateOneBidPrice(
+    function getUpdateBidPrice(
         address _nodeOpAddr,
-        uint256 _oldAuctionScore,
+        bytes32 _bidId,
         uint16 _newDiscountRate,
         uint32 _newTimeInDays
-    ) public view returns (uint256) {
-        // Verify if `_nodeOpAddr` has at least a bid with `_oldAuctionScore`
-        require (getNodeOpAuctionScoreBidPrices(_nodeOpAddr, _oldAuctionScore).length > 0, "Wrong node op auctionScore");
+    ) external view returns (uint256) {
+        // Verify if `_nodeOpAddr` is the owner of `_bidId`
+        if (_bidDetails[_bidId].nodeOp != _nodeOpAddr) revert SenderNotBidder();
 
         // Verify the standing bid parameters
         if (_newDiscountRate > maxDiscountRate) revert DiscountRateTooHigh();
         if (_newTimeInDays < minDuration) revert DurationTooShort();
 
-        // Get the number of bids with this `_oldAuctionScore`
-        uint256 numSameBids = getNodeOpAuctionScoreBidPrices(_nodeOpAddr, _oldAuctionScore).length;
-
         // Get what the node op has already paid
-        uint256 lastBidPrice = _nodeOpsInfo[_nodeOpAddr].auctionScoreToBidPrices[_oldAuctionScore][numSameBids - 1];
+        uint256 priceAlreadyPaid = _bidDetails[_bidId].bidPrice;
 
-        // Calculate operator's new bid price
-        uint256 newDailyVcPrice = ByzantineAuctionMath.calculateVCPrice(expectedDailyReturnWei, _newDiscountRate, clusterSize);
-        uint256 newBidPrice = ByzantineAuctionMath.calculateBidPrice(_newTimeInDays, newDailyVcPrice);
+        // Calculate operator's new bid price according to the auction type
+        uint256 newDailyVcPrice;
+        uint256 newBidPrice;
+        if (_bidDetails[_bidId].auctionType == AuctionType.JOIN_CLUSTER_4) {
+            newDailyVcPrice = ByzantineAuctionMath.calculateVCPrice(expectedDailyReturnWei, _newDiscountRate, _CLUSTER_SIZE_4);
+            newBidPrice = ByzantineAuctionMath.calculateBidPrice(_newTimeInDays, newDailyVcPrice);
+        } else {
+            revert InvalidAuctionType();
+        }
 
-        if (newBidPrice > lastBidPrice) {
+        if (newBidPrice > priceAlreadyPaid) {
             unchecked {
-                return newBidPrice - lastBidPrice;
+                return newBidPrice - priceAlreadyPaid;
             }
         }
         return 0;
-    }*/
+    }
 
     /**
-     * @notice  Update a bid of a node operator associated to `_oldAuctionScore`. The node op will have to pay more if he outbids. 
-     *          If he decreases his bid, the escrow contract will send him back the difference.
-     * @notice  The bid which will be updated will be the last bid with `_oldAuctionScore`
-     * @param _oldAuctionScore: auction score of the bid to update
-     * @param _newDiscountRate: new discount rate (i.e the desired profit margin) in percentage (scale from 0 to 10000)
-     * @param _newTimeInDays: new duration of being a validator, in days
-     * @dev Reverts if the node op doesn't have a bid with `_oldAuctionScore`.
-     * @dev Reverts if the transfer of the funds to the Escrow contract failed.
+     * @notice  Update a bid of a node operator's `_bidId`. The node op will have to pay more if he outbids. 
+     *          If he decreases his bid, the escrow contract will send him back the price difference.
+     * @param _bidId: bidId to update
+     * @param _newDiscountRate: the new discount rate (i.e the desired profit margin) in percentage (scale from 0 to 10000)
+     * @param _newTimeInDays: the new duration of being a validator, in days
+     * @dev Reverts if the node op doesn't have a bid with `_bidId`.
      * @dev Revert if `_newDiscountRate` or `_newTimeInDays` don't respect the values set by the byzantine.
+     * @dev Reverts if the transfer of the funds to the Escrow contract failed.
      */
-    /*function updateOneBid(
-        uint256 _oldAuctionScore,
+    function updateBid(
+        bytes32 _bidId,
         uint16 _newDiscountRate,
         uint32 _newTimeInDays
-    ) external payable nonReentrant returns (uint256){
-        // Verify if the sender has at least a bid with `_oldAuctionScore`
-        require (getNodeOpAuctionScoreBidPrices(msg.sender, _oldAuctionScore).length > 0, "Wrong node op auctionScore");
+    ) external payable nonReentrant returns (bytes32 newBidId) {
+        // Verify if the sender update one of its bids
+        if (_bidDetails[_bidId].nodeOp != msg.sender) revert SenderNotBidder();
 
         // Verify the standing bid parameters
         if (_newDiscountRate > maxDiscountRate) revert DiscountRateTooHigh();
         if (_newTimeInDays < minDuration) revert DurationTooShort();
 
-        // Convert msg.sender address in bytes32
-        bytes32 bidder = bytes32(uint256(uint160(msg.sender)));
-
-        // Get the number of bids with this `_oldAuctionScore`
-        uint256 numSameBids = getNodeOpAuctionScoreBidPrices(msg.sender, _oldAuctionScore).length;
-
-        // Get last bid price associated to `_oldAuctionScore`. That bid will be updated
-        uint256 lastBidPrice = _nodeOpsInfo[msg.sender].auctionScoreToBidPrices[_oldAuctionScore][numSameBids - 1];
-
-        // Update auction tree (if necessary) and node ops details mappings
-        if (numSameBids == 1) {
-            _auctionTree.remove(bidder, _oldAuctionScore);
-            delete _nodeOpsInfo[msg.sender].auctionScoreToBidPrices[_oldAuctionScore];
-            delete _nodeOpsInfo[msg.sender].auctionScoreToVcNumbers[_oldAuctionScore];
-        } else {
-            _nodeOpsInfo[msg.sender].auctionScoreToBidPrices[_oldAuctionScore].pop();
-            _nodeOpsInfo[msg.sender].auctionScoreToVcNumbers[_oldAuctionScore].pop();
-        }
+        // Get the bid to update details
+        BidDetails memory bidToUpdate = _bidDetails[_bidId];
 
         /// TODO: Get the reputation score of msg.sender
         uint32 reputationScore = 1;
 
-        /// @notice Calculate operator's new bid price and new auction score
-        uint256 newDailyVcPrice = ByzantineAuctionMath.calculateVCPrice(expectedDailyReturnWei, _newDiscountRate, clusterSize);
-        uint256 newBidPrice = ByzantineAuctionMath.calculateBidPrice(_newTimeInDays, newDailyVcPrice);
-        uint256 newAuctionScore = ByzantineAuctionMath.calculateAuctionScore(newDailyVcPrice, _newTimeInDays, reputationScore);
+        // Update the bid according to its auction type
+        uint256 newDailyVcPrice;
+        uint256 newBidPrice;
+        uint256 newAuctionScore;
+        if (bidToUpdate.auctionType == AuctionType.JOIN_CLUSTER_4) {
+            // Calculate operator's new bid price and new score
+            newDailyVcPrice = ByzantineAuctionMath.calculateVCPrice(expectedDailyReturnWei, _newDiscountRate, _CLUSTER_SIZE_4);
+            newBidPrice = ByzantineAuctionMath.calculateBidPrice(_newTimeInDays, newDailyVcPrice);
+            newAuctionScore = ByzantineAuctionMath.calculateAuctionScore(newDailyVcPrice, _newTimeInDays, reputationScore);
 
-        // Verify if new Auction score doesn't already exist
-        if (!_auctionTree.keyExists(bidder, newAuctionScore)) {
-            _auctionTree.insert(bidder, newAuctionScore);
-        }
-        _nodeOpsInfo[msg.sender].auctionScoreToBidPrices[newAuctionScore].push(newBidPrice);
-        _nodeOpsInfo[msg.sender].auctionScoreToVcNumbers[newAuctionScore].push(_newTimeInDays);      
+            // Calculate the bid ID (hash(msg.sender, timestamp, bidType))
+            newBidId = keccak256(abi.encodePacked(msg.sender, block.timestamp, _CLUSTER_SIZE_4));
 
-        // Verify the price to pay for the new bid
-        if (newBidPrice > lastBidPrice) {
-            uint256 ethersToAdd;
-            unchecked { ethersToAdd = newBidPrice - lastBidPrice; }
-            // Verify if the sender has sent the difference
-            if (msg.value < ethersToAdd) revert NotEnoughEtherSent();
-            // If to many ethers has been sent, refund the sender
-            uint256 amountToRefund;
-            unchecked { amountToRefund = msg.value - ethersToAdd; }
-            if (amountToRefund > 0) {
-                payable(msg.sender).transfer(amountToRefund);
+            // Update the cluster 4 sub-auction tree
+            _dv4AuctionTree.remove(_bidId, bidToUpdate.auctionScore);
+            _dv4AuctionTree.insert(newBidId, newAuctionScore);
+
+            // Update the bids mapping
+            delete _bidDetails[_bidId];
+            _bidDetails[newBidId] = BidDetails({
+                auctionScore: newAuctionScore,
+                bidPrice: newBidPrice,
+                nodeOp: msg.sender,
+                vcNumber: _newTimeInDays,
+                discountRate: _newDiscountRate,
+                auctionType: AuctionType.JOIN_CLUSTER_4
+            });
+
+            // Update main auction if:
+            //      1. The new bid auction score is higher than the current sub-auction latest winning score
+            //      2. The updated auction score was among the sub-auction winning bids
+            if ((newAuctionScore > _dv4LatestWinningInfo.lastestWinningScore || bidToUpdate.auctionScore >= _dv4LatestWinningInfo.lastestWinningScore) && dv4AuctionNumNodeOps >= _CLUSTER_SIZE_4) {
+                _dv4UpdateMainAuction();
             }
-            // Transfer the ethers in the escrow contract
-            (bool success,) = address(escrow).call{value: ethersToAdd}("");
-            if (!success) revert EscrowTransferFailed();
+
         } else {
-            // Knowing that the node op doesn't have to pay more, send him back the diffence
-            if (msg.value > 0) {
-                payable(msg.sender).transfer(msg.value);
-            }
-            uint256 ethersToSendBack;
-            unchecked {
-                ethersToSendBack = lastBidPrice - newBidPrice;
-            }
-            // Ask the Escrow to send back the ethers
-            escrow.refund(msg.sender, ethersToSendBack);
+
+            revert InvalidAuctionType();
         }
 
-        emit BidUpdated(msg.sender, reputationScore, _oldAuctionScore, _newTimeInDays, _newDiscountRate, newBidPrice, newAuctionScore);
+        // Verify the price difference between the old and new bid
+        uint256 priceDiff;
+        if (newBidPrice > bidToUpdate.bidPrice) { // node op outbids
+            unchecked { priceDiff = newBidPrice - bidToUpdate.bidPrice; }
+            _verifyEthSent(msg.value, priceDiff);
+            _transferToEscrow(priceDiff);
+        } else { // node op downbids
+            if (msg.value > 0) {
+                (bool success, ) = msg.sender.call{value: msg.value}("");
+                if (!success) revert RefundFailed();
+            }
+            unchecked { priceDiff = bidToUpdate.bidPrice - newBidPrice; }
+            // Ask the Escrow to send back the ethers
+            escrow.refund(msg.sender, priceDiff);
+        }
 
-        return newAuctionScore;
+        emit BidUpdated(msg.sender, _bidId, newBidId, _newDiscountRate, _newTimeInDays, newBidPrice, newAuctionScore);
 
-    }*/
+    }
 
     /**
-     * @notice Allow a node operator to withdraw a specific bid (through its auction score).
+     * @notice Allow a node operator to withdraw a specific bid (through its bidId).
      * The withdrawer will be refund its bid price plus (the bond of he paid it).
-     * @param _auctionScore: auction score of the bid to withdraw. Will withdraw the last bid with this score.
+     * @param _bidId: bidId of the bid to withdraw.
+     * @dev Reverts if the node op doesn't have a bid with `_bidId`.
      */
-    /*function withdrawBid(uint256 _auctionScore) external {
-        // Verify if the sender has at least a bid with `_auctionScore`
-        require (getNodeOpAuctionScoreBidPrices(msg.sender, _auctionScore).length > 0, "Wrong node op auctionScore");
+    function withdrawBid(bytes32 _bidId) external {
+        // Verify if the sender withdraw one of its bids
+        if (_bidDetails[_bidId].nodeOp != msg.sender) revert SenderNotBidder();
 
-        // Convert msg.sender address in bytes32
-        bytes32 bidder = bytes32(uint256(uint160(msg.sender)));
+        // Get the bid to withdraw details
+        BidDetails memory bidToWithdraw = _bidDetails[_bidId];
 
-        // Get the number of bids with this `_auctionScore`
-        uint256 numSameBids = getNodeOpAuctionScoreBidPrices(msg.sender, _auctionScore).length;
+        // Find the bid's sub-auction tree
+        if (bidToWithdraw.auctionType == AuctionType.JOIN_CLUSTER_4) {
+            // Decrement the bid number of the node op
+            _nodeOpsDetails[msg.sender].numBidsCluster4 -= 1;
+            // Update `dv4AuctionNumNodeOps` if necessary
+            if (_nodeOpsDetails[msg.sender].numBidsCluster4 == 0) --dv4AuctionNumNodeOps;
 
-        // Get last bid price associated to `_auctionScore`. That bid will be updated
-        uint256 bidToRefund = _nodeOpsInfo[msg.sender].auctionScoreToBidPrices[_auctionScore][numSameBids - 1];
+            // Remove the bid from the sub-auction tree
+            _dv4AuctionTree.remove(_bidId, bidToWithdraw.auctionScore);
 
-        // Update auction tree (if necessary) and node ops details mappings
-        if (numSameBids == 1) {
-            _auctionTree.remove(bidder, _auctionScore);
-            delete _nodeOpsInfo[msg.sender].auctionScoreToBidPrices[_auctionScore];
-            delete _nodeOpsInfo[msg.sender].auctionScoreToVcNumbers[_auctionScore];
+            // delete the bid from the bids mapping
+            delete _bidDetails[_bidId];
+
+            // Update main auction if necessary
+            if (bidToWithdraw.auctionScore >= _dv4LatestWinningInfo.lastestWinningScore && dv4AuctionNumNodeOps >= _CLUSTER_SIZE_4) {
+                _dv4UpdateMainAuction();
+            }
+
         } else {
-            _nodeOpsInfo[msg.sender].auctionScoreToBidPrices[_auctionScore].pop();
-            _nodeOpsInfo[msg.sender].auctionScoreToVcNumbers[_auctionScore].pop();
+
+            revert InvalidAuctionType();
         }
-        _nodeOpsInfo[msg.sender].numBids -= 1;
-        // Decrease the number of node ops in the auction if the winner has no more bids
-        if (_nodeOpsInfo[msg.sender].numBids == 0) --numNodeOpsInAuction;
 
         // Ask the Escrow contract to refund the node op
         if (isWhitelisted(msg.sender)) {
-            escrow.refund(msg.sender, bidToRefund);
+            escrow.refund(msg.sender, bidToWithdraw.bidPrice);
+        } else if (_nodeOpsDetails[msg.sender].numBonds > 0) {
+            _nodeOpsDetails[msg.sender].numBonds -= 1;
+            escrow.refund(msg.sender, bidToWithdraw.bidPrice + _BOND);
         } else {
-            escrow.refund(msg.sender, bidToRefund + _BOND);
+            escrow.refund(msg.sender, bidToWithdraw.bidPrice);
         }
 
-        emit BidWithdrawn(msg.sender, _auctionScore);
-    }*/
+        emit BidWithdrawn(msg.sender, _bidId);
+    }
 
     /**
      * @notice Update the status of a cluster
@@ -393,6 +419,11 @@ contract Auction is
     /// @notice Returns true if `_nodeOpAddr` is whitelisted, false otherwise.
     function isWhitelisted(address _nodeOpAddr) public view returns (bool) {
         return _nodeOpsDetails[_nodeOpAddr].isWhitelisted;
+    }
+
+    /// @notice Returns the globaldetails of a specific node operator
+    function getNodeOpDetails(address _nodeOpAddr) public view returns (NodeOpGlobalDetails memory) {
+        return _nodeOpsDetails[_nodeOpAddr];
     }
 
     /// @notice Returns the number of DVs in the main auction
@@ -548,7 +579,7 @@ contract Auction is
         bytes32 clusterId = ByzantineAuctionMath.generateClusterId(block.timestamp, winnersAddr, averageAuctionScore);        
 
         // Update main auction
-        _updateMainAuctionTree(clusterId, averageAuctionScore);
+        _updateMainAuctionTree(clusterId, averageAuctionScore, AuctionType.JOIN_CLUSTER_4);
 
         // Update cluster mapping
         _createClusterDetails(clusterId, averageAuctionScore, dv4Winners);
@@ -558,37 +589,46 @@ contract Auction is
         _dv4LatestWinningInfo.latestWinningClusterId = clusterId;
     }
 
-    /// @notice Called if a winning DV comes from the dv4 sub-auction
-    function _mainUdateDv4SubAuction(NodeDetails[] memory _nodesToRemove, bytes32 _winningClusterId) private {
+    /// @notice Called to update the winning cluster's sub-auction tree
+    function _mainUdateSubAuction(NodeDetails[] memory _nodesToRemove, bytes32 _winningClusterId, AuctionType _auctionType) private {
 
-        // Reset the latest winning info
-        _dv4LatestWinningInfo.lastestWinningScore = 0;
-        _dv4LatestWinningInfo.latestWinningClusterId = bytes32(0);
+        // Update sub auction tree dv4
+        if (_auctionType == AuctionType.JOIN_CLUSTER_4) {
+            // Reset the latest winning info
+            _dv4LatestWinningInfo.lastestWinningScore = 0;
+            _dv4LatestWinningInfo.latestWinningClusterId = bytes32(0);
 
-        for (uint256 i = 0; i < _nodesToRemove.length;) {
-            // Node op address
-            address nodeOpAddr = _bidDetails[_nodesToRemove[i].bidId].nodeOp;
-            // Remove the winning node operator bid from the dv4 sub-auction tree
-            _dv4AuctionTree.remove(_nodesToRemove[i].bidId, _bidDetails[_nodesToRemove[i].bidId].auctionScore);
-            // Update the bids number of the node op in dv4 sub-auction
-            _nodeOpsDetails[nodeOpAddr].numBidsCluster4 -= 1;
-            // Update the number of node ops in dv4 sub-auction if necessary
-            if (_nodeOpsDetails[nodeOpAddr].numBidsCluster4 == 0) dv4AuctionNumNodeOps -= 1;
+            for (uint256 i = 0; i < _nodesToRemove.length;) {
+                // Bidder address and bidPrice
+                address nodeOpAddr = _bidDetails[_nodesToRemove[i].bidId].nodeOp;
+                uint256 bidPrice = _bidDetails[_nodesToRemove[i].bidId].bidPrice;
+                // Transfer the bid price to the StakerRewards contract
+                escrow.releaseFunds(bidPrice);
+                // Remove the winning node operator bid from the dv4 sub-auction tree
+                _dv4AuctionTree.remove(_nodesToRemove[i].bidId, _bidDetails[_nodesToRemove[i].bidId].auctionScore);
+                // Update the bids number of the node op in dv4 sub-auction
+                _nodeOpsDetails[nodeOpAddr].numBidsCluster4 -= 1;
+                // Update the number of node ops in dv4 sub-auction if necessary
+                if (_nodeOpsDetails[nodeOpAddr].numBidsCluster4 == 0) dv4AuctionNumNodeOps -= 1;
 
-            emit WinnerJoinedCluster(nodeOpAddr, _winningClusterId, _nodesToRemove[i].bidId);
+                emit WinnerJoinedCluster(nodeOpAddr, _winningClusterId, _nodesToRemove[i].bidId);
 
-            unchecked {
-                ++i;
+                unchecked {
+                    ++i;
+                }
             }
+            
+            // If enough operators in dv4 sub-auction, update main tree
+            if (dv4AuctionNumNodeOps >= _CLUSTER_SIZE_4) _dv4UpdateMainAuction();
+        } else {
+            revert InvalidAuctionType();
         }
-        
-        // If enough operators in dv4 sub-auction, update main tree
-        if (dv4AuctionNumNodeOps >= _CLUSTER_SIZE_4) _dv4UpdateMainAuction();
+
     }
 
     /// @notice Update the main auction tree by adding a new virtual cluster and removing the old one
-    function _updateMainAuctionTree(bytes32 _newClusterId, uint256 _newAvgAuctionScore) private {
-        if (_dv4LatestWinningInfo.latestWinningClusterId != bytes32(0)) {
+    function _updateMainAuctionTree(bytes32 _newClusterId, uint256 _newAvgAuctionScore, AuctionType _auctionType) private {
+        if (_auctionType == AuctionType.JOIN_CLUSTER_4 && _dv4LatestWinningInfo.latestWinningClusterId != bytes32(0)) {
             uint256 lastAverageAuctionScore = _clusterDetails[_dv4LatestWinningInfo.latestWinningClusterId].averageAuctionScore;
             _mainAuctionTree.remove(_dv4LatestWinningInfo.latestWinningClusterId, lastAverageAuctionScore);
             delete _clusterDetails[_dv4LatestWinningInfo.latestWinningClusterId];
@@ -599,7 +639,7 @@ contract Auction is
     /// @notice Create a new entry in the `_clusterDetails` mapping
     function _createClusterDetails(bytes32 _clusterId, uint256 _averageAuctionScore, NodeDetails[] memory _nodes) private {
         _clusterDetails[_clusterId].averageAuctionScore = _averageAuctionScore;
-        for (uint256 i = 0; i < _CLUSTER_SIZE_4;) {
+        for (uint256 i = 0; i < _nodes.length;) {
             _clusterDetails[_clusterId].nodes.push(_nodes[i]);
             unchecked {
                 ++i;
@@ -623,20 +663,6 @@ contract Auction is
     function _transferToEscrow(uint256 _priceToPay) private {
         (bool success,) = address(escrow).call{value: _priceToPay}("");
         if (!success) revert EscrowTransferFailed();
-    }
-
-    /// @notice Transfer the bid price to the StakerRewards contract
-    function _transferBidToStakerReward(NodeDetails[] memory _nodes) private {
-
-        uint256 bidToTransfer;
-        for (uint256 i = 0; i < _nodes.length;) {
-            bidToTransfer = _bidDetails[_nodes[i].bidId].bidPrice;
-            escrow.releaseFunds(bidToTransfer);
-            unchecked {
-                ++i;
-            }
-        }
-        
     }
 
     /// @notice Create the split parameters depending on the winning nodes
