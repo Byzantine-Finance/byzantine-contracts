@@ -366,8 +366,7 @@ contract ExistingDeploymentParser is Script, Test {
 
         string memory parameters = "parameters";
         vm.serializeAddress(parameters, "byzantineAdmin", byzantineAdmin);
-        vm.serializeAddress(parameters, "beaconChainAdmin", beaconChainAdmin);
-        // string memory parameters_output = vm.serializeAddress(parameters, "bidReceiver", bidReceiver);
+        string memory parameters_output = vm.serializeAddress(parameters, "beaconChainAdmin", beaconChainAdmin);
 
         string memory chain_info = "chainInfo";
         vm.serializeUint(chain_info, "deploymentBlock", block.number);

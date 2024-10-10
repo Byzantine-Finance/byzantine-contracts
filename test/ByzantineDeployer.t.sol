@@ -159,7 +159,6 @@ contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
             escrow,
             auction
         );
-        StakerRewards stakerRewardsImplementation = new StakerRewards();
 
         // Third, upgrade the proxy contracts to use the correct implementation contracts and initialize them.
         // Upgrade StrategyVaultManager

@@ -718,12 +718,16 @@ contract StakerRewardsTest is ProofParsing, ByzantineDeployer {
         return bidIds;
     }
 
-    function _bidCluster4(address _nodeOp, uint16 _discountRate, uint32 _timeInDays) internal returns (bytes32) {
+    function _bidCluster4(
+        address _nodeOp,
+        uint16 _discountRate,
+        uint32 _timeInDays
+    ) internal returns (bytes32) {
         vm.warp(block.timestamp + 1);
         // Get price to pay
-        uint256 priceToPay = auction.getPriceToPayCluster4(_nodeOp, _discountRate, _timeInDays);
+        uint256 priceToPay = auction.getPriceToPay(_nodeOp, _discountRate, _timeInDays, IAuction.AuctionType.JOIN_CLUSTER_4);
         vm.prank(_nodeOp);
-        return   auction.bidCluster4{value: priceToPay}(_discountRate, _timeInDays);
+        return auction.bid{value: priceToPay}(_discountRate, _timeInDays, IAuction.AuctionType.JOIN_CLUSTER_4);
     }
 
     function _createStratVaultETHAndStake(address _staker, uint256 _amount) internal returns (IStrategyVaultETH) {
