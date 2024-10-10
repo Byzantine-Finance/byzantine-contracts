@@ -232,4 +232,6 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
     function _getETHBalance() internal view virtual returns (uint256) {
         return address(this).balance;
     }
+
+    uint256[44] private __gap;
 }
