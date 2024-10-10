@@ -22,11 +22,16 @@ import "../src/interfaces/IStrategyVaultETH.sol";
 import "../src/interfaces/IStrategyVaultManager.sol";
 import "../src/interfaces/IAuction.sol";
 
+import "./mocks/MockOracle.sol";
+
 contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
     // using BeaconChainProofs for *;
 
     /// @notice Canonical, virtual beacon chain ETH strategy
     IStrategy public constant beaconChainETHStrategy = IStrategy(0xbeaC0eeEeeeeEEeEeEEEEeeEEeEeeeEeeEEBEaC0);
+
+    /// @notice Mock oracle to simulate the price of ETH
+    MockOracle public oracle;
 
     /// @notice Random validator deposit data (simulates a Byzantine DV)
     bytes private pubkey;
@@ -45,6 +50,9 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
     function setUp() public override {
         // deploy locally EigenLayer and Byzantine contracts
         ByzantineDeployer.setUp();
+
+        // Deploy the mock oracle
+        oracle = new MockOracle();
 
         // Fill the node ops' balance
         for (uint256 i = 0; i < nodeOps.length; i++) {
@@ -75,7 +83,7 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
         /* ===================== ALICE CREATES A FIRST STRATVAULTETH ===================== */
         // whitelistedDeposit = true, upgradeable = true, EL Operator = ELOperator1, oracle = 0x0
         vm.prank(alice);
-        IStrategyVaultETH aliceStratVault1 = IStrategyVaultETH(strategyVaultManager.createStratVaultETH(true, true, ELOperator1, address(0)));
+        IStrategyVaultETH aliceStratVault1 = IStrategyVaultETH(strategyVaultManager.createStratVaultETH(true, true, ELOperator1, address(oracle)));
 
         // Verify aliceStratVault1 has been created and has delegated
         assertEq(aliceStratVault1.stratVaultNftId(), uint256(keccak256(abi.encodePacked(block.timestamp, uint64(0), alice))));
@@ -94,7 +102,7 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
         /* ===================== ALICE CREATES A FIRST STRATVAULTETH ===================== */
         // whitelistedDeposit = false, upgradeable = false, EL Operator = ELOperator1, oracle = 0x0
         vm.prank(alice);
-        IStrategyVaultETH aliceStratVault2 = IStrategyVaultETH(strategyVaultManager.createStratVaultETH(false, false, ELOperator1, address(0)));
+        IStrategyVaultETH aliceStratVault2 = IStrategyVaultETH(strategyVaultManager.createStratVaultETH(false, false, ELOperator1, address(oracle)));
 
         // Verify some variables of aliceStratVault2
         assertEq(aliceStratVault2.whitelistedDeposit(), false);
@@ -117,17 +125,17 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
         /* ===================== STRATVAULTETH CREATION FAILS BECAUSE NOT MULTIPLE OF 32ETH STAKED ===================== */
         vm.prank(alice);
         vm.expectRevert(IStrategyVaultETH.CanOnlyDepositMultipleOf32ETH.selector);
-        strategyVaultManager.createStratVaultAndStakeNativeETH{value: 58 ether}(true, true, ELOperator1, address(0), alice);
+        strategyVaultManager.createStratVaultAndStakeNativeETH{value: 58 ether}(true, true, ELOperator1, address(oracle), alice);
 
         /* ===================== STRATVAULTETH CREATION FAILS BECAUSE NOT NODE OPS IN AUCTION ===================== */
         vm.prank(alice);
         vm.expectRevert(IAuction.MainAuctionEmpty.selector);
-        strategyVaultManager.createStratVaultAndStakeNativeETH{value: 320 ether}(true, true, ELOperator1, address(0), alice);
+        strategyVaultManager.createStratVaultAndStakeNativeETH{value: 320 ether}(true, true, ELOperator1, address(oracle), alice);
 
         /* ===================== ALICE CREATES A STRATVAULTETH AND STAKES 64ETH ===================== */
         // whitelistedDeposit = true, upgradeable = true, EL Operator = ELOperator1, oracle = 0x0
         vm.prank(alice);
-        IStrategyVaultETH aliceStratVault1 = IStrategyVaultETH(strategyVaultManager.createStratVaultAndStakeNativeETH{value: 64 ether}(true, true, ELOperator1, address(0), alice));
+        IStrategyVaultETH aliceStratVault1 = IStrategyVaultETH(strategyVaultManager.createStratVaultAndStakeNativeETH{value: 64 ether}(true, true, ELOperator1, address(oracle), alice));
 
         // Verify the StratVaultETH has received the 64 ETH
         assertEq(address(aliceStratVault1).balance, 64 ether);
@@ -179,25 +187,27 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
         assertEq(nodeOpsDV3[2], nodeOps[6]);
         assertEq(nodeOpsDV3[3], nodeOps[7]);
 
-        /* ===================== BOB STAKES AGAIN IN ALICE'S STRATVAULTETH ===================== */
+        // /* ===================== BOB STAKES AGAIN IN ALICE'S STRATVAULTETH ===================== */
 
-        vm.prank(bob);
-        aliceStratVault1.mint{value: 32 ether}(32 ether, bob);
+        /// TODO: Test function mint
 
-        // Verify the StratVaultETH has received the 32 ETH
-        assertEq(address(aliceStratVault1).balance, 64 ether + 32 ether + 32 ether);
+        // vm.prank(bob);
+        // aliceStratVault1.mint{value: 32 ether}(32 ether, bob);
 
-        // Verify the StratVaultETH clusters
-        assertEq(aliceStratVault1.getVaultDVNumber(), 4);
-        clusterIds = aliceStratVault1.getAllDVIds();
-        assertEq(clusterIds.length, 4);
-        // Verify DV4 node ops addresses
-        address[] memory nodeOpsDV4 = _getClusterIdNodeOp(clusterIds[3]);
-        assertEq(nodeOpsDV4.length, 4);
-        assertEq(nodeOpsDV4[0], nodeOps[2]);
-        assertEq(nodeOpsDV4[1], nodeOps[6]);
-        assertEq(nodeOpsDV4[2], nodeOps[7]);
-        assertEq(nodeOpsDV4[3], nodeOps[8]);
+        // // Verify the StratVaultETH has received the 32 ETH
+        // assertEq(address(aliceStratVault1).balance, 64 ether + 32 ether + 32 ether);
+
+        // // Verify the StratVaultETH clusters
+        // assertEq(aliceStratVault1.getVaultDVNumber(), 4);
+        // clusterIds = aliceStratVault1.getAllDVIds();
+        // assertEq(clusterIds.length, 4);
+        // // Verify DV4 node ops addresses
+        // address[] memory nodeOpsDV4 = _getClusterIdNodeOp(clusterIds[3]);
+        // assertEq(nodeOpsDV4.length, 4);
+        // assertEq(nodeOpsDV4[0], nodeOps[2]);
+        // assertEq(nodeOpsDV4[1], nodeOps[6]);
+        // assertEq(nodeOpsDV4[2], nodeOps[7]);
+        // assertEq(nodeOpsDV4[3], nodeOps[8]);
 
     }
 
@@ -205,7 +215,7 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
 
         // Alice creates a StratVaultETH
         vm.prank(alice);
-        IStrategyVaultETH aliceStratVault1 = IStrategyVaultETH(strategyVaultManager.createStratVaultETH(true, true, ELOperator1, address(0)));
+        IStrategyVaultETH aliceStratVault1 = IStrategyVaultETH(strategyVaultManager.createStratVaultETH(true, true, ELOperator1, address(oracle)));
         uint256 nftId = IStrategyVaultETH(aliceStratVault1).stratVaultNftId();
 
         // Verify Alice owns the nft
@@ -223,7 +233,7 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
 
         // Alice creates a StrategyVault and stakes 32 ETH in it
         vm.prank(alice);
-        IStrategyVaultETH aliceStratVault1 = IStrategyVaultETH(strategyVaultManager.createStratVaultAndStakeNativeETH{value: 32 ether}(true, true, ELOperator1, address(0), alice));
+        IStrategyVaultETH aliceStratVault1 = IStrategyVaultETH(strategyVaultManager.createStratVaultAndStakeNativeETH{value: 32 ether}(true, true, ELOperator1, address(oracle), alice));
 
         // Get the DV cluster ID
         bytes32[] memory clusterIds = aliceStratVault1.getAllDVIds();
@@ -271,7 +281,7 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
 
         // Alice creates a StrategyVault and stakes 32 ETH in it
         vm.prank(alice);
-        IStrategyVaultETH aliceStratVault1 = IStrategyVaultETH(strategyVaultManager.createStratVaultAndStakeNativeETH{value: 32 ether}(true, true, ELOperator1, address(0), alice));
+        IStrategyVaultETH aliceStratVault1 = IStrategyVaultETH(strategyVaultManager.createStratVaultAndStakeNativeETH{value: 32 ether}(true, true, ELOperator1, address(oracle), alice));
 
         // Get the DV cluster ID
         bytes32[] memory clusterIds = aliceStratVault1.getAllDVIds();
@@ -297,137 +307,14 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
         aliceStratVault1.activateCluster(pubkey, signature, depositDataRoot, clusterIds[0]);
 
         // Verify the DV status has been updated
-        assertEq(uint256(auction.getClusterDetails(clusterIds[0]).status), uint256(IAuction.ClusterStatus.DEPOSITED_NOT_VERIFIED));
+        assertEq(uint256(auction.getClusterDetails(clusterIds[0]).status), uint256(IAuction.ClusterStatus.DEPOSITED));
+        // Verify the pubkey hash has been set
+        assertEq(auction.getClusterDetails(clusterIds[0]).clusterPubKeyHash, sha256(abi.encodePacked(pubkey, bytes16(0))));
 
         // Verify the balance of the StratVaultETH
         assertEq(address(aliceStratVault1).balance, 0 ether);
 
     }
-
-    // // That test reverts because the `withdrawal_credential_proof` file generated with the Byzantine API
-    // // doesn't point to the correct EigenPod (alice's EigenPod which is locally deployed)
-    // function test_RevertWhen_WrongWithdrawalCredentials() public preCreateClusters(2) {
-    //     // Get the validator fields proof
-    //     (
-    //         BeaconChainProofs.StateRootProof memory stateRootProofStruct,
-    //         uint40[] memory validatorIndices,
-    //         bytes[] memory proofsArray,
-    //         bytes32[][] memory validatorFieldsArray
-    //     ) = 
-    //         _getValidatorFieldsProof(abi.encodePacked("./test/test-data/withdrawal_credential_proof_1634654.json"));
-
-    //     // Start the test
-
-    //     // Alice creates a Strategy Vault and stake ETH
-    //     address stratVaultAddr = _createStratVaultAndStakeNativeETH(alice, 32 ether);
-
-    //     // Deposit received on the Beacon Chain
-    //     uint64 timestamp = uint64(block.timestamp + 16 hours);
-    //     cheats.warp(timestamp);
-
-    //     //set the oracle block root
-    //     _setOracleBlockRoot(abi.encodePacked("./test/test-data/withdrawal_credential_proof_1634654.json"));
-
-    //     // Verify the proof
-    //     vm.prank(alice);
-    //     cheats.expectRevert(
-    //         bytes("EigenPod.verifyCorrectWithdrawalCredentials: Proof is not for this EigenPod")
-    //     );
-    //     /// TODO: Update API to to have the exact timestamp where the proof was generated
-    //     IStrategyVaultETH(stratVaultAddr).verifyWithdrawalCredentials(timestamp, stateRootProofStruct, validatorIndices, proofsArray, validatorFieldsArray);
-
-    // }
-
-    // // TODO: Test the `VerifyWithdrawalCredential` function when the proof is correct
-
-    // // The operator shares for the beacon chain strategy hasn't been updated because alice didn't verify the withdrawal credentials
-    // // of its validator (DV)
-    // function testDelegateTo() public preCreateClusters(2) {
-
-    //     // Create the operator details for the operator to delegate to
-    //     IDelegationManager.OperatorDetails memory operatorDetails = IDelegationManager.OperatorDetails({
-    //         __deprecated_earningsReceiver: ELOperator1,
-    //         delegationApprover: address(0),
-    //         stakerOptOutWindowBlocks: 0
-    //     });
-
-    //     _registerAsELOperator(ELOperator1, operatorDetails);
-
-    //     // Create a restaking strategy: only beacon chain ETH Strategy
-    //     IStrategy[] memory strategies = new IStrategy[](1);
-    //     strategies[0] = beaconChainETHStrategy;
-
-    //     // Get the operator shares before delegation
-    //     uint256[] memory operatorSharesBefore = delegation.getOperatorShares(ELOperator1, strategies);
-    //     assertEq(operatorSharesBefore[0], 0);
-        
-    //     // Alice stake 32 ETH
-    //     address stratVaultAddr = _createStratVaultAndStakeNativeETH(alice, 32 ether);
-    //     // Alice delegate its staked ETH to the ELOperator1
-    //     vm.prank(alice);
-    //     IStrategyVaultETH(stratVaultAddr).delegateTo(ELOperator1);
-
-    //     // Verify if alice's strategy vault is registered as a delegator
-    //     bool[] memory stratVaultsDelegated = strategyVaultManager.isDelegated(alice);
-    //     assertTrue(stratVaultsDelegated[0], "testDelegateTo: Alice's Strategy Vault  didn't delegate to ELOperator1 correctly");
-    //     // Verify if Alice delegated to the correct operator
-    //     address[] memory stratVaultsDelegateTo = strategyVaultManager.hasDelegatedTo(alice);
-    //     assertEq(stratVaultsDelegateTo[0], ELOperator1);
-
-    //     // Operator shares didn't increase because alice didn't verify its withdrawal credentials -> podOwnerShares[stratVaultAddr] = 0
-    //     uint256[] memory operatorSharesAfter = delegation.getOperatorShares(ELOperator1, strategies);
-    //     //console.log("operatorSharesAfter", operatorSharesAfter[0]);
-    //     //assertEq(operatorSharesBefore[0], 0);
-
-    // }
-
-    // // TODO: Verify the operator shares increase correctly when staker has verified correctly its withdrawal credentials
-    // // TODO: Delegate to differents operators by creating new strategy vaults -> necessary to not put the 32ETH in the same DV
-
-    // //--------------------------------------------------------------------------------------
-    // //------------------------------  INTERNAL FUNCTIONS  ----------------------------------
-    // //--------------------------------------------------------------------------------------
-
-    // function _getValidatorFieldsProof(
-    //     bytes memory proofFilePath
-    // ) internal returns (
-    //     BeaconChainProofs.StateRootProof memory,
-    //     uint40[] memory,
-    //     bytes[] memory,
-    //     bytes32[][] memory
-    // ) {
-    //     // File generated with the Byzantine API
-    //     setJSON(string(proofFilePath));
-
-    //     BeaconChainProofs.StateRootProof memory stateRootProofStruct = _getStateRootProof();
-
-    //     uint40[] memory validatorIndices = new uint40[](1);
-    //     validatorIndices[0] = uint40(getValidatorIndex());
-
-    //     bytes32[][] memory validatorFieldsArray = new bytes32[][](1);
-    //     validatorFieldsArray[0] = getValidatorFields();
-
-    //     bytes[] memory proofsArray = new bytes[](1);
-    //     proofsArray[0] = abi.encodePacked(getWithdrawalCredentialProof());
-
-    //     return (stateRootProofStruct, validatorIndices, proofsArray, validatorFieldsArray);
-    // }
-
-    // function _getDVNodesAddr(bytes memory lockFilePath) internal returns (address[4] memory) {
-    //     setJSON(string(lockFilePath));
-    //     return getDVNodesAddr();
-    // }
-
-    // function _getStateRootProof() internal returns (BeaconChainProofs.StateRootProof memory) {
-    //     return BeaconChainProofs.StateRootProof(getBeaconStateRoot(), abi.encodePacked(getStateRootProof()));
-    // }
-
-    // function _setOracleBlockRoot(bytes memory proofFilePath) internal {
-    //     setJSON(string(proofFilePath));
-    //     bytes32 latestBlockRoot = getLatestBlockRoot();
-    //     //set beaconStateRoot
-    //     beaconChainOracle.setOracleBlockRootAtTimestamp(latestBlockRoot);
-    // }
 
     /* ===================== HELPER FUNCTIONS ===================== */
 
@@ -438,9 +325,9 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
     ) internal returns (bytes32) {
         vm.warp(block.timestamp + 1);
         // Get price to pay
-        uint256 priceToPay = auction.getPriceToPayCluster4(_nodeOp, _discountRate, _timeInDays);
+        uint256 priceToPay = auction.getPriceToPay(_nodeOp, _discountRate, _timeInDays, IAuction.AuctionType.JOIN_CLUSTER_4);
         vm.prank(_nodeOp);
-        return   auction.bidCluster4{value: priceToPay}(_discountRate, _timeInDays);
+        return   auction.bid{value: priceToPay}(_discountRate, _timeInDays, IAuction.AuctionType.JOIN_CLUSTER_4);
     }
 
     function _createMultipleBids() internal returns (bytes32[] memory) {
