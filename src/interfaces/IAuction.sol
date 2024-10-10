@@ -306,8 +306,19 @@ interface IAuction {
      */
     function updateMaxDiscountRate(uint16 _newMaxDiscountRate) external;
 
+    /** 
+     * @notice Update the VC number of a node and the cluster status
+     * @param _clusterId: ID of the cluster
+     * @param _consumedVCs: number of VC to subtract
+     * @dev This function is callable only by the StakerRewards contract
+     */
+    function updateNodeVCNumber(bytes32 _clusterId, uint32 _consumedVCs) external;
+
     /// @dev Error when unauthorized call to a function callable only by a StratVaultETH.
     error OnlyStratVaultETH();
+
+    /// @dev Error when unauthorized call to a function callable only by a StakerRewards.
+    error OnlyStakerRewards();
 
     /// @dev Error when address already whitelisted
     error AlreadyWhitelisted();

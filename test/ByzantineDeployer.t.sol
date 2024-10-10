@@ -18,6 +18,7 @@ import "../src/tokens/ByzNft.sol";
 import "../src/core/Auction.sol";
 import "../src/vault/Escrow.sol";
 import "../src/core/StakerRewards.sol";
+import "../src/core/StakerRewards.sol";
 
 contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
 
@@ -39,6 +40,8 @@ contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
     uint256 public currentPoSDailyReturnWei = (uint256(32 ether) * 37) / (1000 * 365); // 3.7% APY --> 3243835616438356 WEI
     uint16 public maxDiscountRate = 15e2; // 15%
     uint160 public minValidationDuration = 30; // 30 days
+    // Initial StakerRewards parameters
+    uint256 public upkeepInterval = 60;
 
     /* =============== TEST VARIABLES AND STRUCT =============== */
    
@@ -145,10 +148,16 @@ contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
         Auction auctionImplementation = new Auction(
             escrow,
             strategyVaultManager,
-            pushSplitFactory
+            pushSplitFactory,
+            stakerRewards
         );
         Escrow escrowImplementation = new Escrow(
             stakerRewards,
+            auction
+        );
+        StakerRewards stakerRewardsImplementation = new StakerRewards(
+            strategyVaultManager,
+            escrow,
             auction
         );
         StakerRewards stakerRewardsImplementation = new StakerRewards();
@@ -194,7 +203,10 @@ contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
         byzantineProxyAdmin.upgradeAndCall(
             TransparentUpgradeableProxy(payable(address(stakerRewards))),
             address(stakerRewardsImplementation),
-            ""
+            abi.encodeWithSelector(
+                StakerRewards.initialize.selector,
+                upkeepInterval
+            )
         );
     }
 
