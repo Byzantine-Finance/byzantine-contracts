@@ -1,0 +1,10 @@
+{
+  "addresses": {
+    "lastAPI3OracleImplementation": "0x83f4bC3A6eB91A2c039416aA09009D5638D2AF7a",
+    "lastChainlinkOracleImplementation": "0x0D8005eE6948aEfEaD28eFBF8F5851d83d59bC33"
+  },
+  "chainInfo": {
+    "chainId": 17000,
+    "deploymentBlock": 2505421
+  }
+}
