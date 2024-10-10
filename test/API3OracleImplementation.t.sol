@@ -22,7 +22,7 @@ contract API3OracleImplementationTest is Test {
             price = 3000 * 1e18; // Mock price of $3000
         } else {
             // Fetch the price from the live contract
-            price = oracle.getPrice(address(0), oracle.ETH_USD_PROXY());
+            price = oracle.getPrice(address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE));
         }
 
         console.log("Current ETH/USD price: $", price / 1e18);

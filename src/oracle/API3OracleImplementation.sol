@@ -18,19 +18,19 @@ interface IProxy {
 contract API3OracleImplementation is IOracle, Ownable {
     error InvalidPrice();
     error StalePrice(uint256 timestamp);
-    error InvalidProxyAddress();
+    error InvalidAsset();
 
     uint256 public constant MAX_DELAY = 1 hours;  // Maximum acceptable delay
     address public ETH_USD_PROXY = 0xa47Fd122b11CdD7aad7c3e8B740FB91D83Ce43D1; // ETH/USD Proxy on Holesky
 
     /// @notice Get the price of an asset from an API3 dAPI
-    /// @param asset The asset to get the price of (unused in this implementation but kept for interface compatibility)
-    /// @param proxyAddress The address of the API3 dAPI proxy for the desired price feed
+    /// @param asset The asset to get the price of
     /// @return price The price of the asset with 18 decimal places
-    function getPrice(address asset, address proxyAddress) external view override returns (uint256) {
-        if (proxyAddress == address(0)) revert InvalidProxyAddress();
+    function getPrice(address asset) external view override returns (uint256) {
+        if (asset == address(0)) revert InvalidAsset();
         
         // If asset is the special ETH address, use the ETH/USD proxy
+        address proxyAddress;
         if (asset == 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE) {
             proxyAddress = ETH_USD_PROXY;
         }

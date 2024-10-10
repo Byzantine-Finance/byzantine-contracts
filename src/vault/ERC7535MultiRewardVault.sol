@@ -151,14 +151,14 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
     function totalAssets() public view override returns (uint256) {
         // Calculate value of native ETH
         uint256 ethBalance = _getETHBalance();
-        uint256 ethPrice = oracle.getPrice(address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE), address(0));
+        uint256 ethPrice = oracle.getPrice(address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE));
         uint256 totalValue = ethBalance * ethPrice;
         
         // Calculate value of reward tokens, add them to the total value
         for (uint i = 0; i < rewardTokens.length; i++) {
             address token = rewardTokens[i];
             uint256 balance = IERC20Upgradeable(token).balanceOf(address(this));
-            uint256 price = oracle.getPrice(address(token), address(0));
+            uint256 price = oracle.getPrice(token);
             totalValue += (balance * price);
         }
         
@@ -179,7 +179,7 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
         if (totalSupply() == 0) {
             return assets; // On first deposit, totalSupply is 0, so return assets (amount of ETH deposited) as shares
         } else {
-            uint256 ethPrice = oracle.getPrice(address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE), address(0));
+            uint256 ethPrice = oracle.getPrice(address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE));
             uint256 assetsUsdValue = assets * ethPrice / 1e18;
             return assetsUsdValue.mulDiv(supply, totalAssets(), rounding);
         }
@@ -195,7 +195,7 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
             return shares; // If there are no shares, return the number of shares as assets. TODO: Remove unnecessary code?
         } else {
             uint256 assetsUsdValue = shares.mulDiv(totalAssets(), supply, rounding);
-            uint256 ethPrice = oracle.getPrice(address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE), address(0));
+            uint256 ethPrice = oracle.getPrice(address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE));
             return assetsUsdValue * 1e18 / ethPrice;
         }
     }

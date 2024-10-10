@@ -24,11 +24,11 @@ contract ChainlinkOracleImplementation is IOracle {
     address public ETH_USD_PROXY = address(0); // ETH/USD Price Feed on Holesky (TODO: Change to price feed when it is deployed)
 
     /// @notice Get the price of an asset from a Chainlink price feed
-    /// @param asset The asset to get the price of (unused in this implementation but kept for interface compatibility)
-    /// @param priceFeed The address of the Chainlink price feed
+    /// @param asset The asset to get the price of
     /// @return price The price of the asset with 18 decimal places
-    function getPrice(address asset, address priceFeed) external view override returns (uint256) {
+    function getPrice(address asset) external view override returns (uint256) {
         // If asset is the special ETH address, use the ETH/USD proxy
+        address priceFeed;
         if (asset == 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE) {
             priceFeed = ETH_USD_PROXY;
         }

@@ -11,7 +11,7 @@ import "./mocks/EmptyContract.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
  
 contract MockOracle is IOracle {
-    function getPrice(address, address) external pure override returns (uint256) {
+    function getPrice(address) external pure override returns (uint256) {
         // Return $1000 USD with 18 decimal places
         return 1000 * 1e18;
     }
