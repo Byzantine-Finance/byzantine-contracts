@@ -33,8 +33,6 @@ contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
 
     // Byzantine Admin
     address public byzantineAdmin = address(this);
-    // Address which receives the bid of the winners (will be a smart contract in the future to distribute the rewards)
-    // address public bidReceiver = makeAddr("bidReceiver");
     // Address of the Beacon Chain Admin (allowed to activate DVs and submit Beacon Merkle Proofs)
     address public beaconChainAdmin = makeAddr("beaconChainAdmin");
     // Initial Auction parameters
@@ -153,7 +151,7 @@ contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
             stakerRewards
         );
         Escrow escrowImplementation = new Escrow(
-            address(stakerRewards),
+            stakerRewards,
             auction
         );
         StakerRewards stakerRewardsImplementation = new StakerRewards(
@@ -161,6 +159,7 @@ contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
             escrow,
             auction
         );
+        StakerRewards stakerRewardsImplementation = new StakerRewards();
 
         // Third, upgrade the proxy contracts to use the correct implementation contracts and initialize them.
         // Upgrade StrategyVaultManager

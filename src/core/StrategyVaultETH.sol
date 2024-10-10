@@ -82,7 +82,7 @@ contract StrategyVaultETH is StrategyVaultETHStorage, ERC7535MultiRewardVault {
        bool _whitelistedDeposit,
        bool _upgradeable,
        address _oracle
-    ) external initializer {
+    ) external override initializer {
 
         // Initialize parent contracts (ERC7535MultiRewardVault)
         __ERC7535MultiRewardVault_init(_oracle);
@@ -126,6 +126,7 @@ contract StrategyVaultETH is StrategyVaultETHStorage, ERC7535MultiRewardVault {
      */
     function deposit(uint256 assets, address receiver) public override(ERC7535MultiRewardVault, IERC7535Upgradeable) payable checkWhitelist returns (uint256) {
         _triggerAuction();
+        amountOfETH += assets;
         return super.deposit(assets, receiver);
     }
 
@@ -140,7 +141,43 @@ contract StrategyVaultETH is StrategyVaultETHStorage, ERC7535MultiRewardVault {
      */
     function mint(uint256 shares, address receiver) public override(ERC7535MultiRewardVault, IERC7535Upgradeable) payable checkWhitelist returns (uint256) {
         _triggerAuction();
-        return super.mint(shares, receiver);
+        uint256 assets = super.mint(shares, receiver);
+        amountOfETH += assets;
+        return assets;
+    }
+
+    /**
+     * @dev Verify one or more validators (DV) have their withdrawal credentials pointed at this StrategyVault's EigenPod, and award
+     * shares based on their effective balance. Proven validators are marked `ACTIVE` within the EigenPod, and
+     * future checkpoint proofs will need to include them.
+     * @dev Withdrawal credential proofs MUST NOT be older than `currentCheckpointTimestamp`.
+     * @dev Validators proven via this method MUST NOT have an exit epoch set already (i.e MUST NOT have initiated an exit).
+     * @param beaconTimestamp the beacon chain timestamp sent to the 4788 oracle contract. Corresponds
+     * to the parent beacon block root against which the proof is verified. MUST be greater than `currentCheckpointTimestamp` and
+     * included in the last 8192 (~27 hours) Beacon Blocks.
+     * @param stateRootProof proves a beacon state root against a beacon block root
+     * @param validatorIndices a list of validator indices being proven
+     * @param validatorFieldsProofs proofs of each validator's `validatorFields` against the beacon state root
+     * @param validatorFields the fields of the beacon chain "Validator" container. See consensus specs for
+     * details: https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/beacon-chain.md#validator
+     */
+    function verifyWithdrawalCredentials(
+        uint64 beaconTimestamp,
+        BeaconChainProofs.StateRootProof calldata stateRootProof,
+        uint40[] calldata validatorIndices,
+        bytes[] calldata validatorFieldsProofs,
+        bytes32[][] calldata validatorFields
+    ) external {
+
+        IEigenPod myPod = eigenPodManager.ownerToPod(address(this));
+
+        myPod.verifyWithdrawalCredentials(
+            beaconTimestamp,
+            stateRootProof,
+            validatorIndices,
+            validatorFieldsProofs,
+            validatorFields
+        );
     }
 
     /**
@@ -157,7 +194,7 @@ contract StrategyVaultETH is StrategyVaultETHStorage, ERC7535MultiRewardVault {
         delegationManager.queueWithdrawals(queuedWithdrawalParams);
 
         // Calculate the withdrawal delay
-        uint256 withdrawalDelay = delegationManager.getWithdrawalDelay(strategies);
+        //uint256 withdrawalDelay = delegationManager.getWithdrawalDelay(strategies);
 
         // Setup scheduled function call for finishWithdrawETH after withdrawal delay is finished.
         // TODO
@@ -238,57 +275,15 @@ contract StrategyVaultETH is StrategyVaultETHStorage, ERC7535MultiRewardVault {
     ) external onlyBeaconChainAdmin {
         if (!clusterIdsFIFO.exists(clusterId)) revert ClusterNotInVault();
 
-        // Change the cluster status to DEPOSITED_NOT_VERIFIED
-        auction.updateClusterStatus(clusterId, IAuction.ClusterStatus.DEPOSITED_NOT_VERIFIED);
-
         // Stake the native ETH in the Beacon Chain
         eigenPodManager.stake{value: 32 ether}(pubkey, signature, depositDataRoot);
 
+        // Change the cluster status to DEPOSITED and set the cluster pubkey hash
+        auction.updateClusterStatus(clusterId, IAuction.ClusterStatus.DEPOSITED);
+        auction.setClusterPubKey(clusterId, pubkey);
+        
         // Call dvActivationCheckpoint
         stakerRewards.dvActivationCheckpoint(address(this), clusterId);
-    }
-
-    /**
-     * @notice This function verifies that the withdrawal credentials of the Distributed Validator(s) owned by
-     * the stratVaultOwner are pointed to the EigenPod of this contract. It also verifies the effective balance of the DV.
-     * It verifies the provided proof of the ETH DV against the beacon chain state root, marks the validator as 'active'
-     * in EigenLayer, and credits the restaked ETH in Eigenlayer.
-     * @param proofTimestamp is the exact timestamp where the proof was generated
-     * @param stateRootProof proves a `beaconStateRoot` against a block root fetched from the oracle
-     * @param validatorIndices is the list of indices of the validators being proven, refer to consensus specs
-     * @param validatorFieldsProofs proofs against the `beaconStateRoot` for each validator in `validatorFields`
-     * @param validatorFields are the fields of the "Validator Container", refer to consensus specs for details: 
-     * https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/beacon-chain.md#validator
-     * @dev That function must be called for a validator which is "INACTIVE".
-     * @dev The timestamp used to generate the Beacon Block Root is `block.timestamp - FINALITY_TIME` to be sure
-     * that the Beacon Block is finalized.
-     * @dev The arguments can be generated with the Byzantine API.
-     * @dev /!\ The Withdrawal credential proof must be recent enough to be valid (no older than VERIFY_BALANCE_UPDATE_WINDOW_SECONDS).
-     * It entails to re-generate a proof every 4.5 hours.
-     */
-    function verifyWithdrawalCredentials(
-        uint64 proofTimestamp,
-        BeaconChainProofs.StateRootProof calldata stateRootProof,
-        uint40[] calldata validatorIndices,
-        bytes[] calldata validatorFieldsProofs,
-        bytes32[][] calldata validatorFields
-    ) external onlyNftOwner {
-
-        IEigenPod myPod = eigenPodManager.ownerToPod(address(this));
-
-        myPod.verifyWithdrawalCredentials(
-            proofTimestamp,
-            stateRootProof,
-            validatorIndices,
-            validatorFieldsProofs,
-            validatorFields
-        );
-
-        // Update DV Status to ACTIVE_AND_VERIFIED
-        // clusterDetails.dvStatus = DVStatus.ACTIVE_AND_VERIFIED;
-
-        // Update the amount of tokens that the StrategyVault is delegating.
-        // delegationManager.increaseDelegatedShares(address(this), strategy, amount);
     }
 
     /* ============== VAULT CREATOR FUNCTIONS ============== */
@@ -368,5 +363,11 @@ contract StrategyVaultETH is StrategyVaultETHStorage, ERC7535MultiRewardVault {
 
     function _burnVaultShares(uint256 amount, address receiver) internal {
         super.withdraw(amount, receiver, msg.sender);
+        amountOfETH -= amount;
+    }
+
+    // Returns the manually tracked amountOfETH instead of relying in address(this).balance
+    function _getETHBalance() internal view override returns (uint256) {
+        return amountOfETH;
     }
 }

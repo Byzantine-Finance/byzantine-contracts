@@ -21,26 +21,18 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
 
     /* ============== STATE VARIABLES ============== */
 
-    /// @notice Struct to store token information
-    struct TokenInfo {
-        address priceFeed;
-        uint8 decimals;
-    }
-
-    /// @notice Mapping of asset token address to its information
-    mapping(IERC20Upgradeable => TokenInfo) public assetInfo;
-
-    /// @notice Mapping of reward token address to its information
-    mapping(IERC20Upgradeable => TokenInfo) public rewardInfo;
-
-    // /// @notice List of asset tokens
-    // IERC20Upgradeable[] public assetTokens;
-
     /// @notice List of reward tokens
-    IERC20Upgradeable[] public rewardTokens;
+    address[] public rewardTokens;
 
     /// @notice Oracle implementation
     IOracle public oracle;
+
+    /**
+     * @dev This empty reserved space is put in place to allow future versions to add new
+     * variables without shifting down storage in the inheritance chain.
+     * See https://docs.openzeppelin.com/upgrades-plugins/1.x/writing-upgradeable#modifying-your-contracts
+     */
+    uint256[44] private __gap;
 
     /* ============== CUSTOM ERRORS ============== */
     error ETHTransferFailedOnWithdrawal();
@@ -48,19 +40,20 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
     error InvalidAddress();
 
     /* ============== EVENTS ============== */
-
-    //event AssetTokenAdded(IERC20Upgradeable indexed token, address priceFeed, uint8 decimals);
-    event RewardTokenAdded(IERC20Upgradeable indexed token, address priceFeed, uint8 decimals);
-    event PriceFeedUpdated(IERC20Upgradeable indexed token, address newPriceFeed);
+    event RewardTokenAdded(address indexed token);
     event OracleUpdated(address newOracle);
-    event RewardTokenWithdrawn(address indexed receiver, IERC20Upgradeable indexed rewardToken, uint256 amount);
+    event RewardTokenWithdrawn(address indexed receiver, address indexed rewardToken, uint256 amount);
     
     /* ============== CONSTRUCTOR & INITIALIZER ============== */
 
     /**
-     * @notice Used to initialize the ERC7535MultiRewardVault given it's setup parameters.
+     * @notice Initializes the ERC7535MultiRewardVault contract.
      * @param _oracle The oracle implementation address to use for the vault.
      */
+    function initialize(address _oracle) public virtual initializer {
+        __ERC7535MultiRewardVault_init(_oracle);
+    }
+
     function __ERC7535MultiRewardVault_init(address _oracle) internal onlyInitializing {
         __ERC7535_init();
         __ERC20_init("ETH Byzantine StrategyVault Token", "byzETH");
@@ -129,62 +122,17 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
         return assets;
     }
 
-    // /**
-    //  * @notice Adds an asset token to the vault.
-    //  * @param _token The asset token to add.
-    //  * @param _priceFeed The price feed address for the token.
-    //  */ 
-    // function addAssetToken(IERC20Upgradeable _token, address _priceFeed) external onlyOwner {
-    //     if (assetInfo[_token].priceFeed != address(0)) revert TokenAlreadyAdded();
-        
-    //     uint8 decimals = IERC20MetadataUpgradeable(address(_token)).decimals();
-    //     assetInfo[_token] = TokenInfo({
-    //         priceFeed: _priceFeed,
-    //         decimals: decimals
-    //     });
-    //     assetTokens.push(_token);
-
-    //     emit AssetTokenAdded(_token, _priceFeed, decimals);
-    // }
-
     /**
      * @notice Adds a reward token to the vault.
      * @param _token The reward token to add.
-     * @param _priceFeed The price feed address for the token.
      */
-    function addRewardToken(IERC20Upgradeable _token, address _priceFeed) external onlyOwner {
-        if (rewardInfo[_token].priceFeed != address(0)) revert TokenAlreadyAdded();
-        
-        uint8 decimals = IERC20MetadataUpgradeable(address(_token)).decimals();
-        rewardInfo[_token] = TokenInfo({
-            priceFeed: _priceFeed,
-            decimals: decimals
-        });
+    function addRewardToken(address _token) external onlyOwner {
+        // Check if the token is already in the rewardTokens array
+        for (uint i = 0; i < rewardTokens.length; i++) {
+            if (rewardTokens[i] == _token) revert TokenAlreadyAdded();
+        }
         rewardTokens.push(_token);
-
-        emit RewardTokenAdded(_token, _priceFeed, decimals);
-    }
-
-    /**
-     * @notice Updates the oracle address for an asset token.
-     * @param _token The asset token to update.
-     * @param _newPriceFeed The new price feed address for the token.
-     */
-    function updateAssetPriceFeed(IERC20Upgradeable _token, address _newPriceFeed) external onlyOwner {
-        if (assetInfo[_token].priceFeed == address(0)) revert InvalidAddress();
-        assetInfo[_token].priceFeed = _newPriceFeed;
-        emit PriceFeedUpdated(_token, _newPriceFeed);
-    }
-
-    /**
-     * @notice Updates the oracle address for a reward token.
-     * @param _token The reward token to update.
-     * @param _newPriceFeed The new price feed address for the token.
-     */
-    function updateRewardPriceFeed(IERC20Upgradeable _token, address _newPriceFeed) external onlyOwner {
-        if (rewardInfo[_token].priceFeed == address(0)) revert InvalidAddress();
-        rewardInfo[_token].priceFeed = _newPriceFeed;
-        emit PriceFeedUpdated(_token, _newPriceFeed);
+        emit RewardTokenAdded(_token);
     }
 
     /**
@@ -204,24 +152,24 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
      * @return The total value of assets in the vault.
      * @dev This function is overridden to integrate with an oracle to determine the total value of all tokens in the vault.
      * @dev This ensures that when depositing or withdrawing, a user receives the correct amount of assets or shares.
+     * @dev Allows for assets to be priced in USD, ETH or any other asset, as long as the oracles are updated accordingly and uniformly.
+     * @dev Assumes that the oracle returns the price in 18 decimals.
      */
     function totalAssets() public view override returns (uint256) {
-        // Calculate value of assets (native ETH)
-        uint256 assetAmount = address(this).balance;
-        address asset = address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE); // Native ETH
-        TokenInfo memory ethInfo = assetInfo[IERC20MetadataUpgradeable(asset)];
-        uint256 totalValue = assetAmount * oracle.getPrice(asset, ethInfo.priceFeed);
+        // Calculate value of native ETH
+        uint256 ethBalance = _getETHBalance();
+        uint256 ethPrice = oracle.getPrice(address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE));
+        uint256 totalValue = ethBalance * ethPrice;
         
-        // Calculate value of reward tokens
+        // Calculate value of reward tokens, add them to the total value
         for (uint i = 0; i < rewardTokens.length; i++) {
-            IERC20Upgradeable token = rewardTokens[i];
-            uint256 balance = token.balanceOf(address(this));
-            TokenInfo memory tokenInfo = rewardInfo[token];
-            uint256 price = oracle.getPrice(address(token), tokenInfo.priceFeed);
-            totalValue += (balance * price) / (10 ** tokenInfo.decimals);
+            address token = rewardTokens[i];
+            uint256 balance = IERC20Upgradeable(token).balanceOf(address(this));
+            uint256 price = oracle.getPrice(token);
+            totalValue += (balance * price);
         }
         
-        return totalValue;
+        return totalValue / 1e18;
     }
 
     /* ============== INTERNAL FUNCTIONS ============== */
@@ -229,15 +177,19 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
     /**
      * @dev Internal conversion function (from assets to shares) with support for rounding direction.
      * @dev This function is overriden to calculate total value of assets including reward tokens.
-     *
+     * @dev Treats totalAssets() as the total value of ETH + reward tokens in USD rather than the total amount of ETH.
      * Will revert if assets > 0, totalSupply > 0 and totalAssets = 0. That corresponds to a case where any asset
      * would represent an infinite amout of shares.
      */
     function _convertToShares(uint256 assets, MathUpgradeable.Rounding rounding) internal view override returns (uint256 shares) {
-        uint256 supply = totalSupply();
-        return (supply == 0)
-            ? assets
-            : assets.mulDiv(supply, totalAssets(), rounding);
+        uint256 supply = totalSupply() + 10 ** _decimalsOffset(); // Supply includes virtual reserves
+        if (totalSupply() == 0) {
+            return assets; // On first deposit, totalSupply is 0, so return assets (amount of ETH deposited) as shares
+        } else {
+            uint256 ethPrice = oracle.getPrice(address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE));
+            uint256 assetsUsdValue = assets * ethPrice / 1e18;
+            return assetsUsdValue.mulDiv(supply, totalAssets(), rounding);
+        }
     }
     
     /**
@@ -245,10 +197,14 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
      * @dev This function is overriden to calculate total value of assets including reward tokens.
      */
     function _convertToAssets(uint256 shares, MathUpgradeable.Rounding rounding) internal view override returns (uint256 assets) {
-        uint256 supply = totalSupply();
-        return (supply == 0)
-            ? shares
-            : shares.mulDiv(totalAssets(), supply, rounding);
+        uint256 supply = totalSupply() + 10 ** _decimalsOffset(); // Supply includes virtual reserves
+        if (totalSupply() == 0) {
+            return shares; // If there are no shares, return the number of shares as assets. TODO: Remove unnecessary code?
+        } else {
+            uint256 assetsUsdValue = shares.mulDiv(totalAssets(), supply, rounding);
+            uint256 ethPrice = oracle.getPrice(address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE));
+            return assetsUsdValue * 1e18 / ethPrice;
+        }
     }
 
     /**
@@ -259,13 +215,21 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
     function _distributeRewards(address receiver, uint256 sharesBurned) internal {
         uint256 totalShares = totalSupply();
         for (uint i = 0; i < rewardTokens.length; i++) {
-            IERC20Upgradeable rewardToken = rewardTokens[i];
-            uint256 rewardBalance = rewardToken.balanceOf(address(this));
+            address rewardToken = rewardTokens[i];
+            uint256 rewardBalance = IERC20Upgradeable(rewardToken).balanceOf(address(this));
             uint256 rewardAmount = (rewardBalance * sharesBurned) / totalShares;
             if (rewardAmount > 0) {
-                rewardToken.safeTransfer(receiver, rewardAmount);
+                IERC20Upgradeable(rewardToken).safeTransfer(receiver, rewardAmount);
                 emit RewardTokenWithdrawn(receiver, rewardToken, rewardAmount);
             }
         }
+    }
+
+    /**
+     * @dev Returns the ETH balance of the vault.
+     * @return The ETH balance of the vault.
+     */
+    function _getETHBalance() internal view virtual returns (uint256) {
+        return address(this).balance;
     }
 }

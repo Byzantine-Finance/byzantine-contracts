@@ -11,7 +11,6 @@ import "eigenlayer-contracts/interfaces/IDelegationManager.sol";
 import "eigenlayer-contracts/core/DelegationManager.sol";
 
 import "eigenlayer-contracts/interfaces/IETHPOSDeposit.sol";
-import "eigenlayer-contracts/interfaces/IBeaconChainOracle.sol";
 
 import "eigenlayer-contracts/core/StrategyManager.sol";
 import "eigenlayer-contracts/strategies/StrategyBase.sol";
@@ -19,13 +18,11 @@ import "eigenlayer-contracts/core/Slasher.sol";
 
 import "eigenlayer-contracts/pods/EigenPod.sol";
 import "eigenlayer-contracts/pods/EigenPodManager.sol";
-import "eigenlayer-contracts/pods/DelayedWithdrawalRouter.sol";
 
 import "eigenlayer-contracts/permissions/PauserRegistry.sol";
 
 import "../mocks/EmptyContract.sol";
 import "../mocks/ETHDepositMock.sol";
-import "../mocks/BeaconChainOracleMock.sol";
 
 import "forge-std/Test.sol";
 
@@ -41,7 +38,6 @@ contract EigenLayerDeployer is Test {
     StrategyManager public strategyManager;
     EigenPodManager public eigenPodManager;
     IEigenPod public pod;
-    IDelayedWithdrawalRouter public delayedWithdrawalRouter;
     IETHPOSDeposit public ethPOSDeposit;
     IBeacon public eigenPodBeacon;
 
@@ -52,7 +48,6 @@ contract EigenLayerDeployer is Test {
     StrategyBase public eigenStrat;
     StrategyBase public baseStrategyImplementation;
     EmptyContract public emptyContract;
-    BeaconChainOracleMock public beaconChainOracle;
 
     mapping(uint256 => IStrategy) public strategies;
 
@@ -74,11 +69,13 @@ contract EigenLayerDeployer is Test {
     address[] public slashingContracts;
 
     uint256 wethInitialSupply = 10e50;
+    uint256 public constant eigenTotalSupply = 1000e18;
     IStrategy[] public initializeStrategiesToSetDelayBlocks;
     uint256[] public initializeWithdrawalDelayBlocks;
     uint256 minWithdrawalDelayBlocks = 0;
     uint32 PARTIAL_WITHDRAWAL_FRAUD_PROOF_PERIOD_BLOCKS = 7 days / 12 seconds;
     uint64 MAX_RESTAKED_BALANCE_GWEI_PER_VALIDATOR = 32e9;
+    uint64 MAX_PARTIAL_WTIHDRAWAL_AMOUNT_GWEI = 1 ether / 1e9;
     uint64 GOERLI_GENESIS_TIME = 1616508000;
 
     address pauser;
@@ -97,9 +94,7 @@ contract EigenLayerDeployer is Test {
     address strategyManagerAddress;
     address eigenPodManagerAddress;
     address podAddress;
-    address delayedWithdrawalRouterAddress;
     address eigenPodBeaconAddress;
-    address beaconChainOracleAddress;
     address emptyContractAddress;
     address operationsMultisig;
     address executorMultisig;
@@ -160,16 +155,11 @@ contract EigenLayerDeployer is Test {
         eigenPodManager = EigenPodManager(
             address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenLayerProxyAdmin), ""))
         );
-        delayedWithdrawalRouter = DelayedWithdrawalRouter(
-            address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenLayerProxyAdmin), ""))
-        );
 
         ethPOSDeposit = new ETHPOSDepositMock();
         pod = new EigenPod(
             ethPOSDeposit,
-            delayedWithdrawalRouter,
             eigenPodManager,
-            MAX_RESTAKED_BALANCE_GWEI_PER_VALIDATOR,
             GOERLI_GENESIS_TIME
         );
 
@@ -186,9 +176,6 @@ contract EigenLayerDeployer is Test {
             slasher,
             delegation
         );
-
-        beaconChainOracle = new BeaconChainOracleMock();
-        DelayedWithdrawalRouter delayedWithdrawalRouterImplementation = new DelayedWithdrawalRouter(eigenPodManager);
 
         // Third, upgrade the proxy contracts to use the correct implementation contracts and initialize them.
         eigenLayerProxyAdmin.upgradeAndCall(
@@ -230,23 +217,9 @@ contract EigenLayerDeployer is Test {
             address(eigenPodManagerImplementation),
             abi.encodeWithSelector(
                 EigenPodManager.initialize.selector,
-                beaconChainOracle,
                 eigenLayerReputedMultisig,
                 eigenLayerPauserReg,
                 0 /*initialPausedStatus*/
-            )
-        );
-        uint256 initPausedStatus = 0;
-        uint256 withdrawalDelayBlocks = PARTIAL_WITHDRAWAL_FRAUD_PROOF_PERIOD_BLOCKS;
-        eigenLayerProxyAdmin.upgradeAndCall(
-            TransparentUpgradeableProxy(payable(address(delayedWithdrawalRouter))),
-            address(delayedWithdrawalRouterImplementation),
-            abi.encodeWithSelector(
-                DelayedWithdrawalRouter.initialize.selector,
-                eigenLayerReputedMultisig,
-                eigenLayerPauserReg,
-                initPausedStatus,
-                withdrawalDelayBlocks
             )
         );
 
