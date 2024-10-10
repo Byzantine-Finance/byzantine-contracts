@@ -4,7 +4,6 @@ pragma solidity ^0.8.20;
 import {IByzNft} from "../interfaces/IByzNft.sol";
 import {IStrategyVaultManager} from "../interfaces/IStrategyVaultManager.sol";
 import {IAuction} from "../interfaces/IAuction.sol";
-import {IStakerRewards} from "../interfaces/IStakerRewards.sol";
 import {IEigenPodManager} from "eigenlayer-contracts/interfaces/IEigenPodManager.sol";
 import {IEigenPod} from "eigenlayer-contracts/interfaces/IEigenPod.sol";
 import {IDelegationManager} from "eigenlayer-contracts/interfaces/IDelegationManager.sol";

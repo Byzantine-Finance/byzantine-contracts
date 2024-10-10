@@ -116,7 +116,6 @@ contract Deploy_Holesky_From_Scratch is ExistingDeploymentParser {
         );
 
         // Third, upgrade the proxy contracts to use the correct implementation contracts and initialize them.
-        // Third, upgrade the proxy contracts to use the correct implementation contracts and initialize them.
         // Upgrade StrategyVaultManager
         byzantineProxyAdmin.upgradeAndCall(
             TransparentUpgradeableProxy(payable(address(strategyVaultManager))),

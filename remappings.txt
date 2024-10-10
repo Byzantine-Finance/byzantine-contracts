@@ -5,5 +5,4 @@ eigenlayer-contracts/=lib/eigenlayer-contracts/src/contracts/
 splits-v2/=lib/splits-contracts-v2/packages/splits-v2/src/
 ds-test/=lib/ds-test/src/
 forge-std/=lib/forge-std/src/
-ds-math/=lib/ds-math/src/
 chainlink/=lib/foundry-chainlink-toolkit/lib/chainlink-brownie-contracts/contracts/src/

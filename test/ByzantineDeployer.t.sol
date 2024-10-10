@@ -18,7 +18,6 @@ import "../src/tokens/ByzNft.sol";
 import "../src/core/Auction.sol";
 import "../src/vault/Escrow.sol";
 import "../src/core/StakerRewards.sol";
-import "../src/core/StakerRewards.sol";
 
 contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
 
