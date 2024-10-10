@@ -21,16 +21,16 @@ contract ChainlinkOracleImplementation is IOracle {
     error PriceTooOld(uint256 timestamp);
 
     uint256 public constant MAX_DELAY = 1 hours;  // Maximum acceptable delay
-    address public ETH_USD_PROXY = address(0); // ETH/USD Price Feed on Holesky (TODO: Change to price feed when it is deployed)
+    address public constant ETH_USD_PRICE_FEED = address(0); // ETH/USD Price Feed on Holesky (TODO: Change to price feed when it is deployed)
 
     /// @notice Get the price of an asset from a Chainlink price feed
     /// @param asset The asset to get the price of
     /// @return price The price of the asset with 18 decimal places
     function getPrice(address asset) external view override returns (uint256) {
-        // If asset is the special ETH address, use the ETH/USD proxy
+        // If asset is the special ETH address, use the ETH/USD price feed
         address priceFeed;
         if (asset == 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE) {
-            priceFeed = ETH_USD_PROXY;
+            priceFeed = ETH_USD_PRICE_FEED;
         }
 
         // Get price data from the feed
