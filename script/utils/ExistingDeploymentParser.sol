@@ -12,7 +12,6 @@ import {ByzNft} from "../../src/tokens/ByzNft.sol";
 import {Auction} from "../../src/core/Auction.sol";
 import {Escrow} from "../../src/vault/Escrow.sol";
 import {StakerRewards} from "../../src/core/StakerRewards.sol";
-import {StakerRewards} from "../../src/core/StakerRewards.sol";
 
 import {EigenPodManager} from "eigenlayer-contracts/pods/EigenPodManager.sol";
 import {DelegationManager} from "eigenlayer-contracts/core/DelegationManager.sol";
@@ -115,8 +114,6 @@ contract ExistingDeploymentParser is Script, Test {
         stakerRewardsImplementation = StakerRewards(payable(stdJson.readAddress(contractsAddressesData, ".addresses.stakerRewardsImplementation")));
         escrow = Escrow(payable(stdJson.readAddress(contractsAddressesData, ".addresses.escrow")));
         escrowImplementation = Escrow(payable(stdJson.readAddress(contractsAddressesData, ".addresses.escrowImplementation")));
-        stakerRewards = StakerRewards(payable(stdJson.readAddress(contractsAddressesData, ".addresses.stakerRewards")));
-        stakerRewardsImplementation = StakerRewards(payable(stdJson.readAddress(contractsAddressesData, ".addresses.stakerRewardsImplementation")));
         strategyVaultETHBeacon = UpgradeableBeacon(stdJson.readAddress(contractsAddressesData, ".addresses.strategyVaultETHBeacon"));
         strategyVaultERC20Beacon = UpgradeableBeacon(stdJson.readAddress(contractsAddressesData, ".addresses.strategyVaultERC20Beacon"));
         strategyVaultETHImplementation = StrategyVaultETH(payable(stdJson.readAddress(contractsAddressesData, ".addresses.strategyVaultETHImplementation")));
@@ -319,7 +316,6 @@ contract ExistingDeploymentParser is Script, Test {
         require(auction.maxDiscountRate() == MAX_DISCOUNT_RATE, "auction: maxDiscountRate not set correctly");
         require(auction.minDuration() == MIN_VALIDATION_DURATION, "auction: minDuration not set correctly");
         // StakerRewards
-        require(stakerRewards.owner() == byzantineAdmin, "stakerRewards: owner not set correctly");
         require(stakerRewards.upkeepInterval() == UPKEEP_INTERVAL, "stakerRewards: upkeepInterval not set correctly");
     }
 
@@ -378,7 +374,7 @@ contract ExistingDeploymentParser is Script, Test {
 
         // serialize all the data
         vm.serializeString(parent_object, deployed_addresses, deployed_addresses_output);
-        // vm.serializeString(parent_object, parameters, parameters_output);
+        vm.serializeString(parent_object, parameters, parameters_output);
         string memory finalJson = vm.serializeString(parent_object, chain_info, chain_info_output);
 
         vm.writeJson(finalJson, outputPath);

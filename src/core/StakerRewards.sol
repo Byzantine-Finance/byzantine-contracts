@@ -81,9 +81,6 @@ contract StakerRewards is
         _disableInitializers();
     }
 
-    /**
-     * @dev Initializes the address of the initial owner
-     */
     function initialize(uint256 _upkeepInterval) external initializer {
         __ReentrancyGuard_init();
         upkeepInterval = _upkeepInterval;

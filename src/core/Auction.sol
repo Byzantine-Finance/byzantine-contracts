@@ -398,6 +398,7 @@ contract Auction is
      * @param _clusterId: ID of the cluster
      * @param _consumedVCs: number of VC to subtract
      * @dev This function is callable only by the StakerRewards contract
+     * TODO: add a try catch to handle the case where consumedVCs is greater than currentVCs
      */
     function updateNodeVCNumber(bytes32 _clusterId, uint32 _consumedVCs) external onlyStakerRewards {
         ClusterDetails storage clusterDetails = _clusterDetails[_clusterId];
