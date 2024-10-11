@@ -106,7 +106,7 @@ contract Deploy_Holesky_From_Scratch is ExistingDeploymentParser {
             stakerRewards
         );
         escrowImplementation = new Escrow(
-            address(stakerRewards),
+            stakerRewards,
             auction
         );
         stakerRewardsImplementation = new StakerRewards(

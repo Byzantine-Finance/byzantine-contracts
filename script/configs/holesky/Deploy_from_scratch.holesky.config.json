@@ -9,8 +9,8 @@
   },
   "stakerRewardsConfig": {
     "upkeepInterval": 60
-  },  
-  "beaconChainAdmin": "0x9c475A3FB5E0ee61B049516b7e1186Cc3F1362C0",
+  },
+  "beaconChainAdmin": "0x5c27a880ec9024F006A70B8f1fB91b82d94ef4D4",
   "eigenLayerContractAddr": {
     "eigenPodManager": "0x30770d7E3e71112d7A6b7259542D1f680a70e315",
     "delegation": "0xA44151489861Fe9e3055d95adC98FbD462B948e7",

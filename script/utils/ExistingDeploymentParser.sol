@@ -58,8 +58,6 @@ contract ExistingDeploymentParser is Script, Test {
 
     // Byzantine Admin
     address byzantineAdmin;
-    // Address which receives the bid of the winners (will be a smart contract in the future to distribute the rewards)
-    // address bidReceiver;
     // Initial Auction parameters
     uint256 EXPECTED_POS_DAILY_RETURN_WEI;
     uint16 MAX_DISCOUNT_RATE;
@@ -113,6 +111,8 @@ contract ExistingDeploymentParser is Script, Test {
         byzNftImplementation = ByzNft(stdJson.readAddress(contractsAddressesData, ".addresses.byzNftImplementation"));
         byzantineProxyAdmin = ProxyAdmin(stdJson.readAddress(contractsAddressesData, ".addresses.byzantineProxyAdmin"));
         emptyContract = EmptyContract(stdJson.readAddress(contractsAddressesData, ".addresses.emptyContract"));
+        stakerRewards = StakerRewards(payable(stdJson.readAddress(contractsAddressesData, ".addresses.stakerRewards")));
+        stakerRewardsImplementation = StakerRewards(payable(stdJson.readAddress(contractsAddressesData, ".addresses.stakerRewardsImplementation")));
         escrow = Escrow(payable(stdJson.readAddress(contractsAddressesData, ".addresses.escrow")));
         escrowImplementation = Escrow(payable(stdJson.readAddress(contractsAddressesData, ".addresses.escrowImplementation")));
         stakerRewards = StakerRewards(payable(stdJson.readAddress(contractsAddressesData, ".addresses.stakerRewards")));
@@ -224,7 +224,7 @@ contract ExistingDeploymentParser is Script, Test {
         );
         // Escrow
         require(
-            escrow.stakerRewards() == address(stakerRewards),
+            escrow.stakerRewards() == stakerRewards,
             "escrow: stakerRewards address not set correctly"
         );
         require(
@@ -315,15 +315,19 @@ contract ExistingDeploymentParser is Script, Test {
         require(byzNft.owner() == address(strategyVaultManager), "byzNft: owner not set correctly");
         // Auction
         require(auction.owner() == byzantineAdmin, "auction: owner not set correctly");
+        require(auction.expectedDailyReturnWei() == EXPECTED_POS_DAILY_RETURN_WEI, "auction: expectedDailyReturnWei not set correctly");
+        require(auction.maxDiscountRate() == MAX_DISCOUNT_RATE, "auction: maxDiscountRate not set correctly");
+        require(auction.minDuration() == MIN_VALIDATION_DURATION, "auction: minDuration not set correctly");
         // StakerRewards
         require(stakerRewards.owner() == byzantineAdmin, "stakerRewards: owner not set correctly");
-        // Cannot verify _expectedDailyReturnWei, _maxDiscountRate, _minDuration,_clusterSize as it is private variables
+        require(stakerRewards.upkeepInterval() == UPKEEP_INTERVAL, "stakerRewards: upkeepInterval not set correctly");
     }
 
     function logInitialDeploymentParams() public {
         emit log_string("==== Parsed Initilize Params for Initial Deployment ====");
 
         emit log_named_address("byzantineAdmin", byzantineAdmin);
+        emit log_named_address("beaconChainAdmin", beaconChainAdmin);
 
         emit log_named_uint("EXPECTED_POS_DAILY_RETURN_WEI", EXPECTED_POS_DAILY_RETURN_WEI);
         emit log_named_uint("MAX_DISCOUNT_RATE", MAX_DISCOUNT_RATE);
@@ -366,8 +370,7 @@ contract ExistingDeploymentParser is Script, Test {
 
         string memory parameters = "parameters";
         vm.serializeAddress(parameters, "byzantineAdmin", byzantineAdmin);
-        vm.serializeAddress(parameters, "beaconChainAdmin", beaconChainAdmin);
-        // string memory parameters_output = vm.serializeAddress(parameters, "bidReceiver", bidReceiver);
+        string memory parameters_output = vm.serializeAddress(parameters, "beaconChainAdmin", beaconChainAdmin);
 
         string memory chain_info = "chainInfo";
         vm.serializeUint(chain_info, "deploymentBlock", block.number);
