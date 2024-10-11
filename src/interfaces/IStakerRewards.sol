@@ -8,9 +8,9 @@ interface IStakerRewards {
     /// @notice Checkpoint updated at every new event
     struct Checkpoint {
         uint256 updateTime;
-        uint256 totalVCs;
         uint256 totalPendingRewards;
         uint256 dailyRewardsPer32ETH; // Daily rewards distributed for every 32ETH staked
+        uint64 totalVCs;
     }
 
     /// @notice Record every cluster at dvCreationCheckpoint
@@ -24,7 +24,7 @@ interface IStakerRewards {
     /// @notice Record every StratVaultETH at dvActivationCheckpoint
     struct VaultData {
         uint256 lastUpdate;
-        uint256 numValidatorsInVault;
+        uint16 numValidatorsInVault;
     }
 
     /* ============== EXTERNAL FUNCTIONS ============== */
