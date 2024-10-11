@@ -270,7 +270,7 @@ contract Auction is
         bytes32 _bidId,
         uint16 _newDiscountRate,
         uint32 _newTimeInDays
-    ) external payable nonReentrant returns (bytes32 newBidId) {
+    ) external payable nonReentrant {
         // Verify if the sender update one of its bids
         if (_bidDetails[_bidId].nodeOp != msg.sender) revert SenderNotBidder();
 
@@ -294,23 +294,15 @@ contract Auction is
             newBidPrice = ByzantineAuctionMath.calculateBidPrice(_newTimeInDays, newDailyVcPrice);
             newAuctionScore = ByzantineAuctionMath.calculateAuctionScore(newDailyVcPrice, _newTimeInDays, reputationScore);
 
-            // Calculate the bid ID (hash(msg.sender, timestamp, bidType))
-            newBidId = keccak256(abi.encodePacked(msg.sender, block.timestamp, _CLUSTER_SIZE_4));
-
             // Update the cluster 4 sub-auction tree
             _dv4AuctionTree.remove(_bidId, bidToUpdate.auctionScore);
-            _dv4AuctionTree.insert(newBidId, newAuctionScore);
+            _dv4AuctionTree.insert(_bidId, newAuctionScore);
 
             // Update the bids mapping
-            delete _bidDetails[_bidId];
-            _bidDetails[newBidId] = BidDetails({
-                auctionScore: newAuctionScore,
-                bidPrice: newBidPrice,
-                nodeOp: msg.sender,
-                vcNumber: _newTimeInDays,
-                discountRate: _newDiscountRate,
-                auctionType: AuctionType.JOIN_CLUSTER_4
-            });
+            _bidDetails[_bidId].auctionScore = newAuctionScore;
+            _bidDetails[_bidId].bidPrice = newBidPrice;
+            _bidDetails[_bidId].vcNumber = _newTimeInDays;
+            _bidDetails[_bidId].discountRate = _newDiscountRate;
 
             // Update main auction if:
             //      1. The new bid auction score is higher than the current sub-auction latest winning score
@@ -340,7 +332,7 @@ contract Auction is
             escrow.refund(msg.sender, priceDiff);
         }
 
-        emit BidUpdated(msg.sender, _bidId, newBidId, _newDiscountRate, _newTimeInDays, newBidPrice, newAuctionScore);
+        emit BidUpdated(msg.sender, _bidId, _newDiscountRate, _newTimeInDays, newBidPrice, newAuctionScore);
 
     }
 

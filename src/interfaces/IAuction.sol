@@ -100,8 +100,7 @@ interface IAuction {
     /// @notice Emitted when a bid is updated
     event BidUpdated(
         address indexed nodeOpAddr,
-        bytes32 indexed oldBidId,
-        bytes32 newBidId,
+        bytes32 indexed bidId,
         uint16 newDiscountRate,
         uint32 newDuration,
         uint256 newBidPrice,
@@ -249,7 +248,7 @@ interface IAuction {
         bytes32 _bidId,
         uint16 _newDiscountRate,
         uint32 _newTimeInDays
-    ) external payable returns (bytes32);
+    ) external payable;
 
     /**
      * @notice Allow a node operator to withdraw a specific bid (through its bidId).
