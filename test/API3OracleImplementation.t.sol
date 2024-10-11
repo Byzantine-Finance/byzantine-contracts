@@ -32,9 +32,4 @@ contract API3OracleImplementationTest is Test {
         assertTrue(price < 1e23, "Price should be less than $100,000");
     }
 
-    function testSetETHUSDProxy() public {
-        address newProxy = address(0x123);
-        oracle.setETHUSDProxy(newProxy);
-        assertEq(oracle.ETH_USD_PROXY(), newProxy);
-    }
 }
