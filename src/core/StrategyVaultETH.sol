@@ -281,6 +281,11 @@ contract StrategyVaultETH is StrategyVaultETHStorage, ERC7535MultiRewardVault {
         // Change the cluster status to DEPOSITED and set the cluster pubkey hash
         auction.updateClusterStatus(clusterId, IAuction.ClusterStatus.DEPOSITED);
         auction.setClusterPubKey(clusterId, pubkey);
+
+
+        // Call dvActivationCheckpoint
+        stakerRewards.dvActivationCheckpoint(address(this), clusterId);
+
     }
 
     /* ============== VAULT CREATOR FUNCTIONS ============== */
@@ -348,6 +353,10 @@ contract StrategyVaultETH is StrategyVaultETHStorage, ERC7535MultiRewardVault {
         for (uint256 i = 0; i < num32ETHBundles;) {
             bytes32 winningClusterId = auction.triggerAuction();
             clusterIdsFIFO.push(winningClusterId);
+
+            // Call dvCreationCheckpoint in StakerRewards contract 
+            stakerRewards.dvCreationCheckpoint(winningClusterId);
+
             unchecked {
                 ++i;
             }

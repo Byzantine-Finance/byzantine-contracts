@@ -102,13 +102,18 @@ contract Deploy_Holesky_From_Scratch is ExistingDeploymentParser {
         auctionImplementation = new Auction(
             escrow,
             strategyVaultManager,
-            pushSplitFactory
+            pushSplitFactory,
+            stakerRewards
         );
         escrowImplementation = new Escrow(
             stakerRewards,
             auction
         );
-        stakerRewardsImplementation = new StakerRewards();
+        stakerRewardsImplementation = new StakerRewards(
+            strategyVaultManager,
+            escrow,
+            auction
+        );
 
         // Third, upgrade the proxy contracts to use the correct implementation contracts and initialize them.
         // Upgrade StrategyVaultManager
@@ -151,7 +156,10 @@ contract Deploy_Holesky_From_Scratch is ExistingDeploymentParser {
         byzantineProxyAdmin.upgradeAndCall(
             TransparentUpgradeableProxy(payable(address(stakerRewards))),
             address(stakerRewardsImplementation),
-            ""
+            abi.encodeWithSelector(
+                StakerRewards.initialize.selector,
+                UPKEEP_INTERVAL
+            )
         );
     }
 }

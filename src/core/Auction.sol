@@ -26,8 +26,9 @@ contract Auction is
     constructor(
         IEscrow _escrow,
         IStrategyVaultManager _strategyVaultManager,
-        PushSplitFactory _pushSplitFactory
-    ) AuctionStorage(_escrow, _strategyVaultManager, _pushSplitFactory) {
+        PushSplitFactory _pushSplitFactory,
+        IStakerRewards _stakerRewards
+    ) AuctionStorage(_escrow, _strategyVaultManager, _pushSplitFactory, _stakerRewards) {
         // Disable initializer in the context of the implementation contract
         _disableInitializers();
     }
@@ -392,6 +393,28 @@ contract Auction is
         emit BidWithdrawn(msg.sender, _bidId);
     }
 
+    /** 
+     * @notice Update the VC number of a node and the cluster status
+     * @param _clusterId: ID of the cluster
+     * @param _consumedVCs: number of VC to subtract
+     * @dev This function is callable only by the StakerRewards contract
+     * TODO: add a try catch to handle the case where consumedVCs is greater than currentVCs
+     */
+    function updateNodeVCNumber(bytes32 _clusterId, uint32 _consumedVCs) external onlyStakerRewards {
+        ClusterDetails storage clusterDetails = _clusterDetails[_clusterId];
+        for (uint8 i; i < clusterDetails.nodes.length; ) {
+            clusterDetails.nodes[i].currentVCNumber -= _consumedVCs;
+
+            if (clusterDetails.nodes[i].currentVCNumber == 0) {
+                clusterDetails.status = ClusterStatus.EXITED;
+            }
+
+            unchecked {
+                ++i;
+            }
+        }
+    }
+    
     /**
      * @notice Update the status of a cluster
      * @param _clusterId The id of the cluster to update the status
@@ -696,4 +719,8 @@ contract Auction is
         _;
     }
 
+    modifier onlyStakerRewards() {
+        if (msg.sender != address(stakerRewards)) revert OnlyStakerRewards();
+        _;
+    }
 }
