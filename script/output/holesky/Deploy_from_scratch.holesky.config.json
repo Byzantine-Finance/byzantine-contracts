@@ -1,25 +1,25 @@
 {
   "addresses": {
-    "auction": "0x9446C097dA289261B98386089dd62F260320d624",
-    "auctionImplementation": "0x7A6fa55A2321388eE37F4769B1f4D0C770c0EB3b",
-    "byzNft": "0x212E30C42959bFE5CE99376c807a3F8Ad77d9625",
-    "byzNftImplementation": "0xc0FF8608Bdec27E69748FBbE0d9571c85ac309e9",
-    "byzantineProxyAdmin": "0x678d13CF8e3752DD5D63f808C28dC0cbe3506f45",
-    "emptyContract": "0x6E35d8D7161a2f646c7B0CCDA81046df11A4Ae62",
-    "escrow": "0xbE1222Ea0C5f7c192889F676d82FB28509024e61",
-    "escrowImplementation": "0x3217f36b42EF37b481f3bEE862528BD1714937Da",
-    "stakerRewards": "0x3822099Ae6E57b12C03d5f6704b7E0bF729058b7",
-    "stakerRewardsImplementation": "0x5C8eB58E6c7D2067D64F2DeACa934F8ab6A7EE99",
-    "strategyVaultERC20Beacon": "0xc319fA723990DFEF34273FBF5870aE11953Da3f7",
-    "strategyVaultERC20Implementation": "0x303266cA58c10e791BD4a1557E71115D44721a1A",
-    "strategyVaultETHBeacon": "0xdc6B283e6f2B8040B11248E53Cb793620654c1ce",
-    "strategyVaultETHImplementation": "0x8322Df3e68572e85B7470BAb4639f7F968F88a20",
-    "strategyVaultManager": "0x0f572133823A5Dbb3cb80a2409CB3Ef7f11402c9",
-    "strategyVaultManagerImplementation": "0x51d0a9F4BEf447aF330D267D737CB0DaEb2b2B66"
+    "auction": "0x66164250B67a376B8FA0b6B5fCE151520A48167E",
+    "auctionImplementation": "0xf49c0A2F08592847f57Dc0c95adb2116486A133d",
+    "byzNft": "0x284e8f00a2ecB8f9CCD4d182650605f71F32728b",
+    "byzNftImplementation": "0x3Ba814e45961CE6Fb7a3b36680d3ac8113043314",
+    "byzantineProxyAdmin": "0x69e06cD0801F7b9F7faC60B9CA191d87107f9275",
+    "emptyContract": "0x1A7A8871FE1BC44f955175BF9F173506d2A458F7",
+    "escrow": "0x95951aC318bf0d5302335fd77BfFa31Ef055CDE4",
+    "escrowImplementation": "0x60bAe0AE6Af3CC4Fd6021013c3C0a4c47C89b2f7",
+    "stakerRewards": "0xdbDEbfe052388cc99B85f36201807Cb49fB051B5",
+    "stakerRewardsImplementation": "0x3349412f35c9c4250a502Be9102EC9B88bBecD30",
+    "strategyVaultERC20Beacon": "0xd8F75DBe8CAf9a50608DEf2ae00a5270E1E8697e",
+    "strategyVaultERC20Implementation": "0xee916f5fEed30Be79220DeB2E944baEb07a68DDa",
+    "strategyVaultETHBeacon": "0xFE06b3699327EBC387ea13975dcfB0856A39579e",
+    "strategyVaultETHImplementation": "0x66e46aA30779b062f9699117674E94364dC615FC",
+    "strategyVaultManager": "0xD3E8cd569e7f30aD6a96DF74e3F262CeC0534287",
+    "strategyVaultManagerImplementation": "0xd7251B8c0ADe8821514cB55C6A9F5c8a6f70bcd3"
   },
   "chainInfo": {
     "chainId": 17000,
-    "deploymentBlock": 2505325
+    "deploymentBlock": 2510132
   },
   "parameters": {
     "beaconChainAdmin": "0x5c27a880ec9024F006A70B8f1fB91b82d94ef4D4",
