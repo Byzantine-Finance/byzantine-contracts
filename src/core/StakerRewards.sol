@@ -12,10 +12,10 @@ import {IStakerRewards} from "../interfaces/IStakerRewards.sol";
 import {IStrategyVaultETH} from "../interfaces/IStrategyVaultETH.sol";
 import {IAuction} from "../interfaces/IAuction.sol";
 import {IEscrow} from "../interfaces/IEscrow.sol";
-import {console} from "forge-std/console.sol";
 
-// TODO: 1. The oldest DV exists due to staker's voluntary exit: StratVaultETH should notify SR to update its numValidatorsInVault and cluster data.
-// TODO: 2. DV exits due to lack of VCs: make sure numValidators >= num32ETHStaked, otherwise no rewards to distribute or force staker to exit
+// TODO: 1. Initialize the byzantineAdmin in initialize()
+// TODO: 2. The oldest DV exists due to staker's voluntary exit: StratVaultETH should notify SR to update its numValidatorsInVault and cluster data.
+// TODO: 3. DV exits due to lack of VCs: make sure numValidators >= num32ETHStaked, otherwise no rewards to distribute or force staker to exit
 
 contract StakerRewards is
     Initializable,
@@ -35,7 +35,7 @@ contract StakerRewards is
     /// @notice Auction contract
     IAuction public immutable auction;
 
-    uint32 internal constant _ONE_DAY = 1 days;
+    uint32 private constant _ONE_DAY = 1 days;
     uint256 private constant _WAD = 1e18;
 
     /* ============== STATE VARIABLES ============== */
@@ -109,8 +109,7 @@ contract StakerRewards is
      */
     function dvCreationCheckpoint(bytes32 _clusterId) external onlyStratVaultETH {
         // Get the total new VCs, the smallest VC and the cluster size
-        IAuction.ClusterDetails memory clusterDetails = auction.getClusterDetails(_clusterId);
-        IAuction.NodeDetails[] memory nodes = clusterDetails.nodes;
+        IAuction.NodeDetails[] memory nodes = auction.getClusterDetails(_clusterId).nodes;
         (uint64 totalClusterVCs, uint32 smallestVC, uint8 clusterSize) = _getTotalAndSmallestVCs(nodes);
 
         // Update ClusterData
@@ -140,24 +139,9 @@ contract StakerRewards is
      */
     function dvActivationCheckpoint(address _vaultAddr, bytes32 _clusterId) external onlyStratVaultETH {
         VaultData storage vault = _vaults[_vaultAddr];
-        uint256 numValsInVault = vault.numValidatorsInVault;
 
-        // Ensure that there is at least one validator, and that both the vault's and the checkpoint's update times have elapsed by at least one day
-        if (numValsInVault > 0 && _hasTimeElapsed(vault.lastUpdate, _ONE_DAY) && _hasTimeElapsed(_checkpoint.updateTime, _ONE_DAY)) {
-            // Send pending rewards to StratVaultETH
-            uint256 rewardsToVault = _sendPendingRewards(_vaultAddr, numValsInVault);
-            // Update global data 
-            _updateVCsAndPendingRewards(rewardsToVault);
-            _adjustDailyRewards();
-        } else if (numValsInVault > 0 && _hasTimeElapsed(vault.lastUpdate, _ONE_DAY)) {
-            // Send pending rewards to StratVaultETH
-            uint256 rewardsToVault = _sendPendingRewards(_vaultAddr, numValsInVault);
-            // Only remove rewardsToVault from totalPendingRewards
-            _updateVCsAndPendingRewards(rewardsToVault);
-        } else if (numValidators4 + numValidators7 > 0 && _hasTimeElapsed(_checkpoint.updateTime, _ONE_DAY)) {
-            _updateVCsAndPendingRewards(0);
-            _adjustDailyRewards();
-        }
+        // Update checkpoint data and send pending rewards to the vault depending on the conditions 
+        _handleCheckpointUpdateAndPendingRewards(_vaultAddr);
 
         // Update Checkpoint updateTime and VaultData
         _checkpoint.updateTime = block.timestamp;
@@ -179,25 +163,8 @@ contract StakerRewards is
      * @param _vaultAddr Address of the StratVaultETH
      */
     function withdrawCheckpoint(address _vaultAddr) external onlyStratVaultETH {
-        VaultData storage vault = _vaults[_vaultAddr];
-        uint256 numValsInVault = vault.numValidatorsInVault;
-
-        // Ensure that there is at least one validator, and that both the vault's and the checkpoint's update times have elapsed by at least one day
-        if (numValsInVault > 0 && _hasTimeElapsed(vault.lastUpdate, _ONE_DAY) && _hasTimeElapsed(_checkpoint.updateTime, _ONE_DAY)) {
-            // Send pending rewards to StratVaultETH
-            uint256 rewardsToVault = _sendPendingRewards(_vaultAddr, numValsInVault);
-            // Update global data 
-            _updateVCsAndPendingRewards(rewardsToVault);
-            _adjustDailyRewards();
-        } else if (numValsInVault > 0 && _hasTimeElapsed(vault.lastUpdate, _ONE_DAY)) {
-            // Send pending rewards to StratVaultETH
-            uint256 rewardsToVault = _sendPendingRewards(_vaultAddr, numValsInVault);
-            // Only remove rewardsToVault from totalPendingRewards
-            _updateVCsAndPendingRewards(rewardsToVault);
-        } else if (numValidators4 + numValidators7 > 0 && _hasTimeElapsed(_checkpoint.updateTime, _ONE_DAY)) {
-            _updateVCsAndPendingRewards(0);
-            _adjustDailyRewards();
-        }
+        // Update checkpoint data and send pending rewards to the vault depending on the conditions 
+        _handleCheckpointUpdateAndPendingRewards(_vaultAddr);
     }
 
     /* ============== CHAINLINK AUTOMATION FUNCTIONS ============== */
@@ -322,12 +289,7 @@ contract StakerRewards is
      * @dev Revert if it is called by a non-forwarder address
     */
     function performUpkeep(bytes calldata performData) external override {
-        // Double check that the upkeep is needed
-        (bool upkeepNeeded, ) = checkUpkeep("");
-        if (!upkeepNeeded) revert UpkeepNotNeeded();
-        if (msg.sender != forwarderAddress)
-            revert NoPermissionToCallPerformUpkeep();
-
+        if (msg.sender != forwarderAddress) revert NoPermissionToCallPerformUpkeep();
         lastPerformUpkeep = block.timestamp;
 
         // Decode `performData` 
@@ -364,7 +326,7 @@ contract StakerRewards is
         }
 
         // Subtract the remaining VCs of the exited DVs from totalVCs
-        if (_checkpoint.totalVCs < remainingVCsToRemove) revert TotalVCsLessThanConsumedVCs(); // TODO: can be removed if TODO2 mentioned above is fixed
+        if (_checkpoint.totalVCs < remainingVCsToRemove) revert TotalVCsLessThanConsumedVCs(); // TODO: can be removed if TODO3 mentioned above is fixed
         _checkpoint.totalVCs -= remainingVCsToRemove;
         // Decrease the number of DVs
         numClusters4 -= numClusters4ToExit;
@@ -419,14 +381,14 @@ contract StakerRewards is
      * @notice Returns the cluster data of a given clusterId
      * @param _clusterId The ID of the cluster
      */
-    function getClusterData(bytes32 _clusterId) public view returns (ClusterData memory) {
+    function getClusterData(bytes32 _clusterId) external view returns (ClusterData memory) {
         return _clusters[_clusterId];
     }
 
     /**
      * @notice Returns the current checkpoint data
      */
-    function getCheckpointData() public view returns (Checkpoint memory) {
+    function getCheckpointData() external view returns (Checkpoint memory) {
         return _checkpoint;
     }
 
@@ -434,7 +396,7 @@ contract StakerRewards is
      * @notice Returns the last update timestamp and the number of active DVs of a given StratVaultETH
      * @param _vaultAddr Address of the StratVaultETH
      */
-    function getVaultData(address _vaultAddr) public view returns (VaultData memory) {
+    function getVaultData(address _vaultAddr) external view returns (VaultData memory) {
         return _vaults[_vaultAddr];
     }
 
@@ -456,10 +418,9 @@ contract StakerRewards is
      * @notice Get the total number of VCs and the smallest VC number of a cluster
      * @param nodes The nodes of the cluster
      */
-    function _getTotalAndSmallestVCs(IAuction.NodeDetails[] memory nodes) internal pure returns (uint64 totalClusterVCs, uint32 smallestVcNumber, uint8 smallClusterSize) {
+    function _getTotalAndSmallestVCs(IAuction.NodeDetails[] memory nodes) private pure returns (uint64 totalClusterVCs, uint32 smallestVcNumber, uint8 smallClusterSize) {
         uint256 bigClusterSize = nodes.length;
         smallestVcNumber = nodes[0].currentVCNumber; 
-        totalClusterVCs = 0;
         for (uint256 i; i < bigClusterSize;) {
             totalClusterVCs += nodes[i].currentVCNumber; 
             if (nodes[i].currentVCNumber < smallestVcNumber) {
@@ -477,15 +438,16 @@ contract StakerRewards is
      * and update totalPendingRewards by adding the distributed rewards since the previous checkpoint
      * @dev Rewards that were already sent to StratVaultETH should be subtracted from totalPendingRewards
      */
-    function _updateVCsAndPendingRewards(uint256 _rewardsToVault) internal nonReentrant {
+    function _updateVCsAndPendingRewards(uint256 _rewardsToVault) private nonReentrant {
+        uint256 elapsedDays = _getElapsedDays(_checkpoint.updateTime);
+
         // Calculate totalVCs
         uint256 dailyConsumedVCs = numValidators4 * 4 + numValidators7 * 7;
-        uint256 totalConsumedVCs = _getElapsedDays(_checkpoint.updateTime) * dailyConsumedVCs;
+        uint256 totalConsumedVCs = elapsedDays * dailyConsumedVCs;
         if (_checkpoint.totalVCs < totalConsumedVCs) revert TotalVCsLessThanConsumedVCs();
         _checkpoint.totalVCs -= uint64(totalConsumedVCs);
 
         // Update totalPendingRewards
-        uint256 elapsedDays = _getElapsedDays(_checkpoint.updateTime);
         uint256 distributedRewards = _checkpoint.dailyRewardsPer32ETH * elapsedDays * (numValidators4 + numValidators7);
         if (_rewardsToVault == 0) {
             _checkpoint.totalPendingRewards += distributedRewards;
@@ -498,7 +460,7 @@ contract StakerRewards is
      * @notice Update the checkpoint struct including calculating and updating dailyRewardsPer32ETH
      * @dev Revert if there are no active DVs or if totalVCs is 0
      */
-    function _adjustDailyRewards() internal nonReentrant {
+    function _adjustDailyRewards() private nonReentrant {
         if (numClusters4 + numClusters7 == 0) revert NoCreatedClusters();
         if (_checkpoint.totalVCs == 0) revert TotalVCsCannotBeZero();
 
@@ -512,7 +474,7 @@ contract StakerRewards is
      * @notice Get the number of days that have elapsed between the last checkpoint and the current one
      * @param _lastTimestamp can be Checkpoint's updateTime or StratVaultETH's lastUpdate
      */
-    function _getElapsedDays(uint256 _lastTimestamp) internal view returns (uint256) {
+    function _getElapsedDays(uint256 _lastTimestamp) private view returns (uint256) {
         if (_lastTimestamp == 0) revert InvalidTimestamp();
         return (block.timestamp - _lastTimestamp) / _ONE_DAY;
     }
@@ -522,7 +484,7 @@ contract StakerRewards is
      * @param _bidPrice The bid price paid by the node
      * @param _vcNumber The VC number bought by the node
      */
-    function _getDailyVcPrice(uint256 _bidPrice, uint32 _vcNumber) internal pure returns(uint256) {
+    function _getDailyVcPrice(uint256 _bidPrice, uint32 _vcNumber) private pure returns(uint256) {
         return _bidPrice / _vcNumber;
     }
 
@@ -533,6 +495,32 @@ contract StakerRewards is
      */
     function _hasTimeElapsed(uint256 _lastTimestamp, uint256 _elapsedTime) private view returns (bool) {
         return block.timestamp - _lastTimestamp >= _elapsedTime;
+    }
+
+    /**
+     * @notice Handle chackpoint data update and sending pending rewards to vault
+     * @param _vaultAddr Address of the StratVaultETH
+     */
+    function _handleCheckpointUpdateAndPendingRewards(address _vaultAddr) private {
+        VaultData storage vault = _vaults[_vaultAddr];
+        uint16 numValsInVault = vault.numValidatorsInVault;
+
+        // Ensure that there is at least one validator, and that both the vault's and the checkpoint's update times have elapsed by at least one day
+        if (numValsInVault > 0 && _hasTimeElapsed(vault.lastUpdate, _ONE_DAY) && _hasTimeElapsed(_checkpoint.updateTime, _ONE_DAY)) {
+            // Send pending rewards to StratVaultETH
+            uint256 rewardsToVault = _sendPendingRewards(_vaultAddr, numValsInVault);
+            // Update global data 
+            _updateVCsAndPendingRewards(rewardsToVault);
+            _adjustDailyRewards();
+        } else if (numValsInVault > 0 && _hasTimeElapsed(vault.lastUpdate, _ONE_DAY)) {
+            // Send pending rewards to StratVaultETH
+            uint256 rewardsToVault = _sendPendingRewards(_vaultAddr, numValsInVault);
+            // Only remove rewardsToVault from totalPendingRewards
+            _updateVCsAndPendingRewards(rewardsToVault);
+        } else if (numValidators4 + numValidators7 > 0 && _hasTimeElapsed(_checkpoint.updateTime, _ONE_DAY)) {
+            _updateVCsAndPendingRewards(0);
+            _adjustDailyRewards();
+        }
     }
 
     /* ============== MODIFIERS ============== */
