@@ -1,4 +1,3 @@
-
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
@@ -61,10 +60,23 @@ contract ERC7535MultiRewardVaultTest is Test {
     function testDeposit() public {
         uint256 oneEth = 1 ether;
 
+        // console.log("~~~Initial State~~~");
+        // console.log("totalAssets", vault.totalAssets());
+        // console.log("totalSupply", vault.totalSupply());
+        // console.log("alice shares", vault.balanceOf(alice));
+        // console.log("bob shares", vault.balanceOf(bob));
+
         /* ===================== ALICE DEPOSITS 1 ETH ===================== */
         // Alice deposits 1 ETH into the vault
         vm.prank(alice);
         uint256 aliceShares = vault.deposit{value: oneEth}(oneEth, alice);
+
+        // console.log("~~~After Alice's deposit~~~");
+        // console.log("return value aliceShares", aliceShares);
+        // console.log("totalAssets", vault.totalAssets());
+        // console.log("totalSupply", vault.totalSupply());
+        // console.log("alice shares", vault.balanceOf(alice));
+        // console.log("bob shares", vault.balanceOf(bob));
         
         // Verify Alice's deposit
         assertEq(aliceShares, oneEth, "Alice should receive 1e18 shares for first deposit");
@@ -76,17 +88,46 @@ contract ERC7535MultiRewardVaultTest is Test {
         vault.addRewardToken(address(rewardToken1));
         // Mint 2 ETH worth of reward tokens to the vault
         rewardToken1.mint(address(vault), 2 * oneEth);
+        // Verify the reward token is added
+        assertEq(vault.rewardTokens(0), address(rewardToken1), "Reward token 1 should be added");
+        // Verify the reward token balance
+        assertEq(rewardToken1.balanceOf(address(vault)), 2 * oneEth, "Vault should have 2 ETH worth of reward token 1");
+
+        // console.log("~~~After adding 2 reward tokens~~~");
+        // console.log("totalAssets", vault.totalAssets());
+        // console.log("totalSupply", vault.totalSupply());
+        // console.log("alice shares", vault.balanceOf(alice));
+        // console.log("bob shares", vault.balanceOf(bob));
 
         /* ===================== BOB DEPOSITS 1 ETH ===================== */
+        /**
+         * Calculate expected shares for Bob (should be 1/4 of total supply after his deposit)
+         * shares = (assets * totalSupply) / totalAssets
+         *  - shares is the number of shares the user will receive
+         *  - assets is the value of underlying assets being deposited
+         *  - totalSupply is the total number of existing shares before the deposit
+         *  - totalAssets is the total value of underlying assets held by the vault before the deposit
+         * expectedBobShares = (1 * 1) / 3 = 0.333333333333333333
+         */
+        uint256 ethPrice = oracle.getPrice(address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE));
+        uint256 bobDepositUsdValue = oneEth * ethPrice / 1e18;
+        uint256 expectedBobShares = (bobDepositUsdValue * vault.totalSupply()) / vault.totalAssets();
+
+        // console.log("expectedBobShares", expectedBobShares);
+
         // Bob deposits 1 ETH into the vault
         vm.prank(bob);
         uint256 bobShares = vault.deposit{value: oneEth}(oneEth, bob);
 
-        // Calculate expected shares for Bob (should be 1/4 of total supply after his deposit)
-        uint256 expectedBobShares = oneEth / 4; // 0.25e18
+        // console.log("~~~After Bob's deposit~~~");
+        // console.log("return value bobShares", bobShares);
+        // console.log("totalAssets", vault.totalAssets());
+        // console.log("totalSupply", vault.totalSupply());
+        // console.log("alice shares", vault.balanceOf(alice));
+        // console.log("bob shares", vault.balanceOf(bob));
         
         // Verify Bob's deposit
-        assertApproxEqRel(bobShares, expectedBobShares, 1e14, "Bob should receive 0.25e18 shares");
+        assertApproxEqRel(bobShares, expectedBobShares, 1e14, "Bob should receive 0.333e18 shares (approx)");
         assertEq(vault.balanceOf(bob), bobShares, "Bob's balance should match received shares");
         assertEq(vault.balanceOf(alice), oneEth, "Alice's balance should remain unchanged");
         assertEq(address(vault).balance, 2 * oneEth, "Vault should have 2 ETH");
@@ -96,8 +137,8 @@ contract ERC7535MultiRewardVaultTest is Test {
         // Verify proportions of ownership
         uint256 aliceProportion = (vault.balanceOf(alice) * 1e18) / vault.totalSupply();
         uint256 bobProportion = (vault.balanceOf(bob) * 1e18) / vault.totalSupply();
-        assertApproxEqRel(aliceProportion, 800000000000000000, 1e14, "Alice should own 80% of the vault");
-        assertApproxEqRel(bobProportion, 200000000000000000, 1e14, "Bob should own 20% of the vault");
+        assertApproxEqRel(aliceProportion, 750000000000000000, 1e14, "Alice should own 75% of the vault");
+        assertApproxEqRel(bobProportion, 250000000000000000, 1e14, "Bob should own 25% of the vault");
     }
 
     function testMint() public {

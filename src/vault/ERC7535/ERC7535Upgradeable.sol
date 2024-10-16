@@ -222,9 +222,21 @@ abstract contract ERC7535Upgradeable is Initializable, ERC20Upgradeable, IERC753
 
     /**
      * @dev Internal conversion function (from assets to shares) with support for rounding direction.
+     * @dev In ERC4626, totalAssets() returns the total value of assets before a deposit is made.
+     *      In ERC7535, totalAssets() returns the total value of assets after a deposit is made.
+     *      Therefore, we need to subtract the assets from totalAssets() to get the total value of assets before the deposit.
      */
     function _convertToShares(uint256 assets, MathUpgradeable.Rounding rounding) internal view virtual returns (uint256) {
-        return assets.mulDiv(totalSupply() + 10 ** _decimalsOffset(), totalAssets() + 1, rounding);
+        uint256 supply = totalSupply() + 10 ** _decimalsOffset(); // Supply includes virtual reserves
+        uint256 totalAssets_ = totalAssets();
+
+        // For the first deposit, return the number of assets as shares
+        if (totalAssets_ == 0 || supply == 0) {
+            return assets;
+        }
+
+        uint256 assetsBeforeDeposit = totalAssets_ - assets;
+        return assets.mulDiv(supply, assetsBeforeDeposit, rounding);
     }
 
     /**

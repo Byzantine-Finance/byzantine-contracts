@@ -182,14 +182,18 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
      * would represent an infinite amout of shares.
      */
     function _convertToShares(uint256 assets, MathUpgradeable.Rounding rounding) internal view override returns (uint256 shares) {
-        uint256 supply = totalSupply() + 10 ** _decimalsOffset(); // Supply includes virtual reserves
-        if (totalSupply() == 0) {
-            return assets; // On first deposit, totalSupply is 0, so return assets (amount of ETH deposited) as shares
-        } else {
-            uint256 ethPrice = oracle.getPrice(address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE));
-            uint256 assetsUsdValue = assets * ethPrice / 1e18;
-            return assetsUsdValue.mulDiv(supply, totalAssets(), rounding);
+        uint256 supply = totalSupply();
+
+        if (supply == 0) {
+            // For the first deposit, we use the asset amount as the share amount
+            return assets;
         }
+
+        uint256 ethPrice = oracle.getPrice(address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE));
+        uint256 assetsUsdValue = assets.mulDiv(ethPrice, 1e18, rounding);
+        
+        // Call the parent implementation with the USD value of assets
+        return super._convertToShares(assetsUsdValue, rounding);
     }
     
     /**
