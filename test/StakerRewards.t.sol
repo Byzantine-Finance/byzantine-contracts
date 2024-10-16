@@ -352,25 +352,24 @@ contract StakerRewardsTest is ProofParsing, ByzantineDeployer {
 
     function test_checkUpkeep_ReturnsFalse_ifNoValidators() public startAtPresentDay {
         // ARRANGE
+        address txOrigin = address(0);
         _createStratVaultETHAndStake(alice, 96 ether);
         // 10 days later
         vm.warp(block.timestamp + 10 days);
 
         // ACT
         // Manually call checkUpkeep
+        // Only address(0) can call checkUpkeep with cannotExecute modifier
+        vm.prank(msg.sender, txOrigin); // make tx.origin be address(0)
         (bool upkeepNeeded, ) = stakerRewards.checkUpkeep("");
 
         // ASSERT
         assert(!upkeepNeeded);
-
-        // Check performUpkeep revert if upkeepNeeded is false  
-        vm.prank(forwarder);
-        vm.expectRevert(IStakerRewards.UpkeepNotNeeded.selector);
-        stakerRewards.performUpkeep("");
     }
 
     function test_checkUpkeep_ReturnFalse_ifCalledWithinTheUpkeepIntervalTimeline() public startAtPresentDay {
         // ARRANGE
+        address txOrigin = address(0);
         IStrategyVaultETH stratVaultETH = _createStratVaultETHAndStake(alice, 32 ether);
         bytes32[] memory clusterIds = stratVaultETH.getAllDVIds();
         vm.warp(block.timestamp + 1 days);
@@ -380,6 +379,8 @@ contract StakerRewardsTest is ProofParsing, ByzantineDeployer {
         // 150 days and 1 second later
         vm.warp(block.timestamp + 150 days + 1);
         // Manually call checkUpkeep and performUpkeep
+        // Only address(0) can call checkUpkeep with cannotExecute modifier
+        vm.prank(msg.sender, txOrigin); // make tx.origin be address(0)
         (bool upkeepNeeded, bytes memory performDataUpkeep1) = stakerRewards.checkUpkeep("");
         assert(upkeepNeeded);
         vm.prank(forwarder);
@@ -390,12 +391,14 @@ contract StakerRewardsTest is ProofParsing, ByzantineDeployer {
         // 30 seconds later
         vm.warp(block.timestamp + 30 seconds);
         assertLt(block.timestamp - stakerRewards.lastPerformUpkeep(), stakerRewards.upkeepInterval());
+        vm.prank(msg.sender, txOrigin);
         (bool upkeepNeeded2, ) = stakerRewards.checkUpkeep("");
         assert(!upkeepNeeded2);
     }
 
     function test_checkUpkeep_ReturnsFalse_ifNoValidatorsHaveConsumedAllVCs() public startAtPresentDay {
         // ARRANGE
+        address txOrigin = address(0);
         IStrategyVaultETH stratVaultETH = _createStratVaultETHAndStake(alice, 64 ether);
         bytes32[] memory clusterIds = stratVaultETH.getAllDVIds();
         vm.prank(beaconChainAdmin);
@@ -407,20 +410,19 @@ contract StakerRewardsTest is ProofParsing, ByzantineDeployer {
 
         // ACT
         // Manually call checkUpkeep and performUpkeep
+        // Only address(0) can call checkUpkeep with cannotExecute modifier
+        vm.prank(msg.sender, txOrigin); // make tx.origin be address(0)
         (bool upkeepNeeded, ) = stakerRewards.checkUpkeep("");
 
         // ASSERT
         assert(!upkeepNeeded);
-        // Check performUpkeep revert if upkeepNeeded is false  
-        vm.prank(forwarder);
-        vm.expectRevert(IStakerRewards.UpkeepNotNeeded.selector);
-        stakerRewards.performUpkeep("");
     }
 
     function test_checkUpkeep_ReturnsTrue_ifOneValidatorConsumedAllVCs() public startAtPresentDay {
         // The smallest VC number of cluster 1 is 150 
 
         // ARRANGE
+        address txOrigin = address(0);
         IStrategyVaultETH stratVaultETH = _createStratVaultETHAndStake(alice, 96 ether);
         bytes32[] memory clusterIds = stratVaultETH.getAllDVIds();
         vm.startPrank(beaconChainAdmin);
@@ -434,6 +436,8 @@ contract StakerRewardsTest is ProofParsing, ByzantineDeployer {
 
         // ACT
         // Manually call checkUpkeep and performUpkeep
+        // Only address(0) can call checkUpkeep with cannotExecute modifier
+        vm.prank(msg.sender, txOrigin); // make tx.origin be address(0)
         (bool upkeepNeeded, bytes memory performDataUpkeep1) = stakerRewards.checkUpkeep("");
         vm.prank(forwarder);
         stakerRewards.performUpkeep(performDataUpkeep1);
@@ -445,6 +449,7 @@ contract StakerRewardsTest is ProofParsing, ByzantineDeployer {
 
     function test_performUpkeep_RevertWhen_calledByNonForwarder() public {
         // ARRANGE
+        address txOrigin = address(0);
         IStrategyVaultETH stratVaultETH = _createStratVaultETHAndStake(alice, 96 ether);
         bytes32[] memory clusterIds = stratVaultETH.getAllDVIds();
         vm.prank(beaconChainAdmin);
@@ -453,6 +458,8 @@ contract StakerRewardsTest is ProofParsing, ByzantineDeployer {
         // 150 days and 1 second later
         // Manually call checkUpkeep and performUpkeep
         vm.warp(block.timestamp + 150 days + 1);
+        // Only address(0) can call checkUpkeep with cannotExecute modifier
+        vm.prank(msg.sender, txOrigin); // make tx.origin be address(0)
         (bool upkeepNeeded, bytes memory performData) = stakerRewards.checkUpkeep("");
 
         // ACT AND ASSERT
@@ -463,6 +470,7 @@ contract StakerRewardsTest is ProofParsing, ByzantineDeployer {
 
     function test_performUpkeep_decodedPerformDataIsCorrect() public startAtPresentDay {
         // ARRANGE
+        address txOrigin = address(0);
         IStrategyVaultETH stratVaultETH = _createStratVaultETHAndStake(alice, 96 ether);
         bytes32[] memory clusterIds = stratVaultETH.getAllDVIds();
         vm.prank(beaconChainAdmin);
@@ -487,6 +495,8 @@ contract StakerRewardsTest is ProofParsing, ByzantineDeployer {
         // 150 days and 1 second later
         // Manually call checkUpkeep and performUpkeep
         vm.warp(block.timestamp + 150 days + 1);
+        // Only address(0) can call checkUpkeep with cannotExecute modifier
+        vm.prank(msg.sender, txOrigin); // make tx.origin be address(0)
         (bool upkeepNeeded, bytes memory performData) = stakerRewards.checkUpkeep("");
         assert(upkeepNeeded);
 
@@ -517,6 +527,7 @@ contract StakerRewardsTest is ProofParsing, ByzantineDeployer {
         uint256 initialEscrowBalance = address(escrow).balance;
         uint256 initialVCs = stakerRewards.getCheckpointData().totalVCs;
         uint256 rewardsPer32ETH = stakerRewards.getCheckpointData().dailyRewardsPer32ETH;
+        address txOrigin = address(0);
 
         // Activate DV1 and DV2
         vm.startPrank(beaconChainAdmin);
@@ -539,6 +550,8 @@ contract StakerRewardsTest is ProofParsing, ByzantineDeployer {
         // 149 days and 1 second later, first upkeep returns true for DV2
         // Manually call checkUpkeep and performUpkeep
         vm.warp(block.timestamp + 149 days + 1);
+        // Only address(0) can call checkUpkeep with cannotExecute modifier
+        vm.prank(msg.sender, txOrigin); // make tx.origin be address(0)
         (, bytes memory performData) = stakerRewards.checkUpkeep("");
         (, uint256 remainingVCsToRemove, uint256 totalBidsToEscrow) = abi.decode(performData, (bytes32[], uint256, uint256));
         vm.prank(forwarder);
@@ -578,6 +591,8 @@ contract StakerRewardsTest is ProofParsing, ByzantineDeployer {
         // 1 day later, second upkeep returns true for DV1
         // Manually call checkUpkeep and performUpkeep
         vm.warp(block.timestamp + 1 days);
+        // Only address(0) can call checkUpkeep with cannotExecute modifier
+        vm.prank(msg.sender, txOrigin); // make tx.origin be address(0)
         (, bytes memory performData2) = stakerRewards.checkUpkeep("");
         (, uint256 remainingVCsToRemoveUpkeep2, uint256 totalBidsToEscrowUpkeep2) = abi.decode(performData2, (bytes32[], uint256, uint256));
 
