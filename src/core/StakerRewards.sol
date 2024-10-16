@@ -6,6 +6,7 @@ import "@openzeppelin-upgrades/contracts/security/ReentrancyGuardUpgradeable.sol
 
 import {AutomationCompatibleInterface} from "chainlink/v0.8/interfaces/AutomationCompatibleInterface.sol";
 import {OwnerIsCreator} from "chainlink/v0.8/shared/access/OwnerIsCreator.sol";
+import {AutomationBase} from "chainlink/v0.8/AutomationBase.sol";
 
 import {IStrategyVaultManager} from "../interfaces/IStrategyVaultManager.sol";
 import {IStakerRewards} from "../interfaces/IStakerRewards.sol";
@@ -22,6 +23,7 @@ contract StakerRewards is
     ReentrancyGuardUpgradeable,
     AutomationCompatibleInterface,
     OwnerIsCreator,
+    AutomationBase,
     IStakerRewards
 {
     /* ============== CONSTANTS + IMMUTABLES ============== */
@@ -179,7 +181,7 @@ contract StakerRewards is
      * @dev Revert if there is no DV
      * @dev Revert if the time interval since the last upkeep is less than the upkeep interval
      */
-    function checkUpkeep(bytes memory /*checkData*/) public view override returns (bool upkeepNeeded, bytes memory performData) {
+    function checkUpkeep(bytes memory /*checkData*/) public view override cannotExecute returns (bool upkeepNeeded, bytes memory performData) {
         if (numValidators4 + numValidators7 == 0) return (false, "");
         if (block.timestamp - lastPerformUpkeep < upkeepInterval) return (false, "");
 
