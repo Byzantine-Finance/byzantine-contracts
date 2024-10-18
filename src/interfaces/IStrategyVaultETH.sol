@@ -8,6 +8,11 @@ import "./IStrategyVault.sol";
 
 interface IStrategyVaultETH is IStrategyVault, IERC7535Upgradeable {
 
+  /* ============== EVENTS ============== */
+
+  /// @notice Emitted when ETH is deposited into the Strategy Vault (either mint or deposit function)
+  event ETHDeposited(address indexed receiver, uint256 assets, uint256 shares);
+
   /* ============== GETTERS ============== */
 
   /// @notice Get the address of the beacon chain admin

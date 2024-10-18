@@ -8,6 +8,18 @@ import {SplitV2Lib} from "splits-v2/libraries/SplitV2.sol";
 
 interface IStrategyVaultManager {
 
+    /* ===================== EVENTS ===================== */
+
+    /// @notice Emitted when an Eigen Layer Native (ETH) Strategy Vault is created
+    event EigenLayerNativeVaultCreated(
+        address indexed vaultAddr,
+        address indexed eigenLayerStrat,
+        address vaultCreator,
+        address byzantineOracle,
+        bool privateVault,
+        bool stratUpgradeable
+    );
+
     /* ============== GETTERS ============== */
 
     /// @notice Get the total number of Strategy Vaults that have been deployed.

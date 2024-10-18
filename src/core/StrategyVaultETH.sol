@@ -126,8 +126,10 @@ contract StrategyVaultETH is StrategyVaultETHStorage, ERC7535MultiRewardVault {
      */
     function deposit(uint256 assets, address receiver) public override(ERC7535MultiRewardVault, IERC7535Upgradeable) payable checkWhitelist returns (uint256) {
         _triggerAuction();
+        uint256 shares = super.deposit(assets, receiver);
         amountOfETH += assets;
-        return super.deposit(assets, receiver);
+        emit ETHDeposited(receiver, assets, shares);
+        return shares;
     }
 
     /**
@@ -143,6 +145,7 @@ contract StrategyVaultETH is StrategyVaultETHStorage, ERC7535MultiRewardVault {
         _triggerAuction();
         uint256 assets = super.mint(shares, receiver);
         amountOfETH += assets;
+        emit ETHDeposited(receiver, assets, shares);
         return assets;
     }
 
