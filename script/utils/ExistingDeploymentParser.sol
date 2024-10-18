@@ -12,6 +12,7 @@ import {ByzNft} from "../../src/tokens/ByzNft.sol";
 import {Auction} from "../../src/core/Auction.sol";
 import {Escrow} from "../../src/vault/Escrow.sol";
 import {StakerRewards} from "../../src/core/StakerRewards.sol";
+import {BidInvestmentMock} from "../../test/mocks/BidInvestmentMock.sol";
 
 import {EigenPodManager} from "eigenlayer-contracts/pods/EigenPodManager.sol";
 import {DelegationManager} from "eigenlayer-contracts/core/DelegationManager.sol";
@@ -41,7 +42,8 @@ contract ExistingDeploymentParser is Script, Test {
     Escrow public escrowImplementation;
     StakerRewards public stakerRewards;
     StakerRewards public stakerRewardsImplementation;
-
+    BidInvestmentMock public bidInvestment;
+    
     // Beacon Chain Admin address
     address public beaconChainAdmin;
 
@@ -221,8 +223,8 @@ contract ExistingDeploymentParser is Script, Test {
         );
         // Escrow
         require(
-            escrow.stakerRewards() == stakerRewards,
-            "escrow: stakerRewards address not set correctly"
+            escrow.bidInvestment() == bidInvestment,
+            "escrow: bidInvestment address not set correctly"
         );
         require(
             escrow.auction() == auction,
