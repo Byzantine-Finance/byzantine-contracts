@@ -5,8 +5,8 @@ import "../../utils/ExistingDeploymentParser.sol";
 
 /**
  * @notice Script used for upgrading all StrategyVault deployed on Holesky
- * forge script script/upgrade/holesky/StrategyVaultsETHUpgrade.s.sol --rpc-url http://127.0.0.1:8545 --private-key $PRIVATE_KEY --broadcast --etherscan-api-key $ETHERSCAN_API_KEY --verify -vvvv
- * forge script script/upgrade/holesky/StrategyVaultsETHUpgrade.s.sol --rpc-url $HOLESKY_RPC_URL --private-key $PRIVATE_KEY --broadcast --etherscan-api-key $ETHERSCAN_API_KEY --verify -vvvv
+ * forge script script/upgrade/holesky/StrategyVaultETHUpgrade.s.sol --rpc-url http://127.0.0.1:8545 --private-key $PRIVATE_KEY --broadcast --etherscan-api-key $ETHERSCAN_API_KEY --verify -vvvv
+ * forge script script/upgrade/holesky/StrategyVaultETHUpgrade.s.sol --rpc-url $HOLESKY_RPC_URL --private-key $PRIVATE_KEY --broadcast --etherscan-api-key $ETHERSCAN_API_KEY --verify -vvvv
  * 
  */
 contract StrategyVaultsETHUpgrade is ExistingDeploymentParser {

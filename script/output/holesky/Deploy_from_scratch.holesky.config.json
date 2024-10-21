@@ -13,9 +13,9 @@
     "strategyVaultERC20Beacon": "0xf9CB2b4f8945b931C0C4b2BF54fCB4f7557AecdA",
     "strategyVaultERC20Implementation": "0x5AaA3f895cF1cA36057B63283e5FfC2C9bCea956",
     "strategyVaultETHBeacon": "0x471E14fe98a34450aAA1198756D23dA241445d12",
-    "strategyVaultETHImplementation": "0x648e8947e025d62074e8E7aE4f21757eC703BCD3",
+    "strategyVaultETHImplementation": "0xb22175A3Ac131DbeB13274369C504d95fB73e374",
     "strategyVaultManager": "0x7027CfbB4E295288c7346c04C577f03aA9a1e5a4",
-    "strategyVaultManagerImplementation": "0xCAF2768241ce5261Cba5b6f50c2483DC90698f74"
+    "strategyVaultManagerImplementation": "0x16E1e7DE1d5B8453358A072AEb5Bc441891fd83D"
   },
   "chainInfo": {
     "chainId": 17000,
