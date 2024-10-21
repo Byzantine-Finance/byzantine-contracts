@@ -184,6 +184,42 @@ contract StrategyVaultETH is StrategyVaultETHStorage, ERC7535MultiRewardVault {
     }
 
     /**
+     * @dev Progress the current checkpoint towards completion by submitting one or more validator
+     * checkpoint proofs. Anyone can call this method to submit proofs towards the current checkpoint.
+     * For each validator proven, the current checkpoint's `proofsRemaining` decreases.
+     * @dev If the checkpoint's `proofsRemaining` reaches 0, the checkpoint is finalized.
+     * @dev This method can only be called when there is a currently-active checkpoint.
+     * @param balanceContainerProof proves the beacon's current balance container root against a checkpoint's `beaconBlockRoot`
+     * @param proofs Proofs for one or more validator current balances against the `balanceContainerRoot`
+     */
+    function verifyCheckpointProofs(
+        BeaconChainProofs.BalanceContainerProof calldata balanceContainerProof,
+        BeaconChainProofs.BalanceProof[] calldata proofs
+    ) external {
+        IEigenPod pod = eigenPodManager.ownerToPod(address(this));
+        pod.verifyCheckpointProofs(balanceContainerProof, proofs);
+    }
+
+    /**
+     * @dev Prove that one of this vault's active validators was slashed on the beacon chain. A successful
+     * staleness proof allows the caller to start a checkpoint.
+     * @param beaconTimestamp the beacon chain timestamp sent to the 4788 oracle contract. Corresponds
+     * to the parent beacon block root against which the proof is verified.
+     * @param stateRootProof proves a beacon state root against a beacon block root
+     * @param proof the fields of the beacon chain "Validator" container, along with a merkle proof against
+     * the beacon state root. See the consensus specs for more details:
+     * https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/beacon-chain.md#validator
+     */
+    function verifyStaleBalance(
+        uint64 beaconTimestamp,
+        BeaconChainProofs.StateRootProof calldata stateRootProof,
+        BeaconChainProofs.ValidatorProof calldata proof
+    ) external {
+        IEigenPod pod = eigenPodManager.ownerToPod(address(this));
+        pod.verifyStaleBalance(beaconTimestamp, stateRootProof, proof);
+    }
+
+    /**
      * @notice Begins the withdrawal process to pull ETH out of the StrategyVault
      * @param queuedWithdrawalParams TODO: Fill in
      * @param strategies An array of strategy contracts for all tokens being withdrawn from EigenLayer.
@@ -290,6 +326,25 @@ contract StrategyVaultETH is StrategyVaultETHStorage, ERC7535MultiRewardVault {
         // Call dvActivationCheckpoint
         stakerRewards.dvActivationCheckpoint(address(this), clusterId);
 
+    }
+
+    /**
+     * @dev Create a checkpoint used to prove the vault's active validator set. Checkpoints are completed
+     * by submitting one checkpoint proof per ACTIVE validator. During the checkpoint process, the total
+     * change in ACTIVE validator balance is tracked, and any validators with 0 balance are marked `WITHDRAWN`.
+     * @dev Once finalized, the vault is awarded shares corresponding to:
+     * - the total change in their ACTIVE validator balances
+     * - any ETH in the pod not already awarded shares
+     * @dev A checkpoint cannot be created if the pod already has an outstanding checkpoint. If
+     * this is the case, the pod owner, i.e the vault, MUST complete the existing checkpoint before starting a new one.
+     * @param revertIfNoBalance Forces a revert if the pod ETH balance is 0. This allows the pod owner
+     * to prevent accidentally starting a checkpoint that will not increase their shares
+     * @dev If waiting too long to submit your checkpoint proof, you may need to use a full archival beacon node to re-generate the proofs.
+     * This is because the EIP-4788 oracle is valid for 27 hours, 8191 blocks.
+     */
+    function startCheckpoint(bool revertIfNoBalance) external onlyBeaconChainAdmin {
+        IEigenPod pod = eigenPodManager.ownerToPod(address(this));
+        pod.startCheckpoint(revertIfNoBalance);
     }
 
     /* ============== VAULT CREATOR FUNCTIONS ============== */
