@@ -77,6 +77,15 @@ contract StrategyVaultManager is
         // Delegate the StrategyVault towards the operator
         newStratVault.delegateTo(operator);
 
+        emit EigenLayerNativeVaultCreated(
+            address(newStratVault),
+            operator,
+            msg.sender,
+            oracle,
+            whitelistedDeposit,
+            upgradeable
+        );
+
         return address(newStratVault);
     }
 
