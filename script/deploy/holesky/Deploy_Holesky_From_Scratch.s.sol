@@ -106,13 +106,14 @@ contract Deploy_Holesky_From_Scratch is ExistingDeploymentParser {
             stakerRewards
         );
         escrowImplementation = new Escrow(
-            stakerRewards,
+            bidInvestment,
             auction
         );
         stakerRewardsImplementation = new StakerRewards(
             strategyVaultManager,
             escrow,
-            auction
+            auction,
+            bidInvestment
         );
 
         // Third, upgrade the proxy contracts to use the correct implementation contracts and initialize them.
