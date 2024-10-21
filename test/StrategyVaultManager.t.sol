@@ -98,6 +98,7 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
         assertEq(strategyVaultManager.numStratVaults(), 1);
         assertEq(aliceStratVault1.hasDelegatedTo(), ELOperator1);
         assertEq(aliceStratVault1.getVaultDVNumber(), 0);
+        assertEq(IEigenPod(strategyVaultManager.getPodByStratVaultAddr(address(aliceStratVault1))).proofSubmitter(), beaconChainAdmin);
 
         /* ===================== ALICE CREATES A FIRST STRATVAULTETH ===================== */
         // whitelistedDeposit = false, upgradeable = false, EL Operator = ELOperator1, oracle = 0x0

@@ -255,7 +255,8 @@ contract StrategyVaultETH is StrategyVaultETHStorage, ERC7535MultiRewardVault {
      * @dev Can only be called by the StrategyVaultManager during the vault creation.
      */
     function createEigenPod() external onlyStratVaultManager {
-        eigenPodManager.createPod();
+        IEigenPod pod = IEigenPod(eigenPodManager.createPod());
+        pod.setProofSubmitter(beaconChainAdmin);
     }
 
     /* ============== BEACON CHAIN ADMIN FUNCTIONS ============== */
