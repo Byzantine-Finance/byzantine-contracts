@@ -13,6 +13,7 @@ import {IStakerRewards} from "../interfaces/IStakerRewards.sol";
 import {IStrategyVaultETH} from "../interfaces/IStrategyVaultETH.sol";
 import {IAuction} from "../interfaces/IAuction.sol";
 import {IEscrow} from "../interfaces/IEscrow.sol";
+import {BidInvestmentMock} from "../../test/mocks/BidInvestmentMock.sol";
 
 // TODO: 1. Initialize the byzantineAdmin in initialize()
 // TODO: 2. The oldest DV exists due to staker's voluntary exit: StratVaultETH should notify SR to update its numValidatorsInVault and cluster data.
@@ -36,6 +37,9 @@ contract StakerRewards is
 
     /// @notice Auction contract
     IAuction public immutable auction;
+
+    /// @notice BidInvestment contract
+    BidInvestmentMock public immutable bidInvestment;
 
     uint32 private constant _ONE_DAY = 1 days;
     uint256 private constant _WAD = 1e18;
@@ -82,11 +86,13 @@ contract StakerRewards is
     constructor(
         IStrategyVaultManager _stratVaultManager,
         IEscrow _escrow,
-        IAuction _auction
+        IAuction _auction,
+        BidInvestmentMock _bidInvestment
     ) {
         stratVaultManager = _stratVaultManager;
         escrow = _escrow;
         auction = _auction;
+        bidInvestment = _bidInvestment;
         // Disable initializer in the context of the implementation contract
         _disableInitializers();
     }
@@ -109,25 +115,25 @@ contract StakerRewards is
      * 2. Update the checkpoint and cluster counter
      * @param _clusterId The ID of the cluster
      */
-    function dvCreationCheckpoint(bytes32 _clusterId) external onlyStratVaultETH {
-        // Get the total new VCs, the smallest VC and the cluster size
-        IAuction.NodeDetails[] memory nodes = auction.getClusterDetails(_clusterId).nodes;
-        (uint64 totalClusterVCs, uint32 smallestVC, uint8 clusterSize) = _getTotalAndSmallestVCs(nodes);
+    // function dvCreationCheckpoint(bytes32 _clusterId) external onlyStratVaultETH {
+    //     // Get the total new VCs, the smallest VC and the cluster size
+    //     IAuction.NodeDetails[] memory nodes = auction.getClusterDetails(_clusterId).nodes;
+    //     (uint64 totalClusterVCs, uint32 smallestVC, uint8 clusterSize) = _getTotalAndSmallestVCs(nodes);
 
-        // Update ClusterData
-        ClusterData storage cluster = _clusters[_clusterId];
-        cluster.smallestVC = smallestVC;
-        cluster.clusterSize = clusterSize;
+    //     // Update ClusterData
+    //     ClusterData storage cluster = _clusters[_clusterId];
+    //     cluster.smallestVC = smallestVC;
+    //     cluster.clusterSize = clusterSize;
 
-        // Update checkpoint and cluster counter
-        _checkpoint.totalVCs += totalClusterVCs;
-        if (numValidators4 + numValidators7 > 0 
-            && _hasTimeElapsed(_checkpoint.updateTime, _ONE_DAY)) {
-            _updateVCsAndPendingRewards(0);
-        }
-        clusterSize == 4 ? ++numClusters4 : ++numClusters7;
-        _adjustDailyRewards();
-    }
+    //     // Update checkpoint and cluster counter
+    //     _checkpoint.totalVCs += totalClusterVCs;
+    //     if (numValidators4 + numValidators7 > 0 
+    //         && _hasTimeElapsed(_checkpoint.updateTime, _ONE_DAY)) {
+    //         _updateVCsAndPendingRewards(0);
+    //     }
+    //     clusterSize == 4 ? ++numClusters4 : ++numClusters7;
+    //     _adjustDailyRewards();
+    // }
 
     /**
      * @notice Function called by StratVaultETH when a DV is activated
@@ -241,7 +247,7 @@ contract StakerRewards is
                     listClusterIds[indexCounter] = clusterIds[j];
                     // Get the total number of VCs and the smallest VC number of the cluster
                     IAuction.NodeDetails[] memory nodes = auction.getClusterDetails(clusterIds[j]).nodes;
-                    (uint64 totalClusterVCs, uint32 smallestVC, ) = _getTotalAndSmallestVCs(nodes);
+                    (uint64 totalClusterVCs, uint32 smallestVC, ) = auction.getTotalAndSmallestVCs(nodes);
                     // Add up the remaining VC number of each cluster
                     remainingVCsToRemove += (totalClusterVCs - smallestVC * cluster.clusterSize);
                     // Calculate the total remaining bid prices of each node
@@ -420,20 +426,20 @@ contract StakerRewards is
      * @notice Get the total number of VCs and the smallest VC number of a cluster
      * @param nodes The nodes of the cluster
      */
-    function _getTotalAndSmallestVCs(IAuction.NodeDetails[] memory nodes) private pure returns (uint64 totalClusterVCs, uint32 smallestVcNumber, uint8 smallClusterSize) {
-        uint256 bigClusterSize = nodes.length;
-        smallestVcNumber = nodes[0].currentVCNumber; 
-        for (uint256 i; i < bigClusterSize;) {
-            totalClusterVCs += nodes[i].currentVCNumber; 
-            if (nodes[i].currentVCNumber < smallestVcNumber) {
-                smallestVcNumber = nodes[i].currentVCNumber;
-            }
-            unchecked {
-                ++i;
-            }
-        }
-        smallClusterSize = uint8(bigClusterSize);
-    }
+    // function _getTotalAndSmallestVCs(IAuction.NodeDetails[] memory nodes) private pure returns (uint64 totalClusterVCs, uint32 smallestVcNumber, uint8 smallClusterSize) {
+    //     uint256 bigClusterSize = nodes.length;
+    //     smallestVcNumber = nodes[0].currentVCNumber; 
+    //     for (uint256 i; i < bigClusterSize;) {
+    //         totalClusterVCs += nodes[i].currentVCNumber; 
+    //         if (nodes[i].currentVCNumber < smallestVcNumber) {
+    //             smallestVcNumber = nodes[i].currentVCNumber;
+    //         }
+    //         unchecked {
+    //             ++i;
+    //         }
+    //     }
+    //     smallClusterSize = uint8(bigClusterSize);
+    // }
     
     /**
      * @notice Decrease totalVCs by the number of VCs used by the nodeOps since the previous checkpoint

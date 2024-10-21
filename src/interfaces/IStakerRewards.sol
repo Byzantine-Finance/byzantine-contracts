@@ -30,12 +30,6 @@ interface IStakerRewards {
     /* ============== EXTERNAL FUNCTIONS ============== */
 
     /**
-     * @notice Function called by StratVaultETH when a DV is created to add a new checkpoint and update variables
-     * @param _clusterId The ID of the cluster
-     */
-    function dvCreationCheckpoint(bytes32 _clusterId) external;
-
-    /**
      * @notice Function called by StratVaultETH when a DV is activated to add a new checkpoint and update variables
      * @param _vaultAddr The address of the vault
      * @param _clusterId The ID of the cluster
