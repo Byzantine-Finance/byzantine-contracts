@@ -155,14 +155,14 @@ abstract contract ERC7535Upgradeable is Initializable, ERC20Upgradeable, IERC753
      * @dev See {IERC7535-deposit}.
      */
     function deposit(uint256 assets, address receiver) public payable virtual returns (uint256) {
+        if (assets != msg.value) revert AssetsShouldBeEqualToMsgVaule();
+        
         uint256 maxAssets = maxDeposit(receiver);
         if (assets > maxAssets) {
             revert ERC7535ExceededMaxDeposit(receiver, assets, maxAssets);
         }
 
         uint256 shares = previewDeposit(assets);
-
-        if (assets != msg.value) revert AssetsShouldBeEqualToMsgVaule();
 
         _deposit(_msgSender(), receiver, assets, shares);
 
@@ -227,23 +227,23 @@ abstract contract ERC7535Upgradeable is Initializable, ERC20Upgradeable, IERC753
      *      Therefore, we need to subtract the assets from totalAssets() to get the total value of assets before the deposit.
      */
     function _convertToShares(uint256 assets, MathUpgradeable.Rounding rounding) internal view virtual returns (uint256) {
-        uint256 supply = totalSupply() + 10 ** _decimalsOffset(); // Supply includes virtual reserves
-        uint256 totalAssets_ = totalAssets();
-
         // For the first deposit, return the number of assets as shares
-        if (totalAssets_ == 0 || supply == 0) {
+        if (totalAssets() == 0 || totalSupply() == 0) {
             return assets;
         }
 
-        uint256 assetsBeforeDeposit = totalAssets_ - assets;
-        return assets.mulDiv(supply, assetsBeforeDeposit, rounding);
+        uint256 supply = totalSupply() + 10 ** _decimalsOffset(); // Supply includes virtual reserves
+        uint256 totalAssets_ = totalAssets() + 1; // Add 1 to avoid division by zero
+        return assets.mulDiv(supply, totalAssets_ - assets, rounding);
     }
 
     /**
      * @dev Internal conversion function (from shares to assets) with support for rounding direction.
      */
     function _convertToAssets(uint256 shares, MathUpgradeable.Rounding rounding) internal view virtual returns (uint256) {
-        return shares.mulDiv(totalAssets() + 1, totalSupply() + 10 ** _decimalsOffset(), rounding);
+        uint256 supply = totalSupply() + 10 ** _decimalsOffset(); // Supply includes virtual reserves
+        uint256 totalAssets = totalAssets() + 1; // Add 1 to avoid division by zero
+        return shares.mulDiv(totalAssets, supply, rounding);
     }
 
     /**

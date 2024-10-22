@@ -149,67 +149,34 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
 
     /**
      * @notice Returns the total value of assets in the vault.
-     * @return The total value of assets in the vault.
+     * @return The total value of assets in the vault, in ETH amount.
      * @dev This function is overridden to integrate with an oracle to determine the total value of all tokens in the vault.
      * @dev This ensures that when depositing or withdrawing, a user receives the correct amount of assets or shares.
      * @dev Allows for assets to be priced in USD, ETH or any other asset, as long as the oracles are updated accordingly and uniformly.
      * @dev Assumes that the oracle returns the price in 18 decimals.
      */
     function totalAssets() public view override returns (uint256) {
-        // Calculate value of native ETH
         uint256 ethBalance = _getETHBalance();
-        uint256 ethPrice = oracle.getPrice(address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE));
-        uint256 totalValue = ethBalance * ethPrice;
+        uint256 rewardTokenUSDValue;
         
         // Calculate value of reward tokens, add them to the total value
         for (uint i = 0; i < rewardTokens.length; i++) {
             address token = rewardTokens[i];
             uint256 balance = IERC20Upgradeable(token).balanceOf(address(this));
             uint256 price = oracle.getPrice(token);
-            totalValue += (balance * price);
+            rewardTokenUSDValue += (balance * price);
         }
         
-        return totalValue / 1e18;
+        // Convert totalValue from USD to ETH
+        uint256 ethPrice = oracle.getPrice(address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE));
+        uint256 rewardTokenETHAmount = rewardTokenUSDValue / ethPrice;
+
+        uint256 totalETHAmount = ethBalance + rewardTokenETHAmount;
+
+        return totalETHAmount;
     }
 
     /* ============== INTERNAL FUNCTIONS ============== */
-
-    /**
-     * @dev Internal conversion function (from assets to shares) with support for rounding direction.
-     * @dev This function is overriden to calculate total value of assets including reward tokens.
-     * @dev Treats totalAssets() as the total value of ETH + reward tokens in USD rather than the total amount of ETH.
-     * Will revert if assets > 0, totalSupply > 0 and totalAssets = 0. That corresponds to a case where any asset
-     * would represent an infinite amout of shares.
-     */
-    function _convertToShares(uint256 assets, MathUpgradeable.Rounding rounding) internal view override returns (uint256 shares) {
-        uint256 supply = totalSupply();
-
-        if (supply == 0) {
-            // For the first deposit, we use the asset amount as the share amount
-            return assets;
-        }
-
-        uint256 ethPrice = oracle.getPrice(address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE));
-        uint256 assetsUsdValue = assets.mulDiv(ethPrice, 1e18, rounding);
-        
-        // Call the parent implementation with the USD value of assets
-        return super._convertToShares(assetsUsdValue, rounding);
-    }
-    
-    /**
-     * @dev Internal conversion function (from shares to assets) with support for rounding direction.
-     * @dev This function is overriden to calculate total value of assets including reward tokens.
-     */
-    function _convertToAssets(uint256 shares, MathUpgradeable.Rounding rounding) internal view override returns (uint256 assets) {
-        uint256 supply = totalSupply() + 10 ** _decimalsOffset(); // Supply includes virtual reserves
-        if (totalSupply() == 0) {
-            return shares; // If there are no shares, return the number of shares as assets. TODO: Remove unnecessary code?
-        } else {
-            uint256 assetsUsdValue = shares.mulDiv(totalAssets(), supply, rounding);
-            uint256 ethPrice = oracle.getPrice(address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE));
-            return assetsUsdValue * 1e18 / ethPrice;
-        }
-    }
 
     /**
      * @dev Distributes rewards to the receiver for all rewardTokens.
