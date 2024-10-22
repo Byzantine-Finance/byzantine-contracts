@@ -130,7 +130,7 @@ contract ERC7535MultiRewardVaultTest is Test {
         assertEq(vault.balanceOf(alice), oneEth, "Alice's balance should remain unchanged");
         assertEq(address(vault).balance, 2 * oneEth, "Vault should have 2 ETH");
         assertEq(vault.totalSupply(), aliceShares + bobShares, "Total supply should be sum of Alice and Bob's shares");
-        assertEq(vault.totalAssets(), 4000 * 1e18, "Total assets should be $4000");
+        assertEq(vault.totalAssets(), 4 ether, "Total assets should be worth 4 ETH");
 
         // Verify proportions of ownership
         uint256 aliceProportion = (vault.balanceOf(alice) * 1e18) / vault.totalSupply();
