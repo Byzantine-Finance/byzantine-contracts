@@ -76,12 +76,13 @@ contract Auction is
 
         // deploy the Split contract and update ClusterDetails
         address splitAddr = pushSplitFactory.createSplit(splitParams, owner(), owner());
+        address eigenPodAddr = strategyVaultManager.getPodByStratVaultAddr(msg.sender);
         _clusterDetails[winningClusterId].splitAddr = splitAddr;
 
         // Update the corresponding sub-auction tree
         _mainUdateSubAuction(winningClusterDetails.nodes, winningClusterId, _bidDetails[winningClusterDetails.nodes[0].bidId].auctionType);
 
-        emit ClusterCreated(winningClusterId, winningAvgAuctionScore, splitAddr);
+        emit ClusterCreated(winningClusterId, winningAvgAuctionScore, splitAddr, eigenPodAddr);
 
         return winningClusterId;
     }

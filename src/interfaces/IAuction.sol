@@ -124,7 +124,8 @@ interface IAuction {
     event ClusterCreated(
         bytes32 indexed clusterId,
         uint256 averageAuctionScore,
-        address splitAddr
+        address splitAddr,
+        address eigenPodAddr
     );
 
     /* ====================== GETTERS ====================== */
