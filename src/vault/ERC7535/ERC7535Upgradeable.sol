@@ -204,7 +204,7 @@ abstract contract ERC7535Upgradeable is Initializable, ERC20Upgradeable, IERC753
             uint256 supply = totalSupply() + 10 ** _decimalsOffset(); // Supply includes virtual reserves
             uint256 totalAssetsAfterMint = totalAssets() + 1; // Add 1 to avoid division by zero
             uint256 totalAssetsBeforeMint = totalAssetsAfterMint - msg.value; // Subtract the deposit from the total assets to ensure ERC7535 performs like ERC4626
-            assets = shares.mulDiv(totalAssetsBeforeMint, supply, MathUpgradeable.Rounding.Down);
+            assets = shares.mulDiv(totalAssetsBeforeMint, supply, MathUpgradeable.Rounding.Up);
         }
 
         // Check if the sent ETH (msg.value) is sufficient to mint the requested shares
