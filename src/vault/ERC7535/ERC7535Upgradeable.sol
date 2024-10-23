@@ -35,6 +35,11 @@ abstract contract ERC7535Upgradeable is Initializable, ERC20Upgradeable, IERC753
      * @dev Attempted to redeem more shares than the max amount for `receiver`.
      */
     error ERC7535ExceededMaxRedeem(address owner, uint256 shares, uint256 max);
+
+    /**
+     * @dev Attempted to deposit less assets than required.
+     */
+    error InsufficientAssets(uint256 assetsRequired, uint256 assetsProvided);
     
     /**
      * @dev Public function for initializing the ERC7535 contract.
@@ -191,9 +196,19 @@ abstract contract ERC7535Upgradeable is Initializable, ERC20Upgradeable, IERC753
             revert ERC7535ExceededMaxMint(receiver, shares, maxShares);
         }
 
-        uint256 assets = previewMint(shares);
+        uint256 assets;
+        // For the first mint, return the number of assets as shares
+        if (totalAssets() == 0 || totalSupply() == 0) {
+            assets = shares;
+        } else {
+            uint256 supply = totalSupply() + 10 ** _decimalsOffset(); // Supply includes virtual reserves
+            uint256 totalAssetsAfterMint = totalAssets() + 1; // Add 1 to avoid division by zero
+            uint256 totalAssetsBeforeMint = totalAssetsAfterMint - msg.value; // Subtract the deposit from the total assets to ensure ERC7535 performs like ERC4626
+            assets = shares.mulDiv(totalAssetsBeforeMint, supply, MathUpgradeable.Rounding.Down);
+        }
 
-        if (assets != msg.value) revert AssetsShouldBeEqualToMsgVaule();
+        // Check if the sent ETH (msg.value) is sufficient to mint the requested shares
+        if (msg.value < assets) revert InsufficientAssets(assets, msg.value);
 
         _deposit(_msgSender(), receiver, assets, shares);
 
@@ -251,6 +266,10 @@ abstract contract ERC7535Upgradeable is Initializable, ERC20Upgradeable, IERC753
      * @dev Internal conversion function (from shares to assets) with support for rounding direction.
      */
     function _convertToAssets(uint256 shares, MathUpgradeable.Rounding rounding) internal view virtual returns (uint256) {
+        // For the first mint, return the number of assets as shares
+        if (totalAssets() == 0 || totalSupply() == 0) {
+            return shares;
+        }
         uint256 supply = totalSupply() + 10 ** _decimalsOffset(); // Supply includes virtual reserves
         uint256 totalAssets_ = totalAssets() + 1; // Add 1 to avoid division by zero
         return shares.mulDiv(totalAssets_, supply, rounding);

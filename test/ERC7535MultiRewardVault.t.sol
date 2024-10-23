@@ -139,105 +139,109 @@ contract ERC7535MultiRewardVaultTest is Test {
         assertApproxEqRel(bobProportion, 250000000000000000, 1e14, "Bob should own 25% of the vault");
     }
 
-    // function testMint() public {
-    //     /* ===================== ALICE MINTS 1 ETH WORTH OF SHARES ===================== */
-    //     uint256 aliceMintAmount = 1 ether;
+    function testMint() public {
+        /* ===================== ALICE MINTS 1 ETH WORTH OF SHARES ===================== */
+        uint256 aliceDesiredShares = 1 ether;
+        uint256 aliceAssetsRequired = vault.previewMint(aliceDesiredShares);
 
-    //     console.log("~~~Initial State~~~");
-    //     console.log("totalAssets", vault.totalAssets());
-    //     console.log("totalSupply", vault.totalSupply());
-    //     console.log("alice shares", vault.balanceOf(alice));
-    //     console.log("bob shares", vault.balanceOf(bob));
+        console.log("~~~Initial State~~~");
+        console.log("totalAssets", vault.totalAssets());
+        console.log("totalSupply", vault.totalSupply());
+        console.log("alice shares", vault.balanceOf(alice));
+        console.log("bob shares", vault.balanceOf(bob));
 
-    //     // Alice mints 1 ETH worth of shares
-    //     vm.prank(alice);
-    //     uint256 aliceAssetsDeposited = vault.mint{value: aliceMintAmount}(aliceMintAmount, alice);
-    //     uint256 aliceShares = vault.balanceOf(alice);
+        console.log("aliceAssetsRequired", aliceAssetsRequired);
 
-    //     console.log("~~~After Alice's mint~~~");
-    //     console.log("return value assets", aliceAssetsDeposited);
-    //     console.log("totalAssets", vault.totalAssets());
-    //     console.log("totalSupply", vault.totalSupply());
-    //     console.log("alice shares", vault.balanceOf(alice));
-    //     console.log("bob shares", vault.balanceOf(bob));
+        // Alice mints 1 ETH worth of shares
+        vm.prank(alice);
+        uint256 aliceAssetsDeposited = vault.mint{value: aliceAssetsRequired}(aliceDesiredShares, alice);
+        uint256 aliceShares = vault.balanceOf(alice);
 
-    //     // Verify Alice's mint
-    //     assertEq(aliceAssetsDeposited, aliceMintAmount, "Alice should deposit 1 ETH");
-    //     assertEq(aliceShares, 1 ether, "Alice should receive 1e18 shares for first deposit");
-    //     assertEq(vault.balanceOf(alice), 1 ether, "Alice's balance should be 1e18 shares");
-    //     assertEq(address(vault).balance, 1 ether, "Vault should have 1 ETH");
+        console.log("~~~After Alice's mint~~~");
+        console.log("return value assets", aliceAssetsDeposited);
+        console.log("totalAssets", vault.totalAssets());
+        console.log("totalSupply", vault.totalSupply());
+        console.log("alice shares", vault.balanceOf(alice));
+        console.log("bob shares", vault.balanceOf(bob));
+
+        // Verify Alice's mint
+        assertEq(aliceAssetsDeposited, aliceAssetsRequired, "Alice should deposit 1 ETH");
+        assertEq(aliceShares, aliceDesiredShares, "Alice should receive 1e18 shares for first deposit");
+        assertEq(vault.balanceOf(alice), aliceDesiredShares, "Alice's balance should be 1e18 shares");
+        assertEq(address(vault).balance, 1 ether, "Vault should have 1 ETH");
         
-    //     /* ===================== ADD 1 REWARD TOKEN ===================== */
-    //     // Add reward token to the vault
-    //     vault.addRewardToken(address(rewardToken1));
-    //     // Mint 1 ETH worth of reward tokens to the vault
-    //     rewardToken1.mint(address(vault), 1 ether);
-    //     // Verify the reward token is added
-    //     assertEq(vault.rewardTokens(0), address(rewardToken1), "Reward token 1 should be added");
-    //     // Verify the reward token balance
-    //     assertEq(rewardToken1.balanceOf(address(vault)), 1 ether, "Vault should have 1 ETH worth of reward token 1");
+        /* ===================== ADD 1 REWARD TOKEN ===================== */
+        // Add reward token to the vault
+        vault.addRewardToken(address(rewardToken1));
+        // Mint 1 ETH worth of reward tokens to the vault
+        rewardToken1.mint(address(vault), 1 ether);
+        // Verify the reward token is added
+        assertEq(vault.rewardTokens(0), address(rewardToken1), "Reward token 1 should be added");
+        // Verify the reward token balance
+        assertEq(rewardToken1.balanceOf(address(vault)), 1 ether, "Vault should have 1 ETH worth of reward token 1");
+        // Verify the total amount of assets on vault
+        assertEq(vault.totalAssets(), 2 ether, "Total assets should be 2 ETH");
 
-    //     console.log("~~~After adding 1 reward token~~~");
-    //     console.log("totalAssets", vault.totalAssets());
-    //     console.log("totalSupply", vault.totalSupply());
-    //     console.log("alice shares", vault.balanceOf(alice));
-    //     console.log("bob shares", vault.balanceOf(bob));
+        console.log("~~~After adding 1 reward token~~~");
+        console.log("totalAssets", vault.totalAssets());
+        console.log("totalSupply", vault.totalSupply());
+        console.log("alice shares", vault.balanceOf(alice));
+        console.log("bob shares", vault.balanceOf(bob));
 
-    //     /* ===================== BOB MINTS 1 ETH WORTH OF SHARES ===================== */
-    //     // Get the expeceted amount of shares from a deposit for 1 ETH
-    //     uint256 bobMintAmount = 1 ether;
-    //     uint256 expectedBobShares = vault.previewDeposit(bobMintAmount);
+        /* ===================== BOB MINTS 1 ETH WORTH OF SHARES ===================== */
+        // Get the expeceted amount of shares from a deposit for 1 ETH
+        uint256 bobMintAmount = 1 ether;
+        uint256 expectedBobShares = vault.previewDeposit(bobMintAmount);
     
-    //     console.log("expectedBobShares", expectedBobShares);
-    //     console.log("assetAmountReturnedFromPreviewMint", vault.previewMint(expectedBobShares));
+        console.log("expectedBobShares", expectedBobShares);
+        console.log("assetAmountReturnedFromPreviewMint", vault.previewMint(expectedBobShares));
 
-    //     // Mint the same amount of shares that we got from the previewDeposit function
-    //     vm.prank(bob);
-    //     uint256 bobAssetsDeposited = vault.mint{value: bobMintAmount}(expectedBobShares, bob);
-    //     uint256 bobShares = vault.balanceOf(bob);
+        // Mint the same amount of shares that we got from the previewDeposit function
+        vm.prank(bob);
+        uint256 bobAssetsDeposited = vault.mint{value: bobMintAmount}(expectedBobShares, bob);
+        uint256 bobShares = vault.balanceOf(bob);
 
-    //     console.log("~~~After Bob's mint~~~");
-    //     console.log("return value assets", bobAssetsDeposited);
-    //     console.log("totalAssets", vault.totalAssets());
-    //     console.log("totalSupply", vault.totalSupply());
-    //     console.log("alice shares", vault.balanceOf(alice));
-    //     console.log("bob shares", vault.balanceOf(bob));
+        console.log("~~~After Bob's mint~~~");
+        console.log("return value assets", bobAssetsDeposited);
+        console.log("totalAssets", vault.totalAssets());
+        console.log("totalSupply", vault.totalSupply());
+        console.log("alice shares", vault.balanceOf(alice));
+        console.log("bob shares", vault.balanceOf(bob));
 
-    //     // Verify Bob's mint
-    //     assertEq(bobAssetsDeposited, bobMintAmount, "Bob should deposit 1 ETH");
-    //     assertApproxEqRel(bobShares, expectedBobShares, 1e14, "Bob should receive 0.5e18 shares (approx)");
-    //     assertEq(vault.balanceOf(alice), 1 ether, "Alice's balance should remain unchanged");
-    //     assertEq(address(vault).balance, 2 ether, "Vault should have 2 ETH");
-    //     assertEq(vault.totalSupply(), aliceShares + bobShares, "Total supply should be sum of Alice and Bob's shares");
-    //     assertEq(vault.totalAssets(), 3000 * 1e18, "Total assets should be $3000");
+        // Verify Bob's mint
+        assertEq(bobAssetsDeposited, bobMintAmount, "Bob should deposit 1 ETH");
+        assertApproxEqRel(bobShares, expectedBobShares, 1e14, "Bob should receive 0.5e18 shares (approx)");
+        assertEq(vault.balanceOf(alice), 1 ether, "Alice's balance should remain unchanged");
+        assertEq(address(vault).balance, 2 ether, "Vault should have 2 ETH");
+        assertEq(vault.totalSupply(), aliceShares + bobShares, "Total supply should be sum of Alice and Bob's shares");
+        assertEq(vault.totalAssets(), 3 ether, "Total assets should be 3 ETH");
 
-    //     // Verify proportions of ownership
-    //     uint256 aliceProportion = (vault.balanceOf(alice) * 1e18) / vault.totalSupply();
-    //     uint256 bobProportion = (vault.balanceOf(bob) * 1e18) / vault.totalSupply();
-    //     assertApproxEqRel(aliceProportion, 666666666666666666, 1e14, "Alice should own (approx) 66.66% of the vault");
-    //     assertApproxEqRel(bobProportion, 333333333333333333, 1e14, "Bob should own (approx) 33.33% of the vault");
+        // Verify proportions of ownership
+        uint256 aliceProportion = (vault.balanceOf(alice) * 1e18) / vault.totalSupply();
+        uint256 bobProportion = (vault.balanceOf(bob) * 1e18) / vault.totalSupply();
+        assertApproxEqRel(aliceProportion, 666666666666666666, 1e14, "Alice should own (approx) 66.66% of the vault");
+        assertApproxEqRel(bobProportion, 333333333333333333, 1e14, "Bob should own (approx) 33.33% of the vault");
 
-    //     /* ===================== ALICE MINTS 1 SHARE ===================== */
-    //     uint256 aliceSharesToMint = vault.balanceOf(bob) / 2; // Half of Bob's shares
-    //     uint256 aliceEthRequired = vault.previewMint(aliceSharesToMint);
+        /* ===================== ALICE MINTS 1 SHARE ===================== */
+        uint256 aliceSharesToMint2 = vault.balanceOf(bob) / 2; // Half of Bob's shares
+        uint256 aliceExpectedAssets2 = vault.previewMint(aliceSharesToMint2);
 
-    //     console.log("aliceSharesToMint", aliceSharesToMint);
-    //     console.log("aliceEthRequired", aliceEthRequired);
+        console.log("aliceSharesToMint", aliceSharesToMint2);
+        console.log("aliceExpectedAssets", aliceExpectedAssets2);
 
-    //     vm.prank(alice);
-    //     uint256 aliceAssetsMinted = vault.mint{value: aliceEthRequired}(aliceSharesToMint, alice);
+        vm.prank(alice);
+        uint256 aliceAssetsMinted = vault.mint{value: aliceExpectedAssets2}(aliceSharesToMint2, alice);
 
-    //     console.log("~~~After Alice's 2nd mint~~~");
-    //     console.log("aliceAssetsMinted", aliceAssetsMinted);
-    //     console.log("totalAssets", vault.totalAssets());
-    //     console.log("totalSupply", vault.totalSupply());
-    //     console.log("alice shares", vault.balanceOf(alice));
-    //     console.log("bob shares", vault.balanceOf(bob));
+        console.log("~~~After Alice's 2nd mint~~~");
+        console.log("aliceAssetsMinted", aliceAssetsMinted);
+        console.log("totalAssets", vault.totalAssets());
+        console.log("totalSupply", vault.totalSupply());
+        console.log("alice shares", vault.balanceOf(alice));
+        console.log("bob shares", vault.balanceOf(bob));
 
-    //     // Verify Alice's mint
+        // Verify Alice's mint
         
-        
-    // }
+    }
 
     function testWithdraw() public {
         /* ===================== ALICE DEPOSITS AND THEN WITHDRAWS HALF ===================== */
