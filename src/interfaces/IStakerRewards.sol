@@ -8,6 +8,7 @@ interface IStakerRewards {
     /// @notice Checkpoint updated at every new event
     struct Checkpoint {
         uint256 updateTime;
+        uint256 totalActivedBids;
         uint256 totalPendingRewards;
         uint256 dailyRewardsPer32ETH; // Daily rewards distributed for every 32ETH staked
         uint64 totalVCs;
@@ -25,6 +26,7 @@ interface IStakerRewards {
     struct VaultData {
         uint256 lastUpdate;
         uint16 numValidatorsInVault;
+        uint256 pendingRewards;
     }
 
     /* ============== EXTERNAL FUNCTIONS ============== */
@@ -58,11 +60,11 @@ interface IStakerRewards {
 
     /**
      * @notice Calculate the pending rewards since last update
-     * @param _vaultAddr Address of the StratVaultETH
-     * @param _numDVs Number of validators in the vault
+     * @param _numValsInVault Number of validators in the vault
+     * @param _vaultUpdateTime Last update time of the vault
      * @dev Revert if the last update timestamp is 0
      */
-    function calculateRewards(address _vaultAddr, uint256 _numDVs) external view returns (uint256);
+    function calculateRewards(uint16 _numValsInVault, uint256 _vaultUpdateTime) external view returns (uint256);
 
     /**
      * @notice Calculate the allocatable amount of ETH in the StakerRewards contract 
