@@ -43,6 +43,7 @@ contract ExistingDeploymentParser is Script, Test {
     StakerRewards public stakerRewards;
     StakerRewards public stakerRewardsImplementation;
     BidInvestmentMock public bidInvestment;
+    BidInvestmentMock public bidInvestmentImplementation;
     
     // Beacon Chain Admin address
     address public beaconChainAdmin;
