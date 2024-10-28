@@ -482,11 +482,12 @@ contract Auction is
      * @notice Get the total number of VCs and the smallest VC number of a cluster
      * @param nodes The nodes of the cluster
      */
-    function getTotalAndSmallestVCs(NodeDetails[] memory nodes) public pure returns (uint64 totalClusterVCs, uint32 smallestVcNumber, uint8 smallClusterSize) {
+    function getClusterMetrics(NodeDetails[] memory nodes) public view returns (uint256 totalBidPrice, uint64 totalClusterVCs, uint32 smallestVcNumber, uint8 smallClusterSize) {
         uint256 bigClusterSize = nodes.length;
         smallestVcNumber = nodes[0].currentVCNumber; 
         for (uint256 i; i < bigClusterSize;) {
             totalClusterVCs += nodes[i].currentVCNumber; 
+            totalBidPrice += _bidDetails[nodes[i].bidId].bidPrice;
             if (nodes[i].currentVCNumber < smallestVcNumber) {
                 smallestVcNumber = nodes[i].currentVCNumber;
             }
