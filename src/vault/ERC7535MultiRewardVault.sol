@@ -305,6 +305,17 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
         return (tokenAddresses, tokenAmounts);
     }
 
+    function previewRedeem(uint256 shares) public view override returns (uint256) {
+        uint256 totalShares = totalSupply();
+        if (totalShares == 0) {
+            return 0;
+        }
+
+        // Calculate proportion of total assets that these shares represent
+        uint256 totalAssetValue = totalAssets(); // This includes both ETH and RWD value
+        return (shares * totalAssetValue) / totalShares;
+    }
+
     /* ============== INTERNAL FUNCTIONS ============== */
 
     /**
