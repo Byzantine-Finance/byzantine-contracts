@@ -61,10 +61,10 @@ contract ERC7535MultiRewardVaultTest is Test {
         uint256 oneEth = 1 ether;
 
         console.log("~~~Initial State~~~");
-        console.log("totalAssets", vault.totalAssets());
-        console.log("totalSupply", vault.totalSupply());
-        console.log("alice shares", vault.balanceOf(alice));
-        console.log("bob shares", vault.balanceOf(bob));
+        console.log("totalAssets", etherToString(vault.totalAssets()));
+        console.log("totalSupply", decimalToString(vault.totalSupply()));
+        console.log("alice shares", decimalToString(vault.balanceOf(alice)));
+        console.log("bob shares", decimalToString(vault.balanceOf(bob)));
 
         /* ===================== ALICE DEPOSITS 1 ETH ===================== */
         // Alice deposits 1 ETH into the vault
@@ -73,10 +73,10 @@ contract ERC7535MultiRewardVaultTest is Test {
 
         console.log("~~~After Alice's deposit~~~");
         console.log("return value aliceShares", aliceShares);
-        console.log("totalAssets", vault.totalAssets());
-        console.log("totalSupply", vault.totalSupply());
-        console.log("alice shares", vault.balanceOf(alice));
-        console.log("bob shares", vault.balanceOf(bob));
+        console.log("totalAssets", etherToString(vault.totalAssets()));
+        console.log("totalSupply", decimalToString(vault.totalSupply()));
+        console.log("alice shares", decimalToString(vault.balanceOf(alice)));
+        console.log("bob shares", decimalToString(vault.balanceOf(bob)));
         
         // Verify Alice's deposit
         assertEq(aliceShares, oneEth, "Alice should receive 1e18 shares for first deposit");
@@ -94,10 +94,10 @@ contract ERC7535MultiRewardVaultTest is Test {
         assertEq(rewardToken1.balanceOf(address(vault)), 2 * oneEth, "Vault should have 2 ETH worth of reward token 1");
 
         console.log("~~~After adding 2 reward tokens~~~");
-        console.log("totalAssets", vault.totalAssets());
-        console.log("totalSupply", vault.totalSupply());
-        console.log("alice shares", vault.balanceOf(alice));
-        console.log("bob shares", vault.balanceOf(bob));
+        console.log("totalAssets", etherToString(vault.totalAssets()));
+        console.log("totalSupply", decimalToString(vault.totalSupply()));
+        console.log("alice shares", decimalToString(vault.balanceOf(alice)));
+        console.log("bob shares", decimalToString(vault.balanceOf(bob)));
 
         /* ===================== BOB DEPOSITS 1 ETH ===================== */
         /**
@@ -119,11 +119,11 @@ contract ERC7535MultiRewardVaultTest is Test {
 
         console.log("~~~After Bob's deposit~~~");
         console.log("return value bobShares", bobShares);
-        console.log("totalAssets", vault.totalAssets());
-        console.log("totalSupply", vault.totalSupply());
-        console.log("alice shares", vault.balanceOf(alice));
-        console.log("bob shares", vault.balanceOf(bob));
-        
+        console.log("totalAssets", etherToString(vault.totalAssets()));
+        console.log("totalSupply", decimalToString(vault.totalSupply()));
+        console.log("alice shares", decimalToString(vault.balanceOf(alice)));
+        console.log("bob shares", decimalToString(vault.balanceOf(bob)));
+
         // Verify Bob's deposit
         assertApproxEqRel(bobShares, expectedBobShares, 1e14, "Bob should receive 0.333e18 shares (approx)");
         assertEq(vault.balanceOf(bob), bobShares, "Bob's balance should match received shares");
@@ -145,10 +145,10 @@ contract ERC7535MultiRewardVaultTest is Test {
         uint256 aliceAssetsRequired = vault.previewMint(aliceDesiredShares);
 
         console.log("~~~Initial State~~~");
-        console.log("totalAssets", vault.totalAssets());
-        console.log("totalSupply", vault.totalSupply());
-        console.log("alice shares", vault.balanceOf(alice));
-        console.log("bob shares", vault.balanceOf(bob));
+        console.log("totalAssets", etherToString(vault.totalAssets()));
+        console.log("totalSupply", decimalToString(vault.totalSupply()));
+        console.log("alice shares", decimalToString(vault.balanceOf(alice)));
+        console.log("bob shares", decimalToString(vault.balanceOf(bob)));
 
         console.log("aliceAssetsRequired", aliceAssetsRequired);
 
@@ -158,11 +158,11 @@ contract ERC7535MultiRewardVaultTest is Test {
         uint256 aliceShares = vault.balanceOf(alice);
 
         console.log("~~~After Alice's mint~~~");
-        console.log("return value assets", aliceAssetsDeposited);
-        console.log("totalAssets", vault.totalAssets());
-        console.log("totalSupply", vault.totalSupply());
-        console.log("alice shares", vault.balanceOf(alice));
-        console.log("bob shares", vault.balanceOf(bob));
+        console.log("return value assets", etherToString(aliceAssetsDeposited));
+        console.log("totalAssets", etherToString(vault.totalAssets()));
+        console.log("totalSupply", decimalToString(vault.totalSupply()));
+        console.log("alice shares", decimalToString(vault.balanceOf(alice)));
+        console.log("bob shares", decimalToString(vault.balanceOf(bob)));
 
         // Verify Alice's mint
         assertEq(aliceAssetsDeposited, aliceAssetsRequired, "Alice should deposit 1 ETH");
@@ -183,10 +183,10 @@ contract ERC7535MultiRewardVaultTest is Test {
         assertEq(vault.totalAssets(), 2 ether, "Total assets should be 2 ETH");
 
         console.log("~~~After adding 1 reward token~~~");
-        console.log("totalAssets", vault.totalAssets());
-        console.log("totalSupply", vault.totalSupply());
-        console.log("alice shares", vault.balanceOf(alice));
-        console.log("bob shares", vault.balanceOf(bob));
+        console.log("totalAssets", etherToString(vault.totalAssets()));
+        console.log("totalSupply", decimalToString(vault.totalSupply()));
+        console.log("alice shares", decimalToString(vault.balanceOf(alice)));
+        console.log("bob shares", decimalToString(vault.balanceOf(bob)));
 
         /* ===================== BOB MINTS 1 ETH WORTH OF SHARES ===================== */
         // Get the expeceted amount of shares from a deposit for 1 ETH
@@ -194,7 +194,7 @@ contract ERC7535MultiRewardVaultTest is Test {
         uint256 expectedBobShares = vault.previewDeposit(bobMintAmount);
     
         console.log("expectedBobShares", expectedBobShares);
-        console.log("assetAmountReturnedFromPreviewMint", vault.previewMint(expectedBobShares));
+        console.log("assetAmountReturnedFromPreviewMint", etherToString(vault.previewMint(expectedBobShares)));
 
         // Mint the same amount of shares that we got from the previewDeposit function
         vm.prank(bob);
@@ -202,11 +202,11 @@ contract ERC7535MultiRewardVaultTest is Test {
         uint256 bobShares = vault.balanceOf(bob);
 
         console.log("~~~After Bob's mint~~~");
-        console.log("return value assets", bobAssetsDeposited);
-        console.log("totalAssets", vault.totalAssets());
-        console.log("totalSupply", vault.totalSupply());
-        console.log("alice shares", vault.balanceOf(alice));
-        console.log("bob shares", vault.balanceOf(bob));
+        console.log("return value assets", etherToString(bobAssetsDeposited));
+        console.log("totalAssets", etherToString(vault.totalAssets()));
+        console.log("totalSupply", decimalToString(vault.totalSupply()));
+        console.log("alice shares", decimalToString(vault.balanceOf(alice)));
+        console.log("bob shares", decimalToString(vault.balanceOf(bob)));
 
         // Verify Bob's mint
         assertEq(bobAssetsDeposited, bobMintAmount, "Bob should deposit 1 ETH");
@@ -223,33 +223,319 @@ contract ERC7535MultiRewardVaultTest is Test {
         assertApproxEqRel(bobProportion, 333333333333333333, 1e14, "Bob should own (approx) 33.33% of the vault");
 
         /* ===================== ALICE MINTS 1 SHARE ===================== */
-        uint256 aliceSharesToMint2 = vault.balanceOf(bob) / 2; // Half of Bob's shares
+        uint256 aliceSharesToMint2 = 1e18;
         uint256 aliceExpectedAssets2 = vault.previewMint(aliceSharesToMint2);
 
-        console.log("aliceSharesToMint", aliceSharesToMint2);
-        console.log("aliceExpectedAssets", aliceExpectedAssets2);
+        console.log("aliceSharesToMint2", decimalToString(aliceSharesToMint2));
+        console.log("aliceExpectedAssets", etherToString(aliceExpectedAssets2));
 
         vm.prank(alice);
         uint256 aliceAssetsMinted = vault.mint{value: aliceExpectedAssets2}(aliceSharesToMint2, alice);
+        uint256 aliceSharesMinted = vault.balanceOf(alice) - aliceShares; // Deduct previous shares
 
         console.log("~~~After Alice's 2nd mint~~~");
-        console.log("aliceAssetsMinted", aliceAssetsMinted);
-        console.log("totalAssets", vault.totalAssets());
-        console.log("totalSupply", vault.totalSupply());
-        console.log("alice shares", vault.balanceOf(alice));
-        console.log("bob shares", vault.balanceOf(bob));
+        console.log("aliceAssetsMinted", etherToString(aliceAssetsMinted));
+        console.log("totalAssets", etherToString(vault.totalAssets()));
+        console.log("totalSupply", decimalToString(vault.totalSupply()));
+        console.log("alice shares", decimalToString(vault.balanceOf(alice)));
+        console.log("bob shares", decimalToString(vault.balanceOf(bob)));
 
         // Verify Alice's mint
-        
+        assertEq(aliceSharesToMint2, aliceSharesMinted, "Alice should receive 1 share");
+        assertEq(aliceAssetsMinted, aliceExpectedAssets2, "Alice should deposit 2 ETH");
+        assertEq(vault.totalAssets(), 5 ether, "Vault should have 5 ETH");
+        assertEq(vault.balanceOf(alice), aliceSharesToMint2 + aliceShares, "Alice's balance should be 2 shares");
     }
 
     function testWithdraw() public {
-        /* ===================== ALICE DEPOSITS AND THEN WITHDRAWS HALF ===================== */
+        /* ===================== ALICE DEPOSITS 1 ETH AND THEN WITHDRAWS 0.5 ETH ===================== */
+        uint256 oneEth = 1 ether;
+        uint256 halfEth = 0.5 ether;
 
+        console.log("~~~Initial State~~~");
+        console.log("totalAssets", etherToString(vault.totalAssets()));
+        console.log("totalSupply", decimalToString(vault.totalSupply()));
+        console.log("ETH in vault", etherToString(address(vault).balance));
+        console.log("RWD in vault", decimalToString(rewardToken1.balanceOf(address(vault))));
+        console.log("alice shares", decimalToString(vault.balanceOf(alice)));
+        console.log("alice ETH balance", etherToString(address(alice).balance));
+        console.log("alice RWD balance", decimalToString(rewardToken1.balanceOf(alice)));
+        console.log("bob shares", decimalToString(vault.balanceOf(bob)));
+        console.log("bob ETH balance", etherToString(address(bob).balance));
+        console.log("bob RWD balance", decimalToString(rewardToken1.balanceOf(bob)));
+
+        // Alice deposits 1 ETH
+        vm.prank(alice);
+        uint256 aliceShares = vault.deposit{value: oneEth}(oneEth, alice);
+
+        console.log("~~~After Alice's deposit~~~");
+        console.log("totalAssets", etherToString(vault.totalAssets()));
+        console.log("totalSupply", decimalToString(vault.totalSupply()));
+        console.log("ETH in vault", etherToString(address(vault).balance));
+        console.log("RWD in vault", decimalToString(rewardToken1.balanceOf(address(vault))));
+        console.log("alice shares", decimalToString(vault.balanceOf(alice)));
+        console.log("alice ETH balance", etherToString(address(alice).balance));
+        console.log("alice RWD balance", decimalToString(rewardToken1.balanceOf(alice)));
+        console.log("bob shares", decimalToString(vault.balanceOf(bob)));
+        console.log("bob ETH balance", etherToString(address(bob).balance));
+        console.log("bob RWD balance", decimalToString(rewardToken1.balanceOf(bob)));
+
+        console.log("alice total ETH value", etherToString(vault.getUserTotalETHValue(alice)));
+        //console.log("alice proportion withdrawn", halfEth / vault.getUserTotalETHValue(alice));
+        (, uint256[] memory assetAmountsAlice) = vault.getUsersOwnedAssetsAndRewards(alice);
+        console.log("alice amount of ETH owned", etherToString(assetAmountsAlice[0]));
+
+        // Alice withdraws 0.5 ETH
+        uint256 aliceSharesBeforeWithdraw = vault.balanceOf(alice);
+        uint256 aliceETHBalanceBeforeWithdraw = address(alice).balance;
+        
+        vm.prank(alice);
+        uint256 sharesBurned = vault.withdraw(halfEth, alice, alice);
+
+        console.log("~~~After Alice's withdrawal~~~");
+        console.log("totalAssets", etherToString(vault.totalAssets()));
+        console.log("totalSupply", decimalToString(vault.totalSupply()));
+        console.log("ETH in vault", etherToString(address(vault).balance));
+        console.log("RWD in vault", decimalToString(rewardToken1.balanceOf(address(vault))));
+        console.log("alice shares", decimalToString(vault.balanceOf(alice)));
+        console.log("alice ETH balance", etherToString(address(alice).balance));
+        console.log("alice RWD balance", decimalToString(rewardToken1.balanceOf(alice)));
+        console.log("bob shares", decimalToString(vault.balanceOf(bob)));
+        console.log("bob ETH balance", etherToString(address(bob).balance));
+        console.log("bob RWD balance", decimalToString(rewardToken1.balanceOf(bob)));
+
+        // Verify Alice's withdrawal
+        assertEq(vault.balanceOf(alice), aliceSharesBeforeWithdraw - sharesBurned, "Alice's shares should decrease by the amount burned");
+        assertEq(address(alice).balance - aliceETHBalanceBeforeWithdraw, halfEth, "Alice should receive 0.5 ETH");
+        assertEq(vault.totalAssets(), halfEth, "Vault should have 0.5 ETH remaining");
+
+        /* ===================== BOB DEPOSITS 1 ETH ===================== */
+        vm.prank(bob);
+        uint256 bobShares = vault.deposit{value: oneEth}(oneEth, bob);
+
+        console.log("~~~After Bob's deposit~~~");
+        console.log("totalAssets", etherToString(vault.totalAssets()));
+        console.log("totalSupply", decimalToString(vault.totalSupply()));
+        console.log("ETH in vault", etherToString(address(vault).balance));
+        console.log("RWD in vault", decimalToString(rewardToken1.balanceOf(address(vault))));
+        console.log("alice shares", decimalToString(vault.balanceOf(alice)));
+        console.log("alice ETH balance", etherToString(address(alice).balance));
+        console.log("alice RWD balance", decimalToString(rewardToken1.balanceOf(alice)));
+        console.log("bob shares", vault.balanceOf(bob));
+        console.log("bob ETH balance", etherToString(address(bob).balance));
+        console.log("bob RWD balance", decimalToString(rewardToken1.balanceOf(bob)));
+
+        // Verify Bob's deposit
+        assertEq(vault.balanceOf(bob), bobShares, "Bob's balance should match received shares");
+        assertEq(vault.totalAssets(), oneEth + halfEth, "Vault should have 1.5 ETH");
+
+        /* ===================== ADD 1 REWARD TOKEN ===================== */
+        vault.addRewardToken(address(rewardToken1));
+        rewardToken1.mint(address(vault), oneEth);
+
+        console.log("~~~After adding reward token~~~");
+        console.log("totalAssets", etherToString(vault.totalAssets()));
+        console.log("totalSupply", decimalToString(vault.totalSupply()));
+        console.log("ETH in vault", etherToString(address(vault).balance));
+        console.log("RWD in vault", decimalToString(rewardToken1.balanceOf(address(vault))));
+        console.log("alice shares", decimalToString(vault.balanceOf(alice)));
+        console.log("alice ETH balance", etherToString(address(alice).balance));
+        console.log("alice RWD balance", decimalToString(rewardToken1.balanceOf(alice)));
+        console.log("bob shares", decimalToString(vault.balanceOf(bob)));
+        console.log("bob ETH balance", etherToString(address(bob).balance));
+        console.log("bob RWD balance", decimalToString(rewardToken1.balanceOf(bob)));
+
+        // Verify reward token addition
+        assertEq(rewardToken1.balanceOf(address(vault)), oneEth, "Vault should have 1 ETH worth of reward token 1");
+        assertEq(vault.totalAssets(), 2.5 ether, "Total assets should be 2.5 ETH");
+
+        /* ===================== BOB WITHDRAWS 1 ETH ===================== */
+        uint256 bobSharesBeforeWithdraw = vault.balanceOf(bob);
+        uint256 bobETHBalanceBeforeWithdraw = address(bob).balance;
+        uint256 bobRWDBalanceBeforeWithdraw = rewardToken1.balanceOf(bob);
+
+        (, uint256[] memory assetAmountsBob) = vault.getUsersOwnedAssetsAndRewards(bob);
+        console.log("bob amount of ETH owned", etherToString(assetAmountsBob[0]));
+        console.log("bob amount of RWD owned", decimalToString(assetAmountsBob[1]));
+
+        vm.prank(bob);
+        uint256 bobSharesBurned = vault.withdraw(oneEth, bob, bob);
+
+        uint256 bobETHBalanceAfterWithdraw = address(bob).balance;
+        uint256 bobRWDBalanceAfterWithdraw = rewardToken1.balanceOf(bob);
+        uint256 bobWithdrawnETH = bobETHBalanceAfterWithdraw - bobETHBalanceBeforeWithdraw;
+        uint256 bobWithdrawnRWD = bobRWDBalanceAfterWithdraw - bobRWDBalanceBeforeWithdraw;
+
+        console.log("~~~After Bob's withdrawal~~~");
+        console.log("totalAssets", etherToString(vault.totalAssets()));
+        console.log("totalSupply", decimalToString(vault.totalSupply()));
+        console.log("ETH in vault", etherToString(address(vault).balance));
+        console.log("RWD in vault", decimalToString(rewardToken1.balanceOf(address(vault))));
+        console.log("alice shares", decimalToString(vault.balanceOf(alice)));
+        console.log("alice ETH balance", etherToString(address(alice).balance));
+        console.log("alice RWD balance", rewardToken1.balanceOf(alice));
+        console.log("bob shares", vault.balanceOf(bob));
+        console.log("bob ETH balance", address(bob).balance);
+        console.log("bob RWD balance", rewardToken1.balanceOf(bob));
+
+        // Verify Bob's withdrawal
+        assertEq(vault.balanceOf(bob), bobSharesBeforeWithdraw - bobSharesBurned, "Bob's shares should decrease by the amount burned");
+        // There is 1.5 ETH and 1 RWD in the vault.
+        // Bob owns 66.66% of the vault.
+        // Therefore, Bob owns 1 ETH and 0.666 RWD.
+        // Bob is withdrawing 1 ETH, which is 60% of his total ETH value (1 / 1.666666666666666666) ≈ 0.6 or 60% .
+        // Therefore, Bob should receive 60% of the remaining ETH and RWD in the vault.
+        // Bob should receive 0.6 ETH and 0.4 RWD.
+        assertApproxEqRel(bobWithdrawnETH, 0.6 ether, 1e14, "Bob should receive approx 0.6 ether");
+        assertApproxEqRel(bobWithdrawnRWD, 0.4 ether, 1e14, "Bob should receive approx 0.4 RWD");
+        assertApproxEqRel(address(vault).balance, 1.5 ether - bobWithdrawnETH, 1e14, "Vault should have approx 0.9 ETH remaining");
+        assertApproxEqRel(rewardToken1.balanceOf(address(vault)), 0.6 ether, 1e14, "Vault should have approx 0.6 RWD remaining");
+        assertApproxEqRel(bobWithdrawnRWD + bobWithdrawnETH, 1 ether, 1e14, "Bob should have received approx 1 ether");
     }
 
     function testRedeem() public {
-        /* ===================== BOB DEPOSITS AND THEN REDEEMS HALF ===================== */
+        console.log("~~~Initial State~~~");
+        console.log("totalAssets", etherToString(vault.totalAssets()));
+        console.log("totalSupply", etherToString(vault.totalSupply()));
+        console.log("ETH in vault", etherToString(address(vault).balance));
+        console.log("RWD in vault", etherToString(rewardToken1.balanceOf(address(vault))));
+        console.log("alice shares", etherToString(vault.balanceOf(alice)));
+        console.log("bob shares", etherToString(vault.balanceOf(bob)));
+
+        /* ===================== ALICE DEPOSITS 1 ETH AND THEN REDEEMS HALF THEIR SHARES ===================== */
+        uint256 aliceDepositAmount = 1 ether;
+        vm.prank(alice);
+        uint256 aliceShares = vault.deposit{value: aliceDepositAmount}(aliceDepositAmount, alice);
+
+        console.log("~~~After Alice's deposit~~~");
+        console.log("totalAssets", etherToString(vault.totalAssets()));
+        console.log("totalSupply", etherToString(vault.totalSupply()));
+        console.log("ETH in vault", etherToString(address(vault).balance));
+        console.log("RWD in vault", etherToString(rewardToken1.balanceOf(address(vault))));
+        console.log("alice shares", etherToString(vault.balanceOf(alice)));
+        console.log("bob shares", etherToString(vault.balanceOf(bob)));
+
+        uint256 halfOfAliceShares = aliceShares / 2;
+        uint256 aliceAssetsToWithdraw = vault.previewRedeem(halfOfAliceShares);
+
+        console.log("aliceAssetsToWithdraw", etherToString(aliceAssetsToWithdraw));
+
+        uint256 aliceETHBalanceBefore = address(alice).balance;
+        uint256 vaultETHBalanceBefore = address(vault).balance;
+        vm.prank(alice);
+        uint256 aliceAssetsWithdrawn = vault.redeem(halfOfAliceShares, alice, alice);
+
+        console.log("~~~After Alice's redeem~~~");
+        console.log("aliceAssetsWithdrawn", etherToString(aliceAssetsWithdrawn));
+        console.log("totalAssets", etherToString(vault.totalAssets()));
+        console.log("totalSupply", etherToString(vault.totalSupply()));
+        console.log("ETH in vault", etherToString(address(vault).balance));
+        console.log("RWD in vault", etherToString(rewardToken1.balanceOf(address(vault))));
+        console.log("alice shares", etherToString(vault.balanceOf(alice)));
+        console.log("bob shares", etherToString(vault.balanceOf(bob)));
+
+        uint256 aliceETHBalanceAfter = address(alice).balance;
+        console.log("aliceETHBalanceBefore", etherToString(aliceETHBalanceBefore));
+        console.log("aliceETHBalanceAfter", etherToString(aliceETHBalanceAfter));
+        uint256 aliceWithdrawnETH = aliceETHBalanceAfter - aliceETHBalanceBefore;
+        console.log("aliceWithdrawnETH", etherToString(aliceWithdrawnETH));
+
+        uint256 vaultETHBalanceAfter = address(vault).balance;
+        console.log("vaultETHBalanceBefore", etherToString(vaultETHBalanceBefore));
+        console.log("vaultETHBalanceAfter", etherToString(vaultETHBalanceAfter));
+        uint256 vaultWithdrawnETH = vaultETHBalanceBefore - vaultETHBalanceAfter;
+        console.log("vaultWithdrawnETH", etherToString(vaultWithdrawnETH));
+
+        uint256 aliceRewardTokenBalance = rewardToken1.balanceOf(alice);
+        console.log("aliceRewardTokenBalance", etherToString(aliceRewardTokenBalance));
+        uint256 aliceTotalAssets = vaultWithdrawnETH + aliceRewardTokenBalance;
+        console.log("aliceTotalAssets", etherToString(aliceTotalAssets));
+
+        // Verify Alice's redeem
+        assertEq(aliceTotalAssets, 0.5 ether, "Alice should receive assets worth 0.5 ETH");
+        assertEq(vaultWithdrawnETH, 0.5 ether, "Vault should have lost 0.5 ETH");
+        assertEq(aliceWithdrawnETH, 0.5 ether, "Alice should have gained 0.5 ETH");
+        assertEq(vault.totalAssets(), 0.5 ether, "Vault should have 0.5 ETH in total value");
+        assertEq(address(vault).balance, 0.5 ether, "Vault should have 0.5 ETH");
+        assertEq(vault.totalSupply(), 0.5e18, "Vault should have 0.5 shares");
+        
+        /* ===================== BOB DEPOSITS 2 ETH ===================== */
+        uint256 bobDepositAmount = 2 ether;
+        vm.prank(bob);
+        uint256 bobSharesAfterDeposit = vault.deposit{value: bobDepositAmount}(bobDepositAmount, bob);
+
+        console.log("~~~After Bob's deposit~~~");
+        console.log("totalAssets", etherToString(vault.totalAssets()));
+        console.log("totalSupply", etherToString(vault.totalSupply()));
+        console.log("ETH in vault", etherToString(address(vault).balance));
+        console.log("RWD in vault", etherToString(rewardToken1.balanceOf(address(vault))));
+        console.log("alice shares", etherToString(vault.balanceOf(alice)));
+        console.log("bob shares", etherToString(vault.balanceOf(bob)));
+
+        assertEq(vault.totalAssets(), 2.5 ether, "Vault should have 2.5 ETH in total value");
+        assertEq(address(vault).balance, 2.5 ether, "Vault should have 2.5 ETH");
+        assertEq(vault.totalSupply(), 2.5e18, "Vault should have 2.5 shares");
+
+        /* ===================== ADD 1 REWARD TOKEN ===================== */
+        vault.addRewardToken(address(rewardToken1));
+        rewardToken1.mint(address(vault), 1 ether);
+
+        console.log("~~~After adding reward token~~~");
+        console.log("totalAssets", etherToString(vault.totalAssets()));
+        console.log("totalSupply", etherToString(vault.totalSupply()));
+        console.log("ETH in vault", etherToString(address(vault).balance));
+        console.log("RWD in vault", etherToString(rewardToken1.balanceOf(address(vault))));
+        console.log("alice shares", etherToString(vault.balanceOf(alice)));
+        console.log("bob shares", etherToString(vault.balanceOf(bob)));
+
+        assertEq(vault.totalAssets(), 3.5 ether, "Vault should have 3.5 ETH in total value");
+        console.log("~~~Attempting Redeem~~~");
+
+        /* ===================== BOB REDEEMS 1 SHARE ===================== */
+        uint256 bobSharesToRedeem = 1e18;
+        uint256 bobETHBalanceBefore = address(bob).balance;
+        console.log("bobETHBalanceBefore", etherToString(bobETHBalanceBefore));
+        uint256 vaultETHBalanceBefore2 = address(vault).balance;
+        console.log("vaultETHBalanceBefore2", etherToString(vaultETHBalanceBefore2));
+
+        vm.prank(bob);
+        uint256 bobAssetsRedeemed = vault.redeem(bobSharesToRedeem, bob, bob);
+        uint256 bobSharesAfterRedeem = vault.balanceOf(bob);
+
+        console.log("~~~After Bob's redeem~~~");
+        console.log("bobAssetsRedeemed", etherToString(bobAssetsRedeemed));
+        console.log("totalAssets", etherToString(vault.totalAssets()));
+        console.log("totalSupply", etherToString(vault.totalSupply()));
+        console.log("ETH in vault", etherToString(address(vault).balance));
+        console.log("RWD in vault", etherToString(rewardToken1.balanceOf(address(vault))));
+        console.log("alice shares", etherToString(vault.balanceOf(alice)));
+        console.log("bob shares", etherToString(vault.balanceOf(bob)));
+
+        uint256 bobETHBalanceAfter = address(bob).balance;
+        console.log("bobETHBalanceAfter", etherToString(bobETHBalanceAfter));
+        uint256 bobWithdrawnETH = bobETHBalanceAfter - bobETHBalanceBefore;
+        console.log("bobWithdrawnETH", etherToString(bobWithdrawnETH));
+
+        uint256 vaultETHBalanceAfter2 = address(vault).balance;
+        console.log("vaultETHBalanceAfter2", etherToString(vaultETHBalanceAfter2));
+        uint256 vaultWithdrawnETH2 = vaultETHBalanceBefore2 - vaultETHBalanceAfter2;
+        console.log("vaultWithdrawnETH2", etherToString(vaultWithdrawnETH2));
+
+        // Verify Bob's redeem
+        // There is 2.5 ETH and 1 RWD in the vault.
+        // Bob holds 2 shares, and the total supply is 2.5 shares.
+        // Bob owns 80% of the vault.
+        // Therefore, Bob owns 2 ETH and 0.8 RWD.
+        // Bob is withdrawing 1 share, which is 50% of his value (1 / 2 = 0.5 or 50%)
+        // Therefore, Bob should receive 1 ETH and 0.4 RWD.
+        assertEq(bobSharesAfterRedeem, 1e18, "Bob should have 1 shares left");
+        assertEq(vaultWithdrawnETH2, 1 ether, "Vault should have lost 1 ETH");
+        assertEq(bobWithdrawnETH, 1 ether, "Bob should have gained 1 ETH");
+        assertEq(rewardToken1.balanceOf(address(vault)), 0.6 ether, "Vault should have 0.6 RWD");
+        assertEq(rewardToken1.balanceOf(bob), 0.4 ether, "Bob should have 0.4 RWD");
+        assertEq(vault.totalAssets(), 2.1 ether, "Vault should have 2.1 ETH in total value");
+        assertEq(address(vault).balance, 1.5 ether, "Vault should have 1.5 ETH");
+        assertEq(vault.totalSupply(), 1.5e18, "Vault should have 1.5 shares");
     }
 
     function testAddRewardToken() public {
@@ -282,6 +568,29 @@ contract ERC7535MultiRewardVaultTest is Test {
         // 3. Mint some reward tokens to the vault
         // 4. Withdraw or redeem for one user
         // 5. Check if rewards are correctly distributed proportionally to the shares
+    }
+
+    function etherToString(uint256 weiAmount) internal pure returns (string memory) {
+        uint256 etherToValue = weiAmount / 1e18;
+        uint256 fractional = (weiAmount % 1e18) / 1e15;  // Get 3 decimal places
+        return string(abi.encodePacked(
+            vm.toString(etherToValue), 
+            ".", 
+            fractional < 10 ? "00" : (fractional < 100 ? "0" : ""),
+            vm.toString(fractional),
+            " ETH"
+        ));
+    }
+
+    function decimalToString(uint256 weiAmount) internal pure returns (string memory) {
+        uint256 wholeNumber = weiAmount / 1e18;
+        uint256 fractional = (weiAmount % 1e18) / 1e15;  // Get 3 decimal places
+        return string(abi.encodePacked(
+            vm.toString(wholeNumber), 
+            ".", 
+            fractional < 10 ? "00" : (fractional < 100 ? "0" : ""),
+            vm.toString(fractional)
+        ));
     }
 
 }

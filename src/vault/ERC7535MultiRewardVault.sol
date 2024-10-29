@@ -97,15 +97,42 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
     }
 
     /**
-     * @notice Withdraws ETH from the vault. Amount is determined by ETH withdrawing. 
+     * @notice Withdraws ETH & Reward Tokens from the vault. Amount is determined by ETH withdrawing
+     * @dev User proportionally receives ETH and reward tokens that are combined worth the amount of `assets` specified.
      * @param assets The amount of ETH to withdraw.
      * @param receiver The address to receive the ETH.
      * @param owner The address that is withdrawing ETH.
      * @return The amount of shares burned.
      */
-    function withdraw(uint256 assets, address receiver, address owner) public override nonReentrant returns (uint256) {
-        uint256 shares = super.withdraw(assets, receiver, owner);
-        _distributeRewards(receiver, shares);
+    function withdraw(uint256 assets, address receiver, address owner) public override nonReentrant returns (uint256) {     
+        // Get the total ETH value of assets + reward tokens owned by the user
+        uint256 userTotalETHValue = getUserTotalETHValue(owner);
+        
+        // Calculate the proportion of total value being withdrawn
+        uint256 withdrawProportion = (assets * 1e18) / userTotalETHValue;
+
+        // Get user's owned assets and rewards
+        (address[] memory tokenAddresses, uint256[] memory tokenAmounts) = getUsersOwnedAssetsAndRewards(owner);
+
+        // Calculate shares to burn based on the ETH withdrawal
+        uint256 ethToWithdraw = (tokenAmounts[0] * withdrawProportion) / 1e18;
+        uint256 shares = previewWithdraw(ethToWithdraw);
+
+        // Withdraw ETH
+        super.withdraw(ethToWithdraw, receiver, owner);
+
+        // Withdraw proportional amount of each reward token
+        for (uint i = 1; i < tokenAddresses.length; i++) {
+            address token = tokenAddresses[i];
+            uint256 tokenAmount = tokenAmounts[i];
+            uint256 tokenToWithdraw = (tokenAmount * withdrawProportion) / 1e18;
+            
+            if (tokenToWithdraw > 0) {
+                IERC20Upgradeable(token).safeTransfer(receiver, tokenToWithdraw);
+                emit RewardTokenWithdrawn(receiver, token, tokenToWithdraw);
+            }
+        }
+
         return shares;
     }
 
@@ -114,12 +141,60 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
      * @param shares The amount of shares to burn to exchange for ETH.
      * @param receiver The address to receive the ETH.
      * @param owner The address that is withdrawing ETH.
-     * return The amount of ETH withdrawn.
+     * return The amount of ETH withdrawn (includes ETH + ETH value of all reward tokens).
      */
     function redeem(uint256 shares, address receiver, address owner) public override nonReentrant returns (uint256) {
-        uint256 assets = super.redeem(shares, receiver, owner);
-        _distributeRewards(receiver, shares);
-        return assets;
+        // Calculate the proportion of shares the user owns
+        uint256 userShareProportion = (balanceOf(owner) * 1e18) / totalSupply();
+        
+        // Calculate the proportion of shares the user is redeeming
+        uint256 userWithdrawProportion = (shares * 1e18) / balanceOf(owner);
+
+        // Get user's owned assets and rewards 
+        (address[] memory tokenAddresses, uint256[] memory tokenAmounts) = getUsersOwnedAssetsAndRewards(owner);
+
+        // Calculate amount of ETH user is withdrawing
+        uint256 ethToWithdraw = (tokenAmounts[0] * userWithdrawProportion) / 1e18;
+
+        // Calculate amount of shares to burn to withdraw ETH
+        uint256 sharesToBurn = previewWithdraw(ethToWithdraw);
+
+        // Withdraw ETH
+        uint256 ethWithdrawn = super.redeem(sharesToBurn, receiver, owner);
+        uint256 totalValueWithdrawn = ethWithdrawn;
+
+        // Burn shares representing Reward Tokens
+        // redeem() must ensure that it burns amount of `shares` specified by the user.
+        // If there are Reward Tokens, user will not have burned all shares in the super.redeem() call.
+        // If there are no Reward Tokens, the user will have burned all shares.
+        uint256 sharesBurningForRewardTokens = shares - sharesToBurn;
+        _burn(owner, sharesBurningForRewardTokens);
+
+        // Withdraw proportional amount of each reward token
+        for (uint i = 0; i < rewardTokens.length; i++) {
+            address token = rewardTokens[i];
+
+            // Get the total amount of the reward token owned by the user
+            uint256 totalTokenOwnedByUser = tokenAmounts[i + 1];
+
+            // Calculate the amount of the reward token to withdraw
+            uint256 tokensToWithdraw = (totalTokenOwnedByUser * userWithdrawProportion) / 1e18;
+
+            if (tokensToWithdraw > 0) {
+                IERC20Upgradeable(token).safeTransfer(receiver, tokensToWithdraw);
+                emit RewardTokenWithdrawn(receiver, token, tokensToWithdraw);
+
+                // Add the ETH value of the withdrawn reward token to the total
+                uint256 tokenPrice = oracle.getPrice(token);
+
+                uint256 ethPrice = oracle.getPrice(address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE));
+                uint256 tokenValueInEth = (tokensToWithdraw * tokenPrice) / ethPrice;
+
+                totalValueWithdrawn += tokenValueInEth;
+            }
+        }
+
+        return totalValueWithdrawn;
     }
 
     /**
@@ -176,15 +251,71 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
         return totalETHAmount;
     }
 
+    /**
+     * @notice Returns the total value of assets in the vault for a user.
+     * @dev Includes ETH amount and ETH value of all reward tokens.
+     * @param user The address of the user.
+     * @return The total value of assets in the vault for the user, in ETH amount.
+     */
+    function getUserTotalETHValue(address user) public view returns (uint256) {
+        uint256 userShares = balanceOf(user);
+
+        uint256 scalingFactor = 1e18;
+
+        uint256 userSharesProportion = (userShares * scalingFactor) / totalSupply();
+
+        uint256 userTotalETHValue = (userSharesProportion * totalAssets()) / scalingFactor;
+
+        return userTotalETHValue;
+    }
+
+    /**
+     * @notice Returns the assets and reward tokens owned by a user.
+     * @dev The ETH amount is the first element of the returned array.
+     * @param user The address of the user.
+     * @return The assets/reward tokens owned by the user and their respective amounts.
+     */
+    function getUsersOwnedAssetsAndRewards(address user) public view returns (address[] memory, uint256[] memory) {
+        // Get the proportion of shares (and thus ETH) the user owns
+        uint256 userShares = balanceOf(user);
+        uint256 scalingFactor = 1e18;
+        uint256 userSharesProportion = (userShares * scalingFactor) / totalSupply();
+
+        // Get the amount of ETH owned by the user
+        uint256 userEthAmount = (userSharesProportion * address(this).balance) / scalingFactor;
+
+        address[] memory tokenAddresses = new address[](rewardTokens.length + 1);
+        uint256[] memory tokenAmounts = new uint256[](rewardTokens.length + 1);
+        
+        // Add ETH to the arrays
+        tokenAddresses[0] = address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE);
+        tokenAmounts[0] = userEthAmount;
+
+        // Add reward tokens to the arrays
+        for (uint i = 0; i < rewardTokens.length; i++) {
+            address token = rewardTokens[i];
+
+            uint256 vaultBalance = IERC20Upgradeable(token).balanceOf(address(this));
+            uint256 userTokenAmount = (vaultBalance * userSharesProportion) / scalingFactor;
+
+            tokenAddresses[i + 1] = token;
+            tokenAmounts[i + 1] = userTokenAmount;
+        }
+
+        return (tokenAddresses, tokenAmounts);
+    }
+
     /* ============== INTERNAL FUNCTIONS ============== */
 
     /**
      * @dev Distributes rewards to the receiver for all rewardTokens.
      * @param receiver The address to receive the rewards.
      * @param sharesBurned The amount of shares burned.
+     * @param totalSharesPreWithdraw The total number of shares before the withdrawal sequence was initiated.
      */
-    function _distributeRewards(address receiver, uint256 sharesBurned) internal {
-        uint256 totalShares = totalSupply();
+    function _distributeRewards(address receiver, uint256 sharesBurned, uint256 totalSharesPreWithdraw) internal {
+        uint256 totalShares = totalSharesPreWithdraw;
+
         for (uint i = 0; i < rewardTokens.length; i++) {
             address rewardToken = rewardTokens[i];
             uint256 rewardBalance = IERC20Upgradeable(rewardToken).balanceOf(address(this));
