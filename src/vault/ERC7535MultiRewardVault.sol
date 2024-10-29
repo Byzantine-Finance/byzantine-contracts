@@ -305,6 +305,11 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
         return (tokenAddresses, tokenAmounts);
     }
 
+    /**
+     * @notice Returns the ETH value of shares being redeemed. Includes ETH amount + ETH value of all reward tokens.
+     * @param shares The amount of shares to redeem.
+     * @return The ETH value of the shares being redeemed.
+     */
     function previewRedeem(uint256 shares) public view override returns (uint256) {
         uint256 totalShares = totalSupply();
         if (totalShares == 0) {
@@ -312,7 +317,7 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
         }
 
         // Calculate proportion of total assets that these shares represent
-        uint256 totalAssetValue = totalAssets(); // This includes both ETH and RWD value
+        uint256 totalAssetValue = totalAssets();
         return (shares * totalAssetValue) / totalShares;
     }
 
