@@ -8,6 +8,8 @@ import {AutomationCompatibleInterface} from "chainlink/v0.8/interfaces/Automatio
 import {OwnerIsCreator} from "chainlink/v0.8/shared/access/OwnerIsCreator.sol";
 import {AutomationBase} from "chainlink/v0.8/AutomationBase.sol";
 
+import {IEigenPodManager} from "eigenlayer-contracts/interfaces/IEigenPodManager.sol";
+import {IEigenPod} from "eigenlayer-contracts/interfaces/IEigenPod.sol";
 import {IStrategyVaultManager} from "../interfaces/IStrategyVaultManager.sol";
 import {IStakerRewards} from "../interfaces/IStakerRewards.sol";
 import {IStrategyVaultETH} from "../interfaces/IStrategyVaultETH.sol";
@@ -40,6 +42,9 @@ contract StakerRewards is
 
     /// @notice BidInvestment contract
     BidInvestmentMock public immutable bidInvestment;
+
+    /// @notice EigenLayer's EigenPodManager contract
+    IEigenPodManager public immutable eigenPodManager;
 
     uint32 private constant _ONE_DAY = 1 days;
     uint256 private constant _WAD = 1e18;
@@ -82,12 +87,14 @@ contract StakerRewards is
         IStrategyVaultManager _stratVaultManager,
         IEscrow _escrow,
         IAuction _auction,
-        BidInvestmentMock _bidInvestment
+        BidInvestmentMock _bidInvestment,
+        IEigenPodManager _eigenPodManager
     ) {
         stratVaultManager = _stratVaultManager;
         escrow = _escrow;
         auction = _auction;
         bidInvestment = _bidInvestment;
+        eigenPodManager = _eigenPodManager;
         // Disable initializer in the context of the implementation contract
         _disableInitializers();
     }
@@ -116,8 +123,8 @@ contract StakerRewards is
      */
     function dvActivationCheckpoint(address _vaultAddr, bytes32 _clusterId) external onlyStratVaultETH {
         // Get the total new VCs, the smallest VC and the cluster size
-        IAuction.NodeDetails[] memory nodes = auction.getClusterDetails(_clusterId).nodes;
-        (uint256 totalBidPrice, uint64 totalClusterVCs, uint32 smallestVC, uint8 clusterSize) = auction.getClusterMetrics(nodes);
+        IAuction.ClusterDetails memory clusterDetails = auction.getClusterDetails(_clusterId);
+        (uint256 totalBidPrice, uint64 totalClusterVCs, uint32 smallestVC, uint8 clusterSize) = auction.getClusterMetrics(clusterDetails.nodes);
 
         // Add up the new total bid prices and total VCs
         _checkpoint.totalActivedBids += totalBidPrice;
@@ -132,17 +139,22 @@ contract StakerRewards is
 
         // Update rewards and checkpoint data depending on the conditions 
         VaultData storage vault = _vaults[_vaultAddr];
-
         if (numValidators4 + numValidators7 == 0) {
             _checkpoint.updateTime = block.timestamp;
         } else {
             _handleRewardsAndCheckpointUpdates(_vaultAddr);
         }
 
-        // Update vault data and validator counter at the end
-        vault.lastUpdate = block.timestamp;
-        ++vault.numValidatorsInVault;
+        // Calculate the pectra ratio and add it up to accumulatedPectraRatio
+        IEigenPod eigenPod = eigenPodManager.ownerToPod(_vaultAddr);
+        IEigenPod.ValidatorInfo memory validatorInfo = eigenPod.validatorPubkeyHashToInfo(clusterDetails.clusterPubKeyHash);
+        // Convert restakedBalanceGwei from Gwei to wei and multiply by 100 to preserve 2 decimal places
+        uint16 pectraRatio = uint16((validatorInfo.restakedBalanceGwei * 1e9 * 100) / 32 ether);
+        vault.accumulatedPectraRatio += pectraRatio;
+        
+        // Update validator counter and timestamp 
         clusterSize == 4 ? ++numValidators4 : ++numValidators7;
+        vault.lastUpdate = block.timestamp;
     }
 
     /** 
@@ -354,12 +366,13 @@ contract StakerRewards is
 
     /**
      * @notice Calculate the pending rewards since last update of a given vault
-     * @param _numValsInVault Number of validators in the vault
+     * @param _accumulatedPectraRatio Accumulated pectra ratio of the vault
      * @param _vaultUpdateTime Last update time of the vault
      */
-    function calculateRewards(uint16 _numValsInVault, uint256 _vaultUpdateTime) public view returns (uint256) {
+    function calculateRewards(uint16 _accumulatedPectraRatio, uint256 _vaultUpdateTime) public view returns (uint256) {
         uint256 elapsedDays = _getElapsedDays(_vaultUpdateTime);
-        return _checkpoint.dailyRewardsPer32ETH * elapsedDays * _numValsInVault;
+        // Scale down the accumulatedPectraRatio by 2 decimal places
+        return (_checkpoint.dailyRewardsPer32ETH * elapsedDays * _accumulatedPectraRatio) / 100;
     }
 
     /**
@@ -464,15 +477,15 @@ contract StakerRewards is
      */
     function _handleRewardsAndCheckpointUpdates(address _vaultAddr) private {
         VaultData storage vault = _vaults[_vaultAddr];
-        uint16 numValsInVault = vault.numValidatorsInVault;
+        uint16 accumulatedPectraRatio = vault.accumulatedPectraRatio;
         uint256 vaultUpdateTime = vault.lastUpdate;
 
-        bool vaultUpdateNeeded = numValsInVault > 0 && _hasTimeElapsed(vaultUpdateTime, _ONE_DAY);
+        bool vaultUpdateNeeded = accumulatedPectraRatio != 0 && _hasTimeElapsed(vaultUpdateTime, _ONE_DAY);
         bool checkpointUpdateNeeded = numValidators4 + numValidators7 > 0 && _hasTimeElapsed(_checkpoint.updateTime, _ONE_DAY);
 
         if (vaultUpdateNeeded) {
             // Store the pending rewards of the previous validator in VaultData
-            uint256 pendingRewards = calculateRewards(numValsInVault, vaultUpdateTime);
+            uint256 pendingRewards = calculateRewards(accumulatedPectraRatio, vaultUpdateTime);
             vault.pendingRewards += pendingRewards;
             // Update totalVCs and totalPendingRewards variables
             _updateVCsAndPendingRewards(pendingRewards);

@@ -25,7 +25,7 @@ interface IStakerRewards {
     /// @notice Record every StratVaultETH at dvActivationCheckpoint
     struct VaultData {
         uint256 lastUpdate;
-        uint16 numValidatorsInVault;
+        uint16 accumulatedPectraRatio;
         uint256 pendingRewards;
     }
 
@@ -60,11 +60,11 @@ interface IStakerRewards {
 
     /**
      * @notice Calculate the pending rewards since last update
-     * @param _numValsInVault Number of validators in the vault
+     * @param _accumulatedPectraRatio Accumulated pectra ratio of the vault
      * @param _vaultUpdateTime Last update time of the vault
      * @dev Revert if the last update timestamp is 0
      */
-    function calculateRewards(uint16 _numValsInVault, uint256 _vaultUpdateTime) external view returns (uint256);
+    function calculateRewards(uint16 _accumulatedPectraRatio, uint256 _vaultUpdateTime) external view returns (uint256);
 
     /**
      * @notice Calculate the allocatable amount of ETH in the StakerRewards contract 
