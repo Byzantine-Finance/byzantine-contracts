@@ -60,11 +60,6 @@ contract StakerRewards is
     /// @notice StratVaultETH address => VaultData
     mapping(address => VaultData) internal _vaults;
 
-    /// @dev A cluster becomes a validator when it is activated with 32ETH
-    /// @notice Number of created cluster of size 4
-    uint16 public numClusters4;
-    /// @notice Number of created cluster of size 7
-    uint16 public numClusters7;
     /// @notice Number of validators of size 4
     uint16 public numValidators4;
     /// @notice Number of validators of size 7
@@ -141,7 +136,7 @@ contract StakerRewards is
         if (numValidators4 + numValidators7 == 0) {
             _checkpoint.updateTime = block.timestamp;
         } else {
-            _handleRewardsAndCheckpointUpdates(vault);
+            _handleRewardsAndCheckpointUpdates(_vaultAddr);
         }
 
         // Update vault data and validator counter at the end
@@ -160,7 +155,7 @@ contract StakerRewards is
     function withdrawCheckpoint(address _vaultAddr) external onlyStratVaultETH {
         VaultData storage vault = _vaults[_vaultAddr];
         // Update rewards and checkpoint data depending on the conditions 
-        _handleRewardsAndCheckpointUpdates(vault);
+        _handleRewardsAndCheckpointUpdates(_vaultAddr);
         // Send the pending rewards from the BidInvestment contract to the vault
         bidInvestment.sendRewardsToVault(_vaultAddr, vault.pendingRewards);
     }
@@ -293,8 +288,8 @@ contract StakerRewards is
         // Decode `performData` 
         (bytes32[] memory clusterIds, uint64 remainingVCsToRemove, uint256 totalBidsToEscrow) = abi.decode(performData, (bytes32[], uint64, uint256));
 
-        uint16 numClusters4ToExit;
-        uint16 numClusters7ToExit;
+        uint16 numValidators4ToExit;
+        uint16 numValidators7ToExit;
         
         for (uint256 i; i < clusterIds.length; ) {
             ClusterData storage cluster = _clusters[clusterIds[i]];
@@ -307,32 +302,34 @@ contract StakerRewards is
             cluster.activeTime = 0;
             cluster.exitTimestamp = 0;
             // Add up the number of active DVs to exit
-            cluster.clusterSize == 4 ? ++numClusters4ToExit : ++numClusters7ToExit;
+            cluster.clusterSize == 4 ? ++numValidators4ToExit : ++numValidators7ToExit;
 
             unchecked {
                 ++i;
             }
         }
-         
+
+        // Send back remaining bid prices of exited DVs to the Escrow contract
         bidInvestment.sendBidsToEscrow(totalBidsToEscrow);
 
-        // Update totalVCs and totalPendingRewards variables
+        // Decrease the number of validators
+        numValidators4 -= numValidators4ToExit;
+        numValidators7 -= numValidators7ToExit;
+
+        // Subtract the remaining VCs of the exited DVs from totalVCs
+        if (_checkpoint.totalVCs < remainingVCsToRemove) revert TotalVCsLessThanConsumedVCs(); // TODO: can be removed if TODO3 mentioned above is fixed
+        _checkpoint.totalVCs -= remainingVCsToRemove;
+
+        // Update totalVCs and totalPendingRewards variables for the period from the last checkpoint to this checkpoint
         if (_hasTimeElapsed(_checkpoint.updateTime, _ONE_DAY)) {
             _updateVCsAndPendingRewards(0);
             _checkpoint.updateTime = block.timestamp;
         }
 
-        // Subtract the remaining VCs of the exited DVs from totalVCs
-        if (_checkpoint.totalVCs < remainingVCsToRemove) revert TotalVCsLessThanConsumedVCs(); // TODO: can be removed if TODO3 mentioned above is fixed
-        _checkpoint.totalVCs -= remainingVCsToRemove;
-        // Decrease the number of DVs
-        numClusters4 -= numClusters4ToExit;
-        numClusters7 -= numClusters7ToExit;
-
-        // Update the checkpoint data
-        if (numClusters4 + numClusters7 != 0 && _checkpoint.totalVCs != 0) {
+        // Update dailyRewardsPer32ETH based on the updated data
+        if (numValidators4 + numValidators7 > 0) {
             _adjustDailyRewards();
-        } 
+        }
     }
 
     /**
@@ -426,7 +423,6 @@ contract StakerRewards is
      * @dev Revert if there are no active DVs or if totalVCs is 0
      */
     function _adjustDailyRewards() private nonReentrant {
-        if (numValidators4 + numValidators7 == 0) revert NoCreatedClusters();
         if (_checkpoint.totalVCs == 0) revert TotalVCsCannotBeZero();
 
         uint256 averageVCsUsedPerDayPerValidator = ((numValidators4 * 4 + numValidators7 * 7) * _WAD) / (numValidators4 + numValidators7);
@@ -464,11 +460,12 @@ contract StakerRewards is
 
     /**
      * @notice Handle chackpoint data update and sending pending rewards to vault
-     * @param _vault VaultData of the StratVaultETH
+     * @param _vaultAddr Address of the StratVaultETH
      */
-    function _handleRewardsAndCheckpointUpdates(VaultData memory _vault) private {
-        uint16 numValsInVault = _vault.numValidatorsInVault;
-        uint256 vaultUpdateTime = _vault.lastUpdate;
+    function _handleRewardsAndCheckpointUpdates(address _vaultAddr) private {
+        VaultData storage vault = _vaults[_vaultAddr];
+        uint16 numValsInVault = vault.numValidatorsInVault;
+        uint256 vaultUpdateTime = vault.lastUpdate;
 
         bool vaultUpdateNeeded = numValsInVault > 0 && _hasTimeElapsed(vaultUpdateTime, _ONE_DAY);
         bool checkpointUpdateNeeded = numValidators4 + numValidators7 > 0 && _hasTimeElapsed(_checkpoint.updateTime, _ONE_DAY);
@@ -476,8 +473,8 @@ contract StakerRewards is
         if (vaultUpdateNeeded) {
             // Store the pending rewards of the previous validator in VaultData
             uint256 pendingRewards = calculateRewards(numValsInVault, vaultUpdateTime);
-            _vault.pendingRewards += pendingRewards;
-            // Update global data 
+            vault.pendingRewards += pendingRewards;
+            // Update totalVCs and totalPendingRewards variables
             _updateVCsAndPendingRewards(pendingRewards);
 
             if (checkpointUpdateNeeded) {

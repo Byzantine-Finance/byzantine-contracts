@@ -107,9 +107,6 @@ interface IStakerRewards {
     /// @dev Error when the timestamp is invalid
     error InvalidTimestamp();
 
-    /// @dev Error when there are no active cluster in the StakerRewards contract
-    error NoCreatedClusters();
-
     /// @dev Error when the total VC cannot be zero
     error TotalVCsCannotBeZero();
 
