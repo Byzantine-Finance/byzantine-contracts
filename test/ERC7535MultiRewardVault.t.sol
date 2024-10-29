@@ -396,11 +396,11 @@ contract ERC7535MultiRewardVaultTest is Test {
     function testRedeem() public {
         console.log("~~~Initial State~~~");
         console.log("totalAssets", etherToString(vault.totalAssets()));
-        console.log("totalSupply", etherToString(vault.totalSupply()));
+        console.log("totalSupply", decimalToString(vault.totalSupply()));
         console.log("ETH in vault", etherToString(address(vault).balance));
-        console.log("RWD in vault", etherToString(rewardToken1.balanceOf(address(vault))));
-        console.log("alice shares", etherToString(vault.balanceOf(alice)));
-        console.log("bob shares", etherToString(vault.balanceOf(bob)));
+        console.log("RWD in vault", decimalToString(rewardToken1.balanceOf(address(vault))));
+        console.log("alice shares", decimalToString(vault.balanceOf(alice)));
+        console.log("bob shares", decimalToString(vault.balanceOf(bob)));
 
         /* ===================== ALICE DEPOSITS 1 ETH AND THEN REDEEMS HALF THEIR SHARES ===================== */
         uint256 aliceDepositAmount = 1 ether;
@@ -409,11 +409,11 @@ contract ERC7535MultiRewardVaultTest is Test {
 
         console.log("~~~After Alice's deposit~~~");
         console.log("totalAssets", etherToString(vault.totalAssets()));
-        console.log("totalSupply", etherToString(vault.totalSupply()));
+        console.log("totalSupply", decimalToString(vault.totalSupply()));
         console.log("ETH in vault", etherToString(address(vault).balance));
-        console.log("RWD in vault", etherToString(rewardToken1.balanceOf(address(vault))));
-        console.log("alice shares", etherToString(vault.balanceOf(alice)));
-        console.log("bob shares", etherToString(vault.balanceOf(bob)));
+        console.log("RWD in vault", decimalToString(rewardToken1.balanceOf(address(vault))));
+        console.log("alice shares", decimalToString(vault.balanceOf(alice)));
+        console.log("bob shares", decimalToString(vault.balanceOf(bob)));
 
         uint256 halfOfAliceShares = aliceShares / 2;
         uint256 aliceAssetsToWithdraw = vault.previewRedeem(halfOfAliceShares);
@@ -428,11 +428,11 @@ contract ERC7535MultiRewardVaultTest is Test {
         console.log("~~~After Alice's redeem~~~");
         console.log("aliceAssetsWithdrawn", etherToString(aliceAssetsWithdrawn));
         console.log("totalAssets", etherToString(vault.totalAssets()));
-        console.log("totalSupply", etherToString(vault.totalSupply()));
+        console.log("totalSupply", decimalToString(vault.totalSupply()));
         console.log("ETH in vault", etherToString(address(vault).balance));
-        console.log("RWD in vault", etherToString(rewardToken1.balanceOf(address(vault))));
-        console.log("alice shares", etherToString(vault.balanceOf(alice)));
-        console.log("bob shares", etherToString(vault.balanceOf(bob)));
+        console.log("RWD in vault", decimalToString(rewardToken1.balanceOf(address(vault))));
+        console.log("alice shares", decimalToString(vault.balanceOf(alice)));
+        console.log("bob shares", decimalToString(vault.balanceOf(bob)));
 
         uint256 aliceETHBalanceAfter = address(alice).balance;
         console.log("aliceETHBalanceBefore", etherToString(aliceETHBalanceBefore));
@@ -447,7 +447,7 @@ contract ERC7535MultiRewardVaultTest is Test {
         console.log("vaultWithdrawnETH", etherToString(vaultWithdrawnETH));
 
         uint256 aliceRewardTokenBalance = rewardToken1.balanceOf(alice);
-        console.log("aliceRewardTokenBalance", etherToString(aliceRewardTokenBalance));
+        console.log("aliceRewardTokenBalance", decimalToString(aliceRewardTokenBalance));
         uint256 aliceTotalAssets = vaultWithdrawnETH + aliceRewardTokenBalance;
         console.log("aliceTotalAssets", etherToString(aliceTotalAssets));
 
@@ -466,11 +466,11 @@ contract ERC7535MultiRewardVaultTest is Test {
 
         console.log("~~~After Bob's deposit~~~");
         console.log("totalAssets", etherToString(vault.totalAssets()));
-        console.log("totalSupply", etherToString(vault.totalSupply()));
+        console.log("totalSupply", decimalToString(vault.totalSupply()));
         console.log("ETH in vault", etherToString(address(vault).balance));
-        console.log("RWD in vault", etherToString(rewardToken1.balanceOf(address(vault))));
-        console.log("alice shares", etherToString(vault.balanceOf(alice)));
-        console.log("bob shares", etherToString(vault.balanceOf(bob)));
+        console.log("RWD in vault", decimalToString(rewardToken1.balanceOf(address(vault))));
+        console.log("alice shares", decimalToString(vault.balanceOf(alice)));
+        console.log("bob shares", decimalToString(vault.balanceOf(bob)));
 
         assertEq(vault.totalAssets(), 2.5 ether, "Vault should have 2.5 ETH in total value");
         assertEq(address(vault).balance, 2.5 ether, "Vault should have 2.5 ETH");
@@ -482,11 +482,11 @@ contract ERC7535MultiRewardVaultTest is Test {
 
         console.log("~~~After adding reward token~~~");
         console.log("totalAssets", etherToString(vault.totalAssets()));
-        console.log("totalSupply", etherToString(vault.totalSupply()));
+        console.log("totalSupply", decimalToString(vault.totalSupply()));
         console.log("ETH in vault", etherToString(address(vault).balance));
-        console.log("RWD in vault", etherToString(rewardToken1.balanceOf(address(vault))));
-        console.log("alice shares", etherToString(vault.balanceOf(alice)));
-        console.log("bob shares", etherToString(vault.balanceOf(bob)));
+        console.log("RWD in vault", decimalToString(rewardToken1.balanceOf(address(vault))));
+        console.log("alice shares", decimalToString(vault.balanceOf(alice)));
+        console.log("bob shares", decimalToString(vault.balanceOf(bob)));
 
         assertEq(vault.totalAssets(), 3.5 ether, "Vault should have 3.5 ETH in total value");
         console.log("~~~Attempting Redeem~~~");
@@ -503,13 +503,12 @@ contract ERC7535MultiRewardVaultTest is Test {
         uint256 bobSharesAfterRedeem = vault.balanceOf(bob);
 
         console.log("~~~After Bob's redeem~~~");
-        console.log("bobAssetsRedeemed", etherToString(bobAssetsRedeemed));
         console.log("totalAssets", etherToString(vault.totalAssets()));
-        console.log("totalSupply", etherToString(vault.totalSupply()));
+        console.log("totalSupply", decimalToString(vault.totalSupply()));
         console.log("ETH in vault", etherToString(address(vault).balance));
-        console.log("RWD in vault", etherToString(rewardToken1.balanceOf(address(vault))));
-        console.log("alice shares", etherToString(vault.balanceOf(alice)));
-        console.log("bob shares", etherToString(vault.balanceOf(bob)));
+        console.log("RWD in vault", decimalToString(rewardToken1.balanceOf(address(vault))));
+        console.log("alice shares", decimalToString(vault.balanceOf(alice)));
+        console.log("bob shares", decimalToString(vault.balanceOf(bob)));
 
         uint256 bobETHBalanceAfter = address(bob).balance;
         console.log("bobETHBalanceAfter", etherToString(bobETHBalanceAfter));
@@ -540,7 +539,8 @@ contract ERC7535MultiRewardVaultTest is Test {
 
     function testAddRewardToken() public {
         /* ===================== ADD REWARD TOKEN 1 ===================== */
-        //vault.addRewardToken(rewardToken1, address(0x123));        
+        vault.addRewardToken(address(rewardToken1));
+        assertEq(vault.rewardTokens(0), address(rewardToken1), "Reward token 1 should be added");
     }
 
     function testTotalAssets() public {
@@ -558,16 +558,6 @@ contract ERC7535MultiRewardVaultTest is Test {
         // Verify the total assets are calculated correctly  
         // Should be $2000 (1000 from ETH + 1000 from reward token) 
         assertEq(vault.totalAssets(), 2 ether, "Total assets should be 2 ether");
-    }
-
-    function testRewardDistribution() public {
-        // TODO: Implement test for reward distribution
-        /* ===================== DISTRIBUTE REWARDS ===================== */
-        // 1. Deposit some ETH from multiple users
-        // 2. Add reward tokens
-        // 3. Mint some reward tokens to the vault
-        // 4. Withdraw or redeem for one user
-        // 5. Check if rewards are correctly distributed proportionally to the shares
     }
 
     function etherToString(uint256 weiAmount) internal pure returns (string memory) {
