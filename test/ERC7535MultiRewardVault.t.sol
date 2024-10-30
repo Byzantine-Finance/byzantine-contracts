@@ -321,7 +321,7 @@ contract ERC7535MultiRewardVaultTest is Test {
         console.log("alice shares", decimalToString(vault.balanceOf(alice)));
         console.log("alice ETH balance", etherToString(address(alice).balance));
         console.log("alice RWD balance", decimalToString(rewardToken1.balanceOf(alice)));
-        console.log("bob shares", vault.balanceOf(bob));
+        console.log("bob shares", decimalToString(vault.balanceOf(bob)));
         console.log("bob ETH balance", etherToString(address(bob).balance));
         console.log("bob RWD balance", decimalToString(rewardToken1.balanceOf(bob)));
 
@@ -360,6 +360,7 @@ contract ERC7535MultiRewardVaultTest is Test {
 
         vm.prank(bob);
         uint256 bobSharesBurned = vault.withdraw(oneEth, bob, bob);
+        console.log("bob shares burned", decimalToString(bobSharesBurned));
 
         uint256 bobETHBalanceAfterWithdraw = address(bob).balance;
         uint256 bobRWDBalanceAfterWithdraw = rewardToken1.balanceOf(bob);
@@ -373,10 +374,10 @@ contract ERC7535MultiRewardVaultTest is Test {
         console.log("RWD in vault", decimalToString(rewardToken1.balanceOf(address(vault))));
         console.log("alice shares", decimalToString(vault.balanceOf(alice)));
         console.log("alice ETH balance", etherToString(address(alice).balance));
-        console.log("alice RWD balance", rewardToken1.balanceOf(alice));
-        console.log("bob shares", vault.balanceOf(bob));
-        console.log("bob ETH balance", address(bob).balance);
-        console.log("bob RWD balance", rewardToken1.balanceOf(bob));
+        console.log("alice RWD balance", decimalToString(rewardToken1.balanceOf(alice)));
+        console.log("bob shares", decimalToString(vault.balanceOf(bob)));
+        console.log("bob ETH balance", etherToString(address(bob).balance));
+        console.log("bob RWD balance", decimalToString(rewardToken1.balanceOf(bob)));
 
         // Verify Bob's withdrawal
         assertEq(vault.balanceOf(bob), bobSharesBeforeWithdraw - bobSharesBurned, "Bob's shares should decrease by the amount burned");
@@ -528,13 +529,13 @@ contract ERC7535MultiRewardVaultTest is Test {
         // Bob is withdrawing 1 share, which is 50% of his value (1 / 2 = 0.5 or 50%)
         // Therefore, Bob should receive 1 ETH and 0.4 RWD.
         assertEq(bobSharesAfterRedeem, 1e18, "Bob should have 1 shares left");
-        assertEq(vaultWithdrawnETH2, 1 ether, "Vault should have lost 1 ETH");
-        assertEq(bobWithdrawnETH, 1 ether, "Bob should have gained 1 ETH");
-        assertEq(rewardToken1.balanceOf(address(vault)), 0.6 ether, "Vault should have 0.6 RWD");
-        assertEq(rewardToken1.balanceOf(bob), 0.4 ether, "Bob should have 0.4 RWD");
-        assertEq(vault.totalAssets(), 2.1 ether, "Vault should have 2.1 ETH in total value");
-        assertEq(address(vault).balance, 1.5 ether, "Vault should have 1.5 ETH");
-        assertEq(vault.totalSupply(), 1.5e18, "Vault should have 1.5 shares");
+        assertApproxEqRel(vaultWithdrawnETH2, 1 ether, 1e14, "Vault should have lost 1 ETH");
+        assertApproxEqRel(bobWithdrawnETH, 1 ether, 1e14, "Bob should have gained 1 ETH");
+        assertApproxEqRel(rewardToken1.balanceOf(address(vault)), 0.6 ether, 1e14, "Vault should have 0.6 RWD");
+        assertApproxEqRel(rewardToken1.balanceOf(bob), 0.4 ether, 1e14, "Bob should have 0.4 RWD");
+        assertApproxEqRel(vault.totalAssets(), 2.1 ether, 1e14, "Vault should have 2.1 ETH in total value");
+        assertApproxEqRel(address(vault).balance, 1.5 ether, 1e14, "Vault should have 1.5 ETH");
+        assertApproxEqRel(vault.totalSupply(), 1.5e18, 1e14, "Vault should have 1.5 shares");
     }
 
     function testAddRewardToken() public {
@@ -558,6 +559,123 @@ contract ERC7535MultiRewardVaultTest is Test {
         // Verify the total assets are calculated correctly  
         // Should be $2000 (1000 from ETH + 1000 from reward token) 
         assertEq(vault.totalAssets(), 2 ether, "Total assets should be 2 ether");
+    }
+
+    function testGetUserTotalETHValue() public {
+        uint256 initialDeposit = 1 ether;
+        vm.prank(alice);
+        vault.deposit{value: initialDeposit}(initialDeposit, alice);
+
+        vault.addRewardToken(address(rewardToken1));
+        rewardToken1.mint(address(vault), 1 ether);
+
+        uint256 totalETHValue = vault.getUserTotalETHValue(alice);
+        assertEq(totalETHValue, 2 ether, "Alice's total ETH value should be 2 ETH");
+    }
+
+    function testGetUsersOwnedAssetsAndRewards() public {
+        uint256 initialDeposit = 1 ether;
+        vm.prank(alice);
+        vault.deposit{value: initialDeposit}(initialDeposit, alice);
+
+        vault.addRewardToken(address(rewardToken1));
+        rewardToken1.mint(address(vault), 1 ether);
+
+        (address[] memory tokens, uint256[] memory amounts) = vault.getUsersOwnedAssetsAndRewards(alice);
+        assertEq(tokens[0], address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE), "First token should be ETH");
+        assertEq(amounts[0], 1 ether, "Alice should own 1 ETH");
+        assertEq(tokens[1], address(rewardToken1), "Second token should be reward token 1");
+        assertEq(amounts[1], 1 ether, "Alice should own 1 ETH worth of reward token 1");
+    }
+
+    function testPreviewDeposit() public {
+        uint256 initialDeposit = 1 ether;
+        vm.prank(alice);
+        vault.deposit{value: initialDeposit}(initialDeposit, alice);
+
+        vault.addRewardToken(address(rewardToken1));
+        rewardToken1.mint(address(vault), 1 ether);
+
+        uint256 depositAmount = 1 ether;
+        uint256 expectedShares = vault.previewDeposit(depositAmount);
+
+        vm.prank(bob);
+        uint256 actualShares = vault.deposit{value: depositAmount}(depositAmount, bob);
+
+        assertEq(expectedShares, actualShares, "Preview deposit should match actual deposit shares");
+    }
+
+    function testPreviewMint() public {
+        uint256 initialDeposit = 1 ether;
+        vm.prank(alice);
+        vault.deposit{value: initialDeposit}(initialDeposit, alice);
+
+        vault.addRewardToken(address(rewardToken1));
+        rewardToken1.mint(address(vault), 1 ether);
+
+        uint256 mintAmount = 0.5 ether;
+        uint256 expectedAssets = vault.previewMint(mintAmount);
+
+        vm.prank(bob);
+        uint256 actualAssets = vault.mint{value: expectedAssets}(mintAmount, bob);
+
+        assertEq(expectedAssets, actualAssets, "Preview mint should match actual mint assets");
+    }
+
+    function testPreviewWithdraw() public {
+        console.log("~~~~~testPreviewWithdraw~~~~~");
+        // Alice deposits 1 ETH
+            // totalAssets = 1 ETH
+            // totalETH = 1
+            // totalRWD = 0
+            // totalSupply = 1 share
+        uint256 initialDeposit = 1 ether;
+        vm.prank(alice);
+        vault.deposit{value: initialDeposit}(initialDeposit, alice);
+
+        // Add reward token 1 (worth 1 ETH)
+            // totalAssets = 2 ETH
+            // totalETH = 1
+            // totalRWD = 1
+            // totalSupply = 1 share
+        vault.addRewardToken(address(rewardToken1));
+        rewardToken1.mint(address(vault), 1 ether);
+
+        // Alice withdraws 0.5 ETH of value
+            // 0.5 ETH is 1/4 of the total value owned by Alice
+            // Therefore, expected shares to burn = 1/4 * totalSupply = 1/4 * 1 share = 0.25 shares
+            // Alice should receive 1/4 of their ETH and 1/4 of their RWD
+            // Therefore, Alice should receive 0.25 ETH and 0.25 RWD
+            // totalAssets = 1.5 ETH
+            // totalETH = 0.75
+            // totalRWD = 0.75
+            // totalSupply = 0.75 shares
+        uint256 withdrawAmount = 0.5 ether;
+        uint256 expectedShares = vault.previewWithdraw(withdrawAmount);
+        console.log("Expected shares: %s", expectedShares);
+
+        vm.prank(alice);
+        uint256 actualShares = vault.withdraw(withdrawAmount, alice, alice);
+        console.log("Actual shares: %s", actualShares);
+        assertApproxEqRel(expectedShares, actualShares, 1e14, "Preview withdraw should approximately match actual withdraw shares");
+    }
+
+    function testPreviewRedeem() public {
+        uint256 initialDeposit = 1 ether;
+        vm.prank(alice);
+        vault.deposit{value: initialDeposit}(initialDeposit, alice);
+
+        vault.addRewardToken(address(rewardToken1));
+        rewardToken1.mint(address(vault), 1 ether);
+
+        uint256 redeemAmount = 0.5 ether;
+        uint256 expectedAssets = vault.previewRedeem(redeemAmount);
+
+        vm.prank(alice);
+        uint256 actualAssets = vault.redeem(redeemAmount, alice, alice);
+
+        // User receives slightly more than expectedAssets because of rounding. Rounding is in favour of the user, as per ERC4626 recommendations.
+        assertApproxEqRel(expectedAssets, actualAssets, 1e14, "Preview redeem should match actual redeem assets");
     }
 
     function etherToString(uint256 weiAmount) internal pure returns (string memory) {

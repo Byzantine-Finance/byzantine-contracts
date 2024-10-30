@@ -99,41 +99,50 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
     /**
      * @notice Withdraws ETH & Reward Tokens from the vault. Amount is determined by ETH withdrawing
      * @dev User proportionally receives ETH and reward tokens that are combined worth the amount of `assets` specified.
-     * @param assets The amount of ETH to withdraw.
+     * @param assets The value to withdraw from the vault, in ETH amount.
      * @param receiver The address to receive the ETH.
      * @param owner The address that is withdrawing ETH.
      * @return The amount of shares burned.
      */
-    function withdraw(uint256 assets, address receiver, address owner) public override nonReentrant returns (uint256) {     
+    function withdraw(uint256 assets, address receiver, address owner) public override nonReentrant returns (uint256) {   
+        // Calculate the amount of shares that will be burned
+        uint256 sharesToBurn = previewWithdraw(assets);
+
         // Get the total ETH value of assets + reward tokens owned by the user
         uint256 userTotalETHValue = getUserTotalETHValue(owner);
-        
+
         // Calculate the proportion of total value being withdrawn
         uint256 withdrawProportion = (assets * 1e18) / userTotalETHValue;
 
         // Get user's owned assets and rewards
         (address[] memory tokenAddresses, uint256[] memory tokenAmounts) = getUsersOwnedAssetsAndRewards(owner);
 
-        // Calculate shares to burn based on the ETH withdrawal
+        // Calculate the amount of ETH that will be withdrawn, based on the withdrawn proportion
         uint256 ethToWithdraw = (tokenAmounts[0] * withdrawProportion) / 1e18;
-        uint256 shares = previewWithdraw(ethToWithdraw);
-
+        
         // Withdraw ETH
-        super.withdraw(ethToWithdraw, receiver, owner);
+        uint256 sharesBurnedForETH = super.withdraw(ethToWithdraw, receiver, owner);
+        
+        // Burn shares representing Reward Tokens
+            // withdraw() must ensure that it burns amount of `shares` specified by the user.
+            // If there are Reward Tokens, user will not have burned all shares in the super.withdraw() call.
+            // If there are no Reward Tokens, the user will have burned all shares.
+        uint256 sharesBurningForRewardTokens = sharesToBurn - sharesBurnedForETH;
+        _burn(owner, sharesBurningForRewardTokens);
 
         // Withdraw proportional amount of each reward token
         for (uint i = 1; i < tokenAddresses.length; i++) {
             address token = tokenAddresses[i];
             uint256 tokenAmount = tokenAmounts[i];
             uint256 tokenToWithdraw = (tokenAmount * withdrawProportion) / 1e18;
-            
             if (tokenToWithdraw > 0) {
                 IERC20Upgradeable(token).safeTransfer(receiver, tokenToWithdraw);
                 emit RewardTokenWithdrawn(receiver, token, tokenToWithdraw);
             }
         }
 
-        return shares;
+        uint256 totalSharesBurned = sharesBurnedForETH + sharesBurningForRewardTokens;
+        return totalSharesBurned;
     }
 
     /**
@@ -303,22 +312,6 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
         }
 
         return (tokenAddresses, tokenAmounts);
-    }
-
-    /**
-     * @notice Returns the ETH value of shares being redeemed. Includes ETH amount + ETH value of all reward tokens.
-     * @param shares The amount of shares to redeem.
-     * @return The ETH value of the shares being redeemed.
-     */
-    function previewRedeem(uint256 shares) public view override returns (uint256) {
-        uint256 totalShares = totalSupply();
-        if (totalShares == 0) {
-            return 0;
-        }
-
-        // Calculate proportion of total assets that these shares represent
-        uint256 totalAssetValue = totalAssets();
-        return (shares * totalAssetValue) / totalShares;
     }
 
     /* ============== INTERNAL FUNCTIONS ============== */
