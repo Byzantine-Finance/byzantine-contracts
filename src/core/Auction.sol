@@ -82,7 +82,7 @@ contract Auction is
         // Update the corresponding sub-auction tree
         _mainUdateSubAuction(winningClusterDetails.nodes, winningClusterId, _bidDetails[winningClusterDetails.nodes[0].bidId].auctionType);
 
-        emit ClusterCreated(winningClusterId, winningAvgAuctionScore, splitAddr, eigenPodAddr);
+        emit ClusterCreated(winningClusterId, winningAvgAuctionScore, msg.sender, splitAddr, eigenPodAddr);
 
         return winningClusterId;
     }
