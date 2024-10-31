@@ -10,8 +10,10 @@ interface IStakerRewards {
         uint256 updateTime;
         uint256 totalActivedBids;
         uint256 totalPendingRewards;
-        uint256 dailyRewardsPer32ETH; // Daily rewards distributed for every 32ETH staked
+        uint256 daily32EthBaseRewards; // Daily rewards distributed for every 32ETH staked
         uint64 totalVCs;
+        uint64 totalDailyConsumedVCs;
+        uint24 totalStakedBalanceRate;
     }
 
     /// @notice Record every cluster at dvCreationCheckpoint
@@ -25,7 +27,7 @@ interface IStakerRewards {
     /// @notice Record every StratVaultETH at dvActivationCheckpoint
     struct VaultData {
         uint256 lastUpdate;
-        uint16 accumulatedPectraRatio;
+        uint16 accruedStakedBalanceRate;
         uint256 pendingRewards;
     }
 
@@ -60,15 +62,15 @@ interface IStakerRewards {
 
     /**
      * @notice Calculate the pending rewards since last update
-     * @param _accumulatedPectraRatio Accumulated pectra ratio of the vault
+     * @param _accumulatedStakedRatio Accumulated pectra ratio of the vault
      * @param _vaultUpdateTime Last update time of the vault
      * @dev Revert if the last update timestamp is 0
      */
-    function calculateRewards(uint16 _accumulatedPectraRatio, uint256 _vaultUpdateTime) external view returns (uint256);
+    function calculateRewards(uint16 _accumulatedStakedRatio, uint256 _vaultUpdateTime) external view returns (uint256);
 
     /**
      * @notice Calculate the allocatable amount of ETH in the StakerRewards contract 
-     * @dev The calculation of the dailyRewardsPer32ETH cannot take into account the rewards that were already distributed to the stakers.
+     * @dev The calculation of the daily32EthBaseRewards cannot take into account the rewards that were already distributed to the stakers.
      */
     function getAllocatableRewards() external view returns (uint256);
 

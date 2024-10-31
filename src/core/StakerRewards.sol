@@ -3,9 +3,9 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin-upgrades/contracts/proxy/utils/Initializable.sol";
 import "@openzeppelin-upgrades/contracts/security/ReentrancyGuardUpgradeable.sol";
+import { OwnableUpgradeable } from "@openzeppelin-upgrades/contracts/access/OwnableUpgradeable.sol";
 
 import {AutomationCompatibleInterface} from "chainlink/v0.8/interfaces/AutomationCompatibleInterface.sol";
-import {OwnerIsCreator} from "chainlink/v0.8/shared/access/OwnerIsCreator.sol";
 import {AutomationBase} from "chainlink/v0.8/AutomationBase.sol";
 
 import {IEigenPodManager} from "eigenlayer-contracts/interfaces/IEigenPodManager.sol";
@@ -17,15 +17,14 @@ import {IAuction} from "../interfaces/IAuction.sol";
 import {IEscrow} from "../interfaces/IEscrow.sol";
 import {BidInvestmentMock} from "../../test/mocks/BidInvestmentMock.sol";
 
-// TODO: 1. Initialize the byzantineAdmin in initialize()
-// TODO: 2. The oldest DV exists due to staker's voluntary exit: StratVaultETH should notify SR to update its numValidatorsInVault and cluster data.
-// TODO: 3. DV exits due to lack of VCs: make sure numValidators >= num32ETHStaked, otherwise no rewards to distribute or force staker to exit
+// TODO: The oldest DV exists due to staker's voluntary exit: StratVaultETH should notify SR to update its numValidatorsInVault and cluster data.
+// TODO: DV exits due to lack of VCs: make sure numValidators >= num32ETHStaked, otherwise no rewards to distribute or force staker to exit
 
 contract StakerRewards is
     Initializable,
+    OwnableUpgradeable,
     ReentrancyGuardUpgradeable,
     AutomationCompatibleInterface,
-    OwnerIsCreator,
     AutomationBase,
     IStakerRewards
 {
@@ -48,6 +47,8 @@ contract StakerRewards is
 
     uint32 private constant _ONE_DAY = 1 days;
     uint256 private constant _WAD = 1e18;
+    uint256 private constant _GWEI_TO_WEI = 1e9;
+    uint256 private constant _STAKED_BALANCE_RATE_SCALE = 1e4;
 
     /* ============== STATE VARIABLES ============== */
 
@@ -99,7 +100,8 @@ contract StakerRewards is
         _disableInitializers();
     }
 
-    function initialize(uint256 _upkeepInterval) external initializer {
+    function initialize(address _initialOwner, uint256 _upkeepInterval) external initializer {
+        _transferOwnership(_initialOwner);
         __ReentrancyGuard_init();
         upkeepInterval = _upkeepInterval;
     }
@@ -122,39 +124,40 @@ contract StakerRewards is
      * @param _clusterId The ID of the cluster
      */
     function dvActivationCheckpoint(address _vaultAddr, bytes32 _clusterId) external onlyStratVaultETH {
-        // Get the total new VCs, the smallest VC and the cluster size
+        // Get the total new VCs, the smallest VC and the cluster size of the new DV
         IAuction.ClusterDetails memory clusterDetails = auction.getClusterDetails(_clusterId);
         (uint256 totalBidPrice, uint64 totalClusterVCs, uint32 smallestVC, uint8 clusterSize) = auction.getClusterMetrics(clusterDetails.nodes);
 
-        // Add up the new total bid prices and total VCs
-        _checkpoint.totalActivedBids += totalBidPrice;
-        _checkpoint.totalVCs += totalClusterVCs;
+        // Get the staked ETH balance rate of the new DV
+        VaultData storage vault = _vaults[_vaultAddr];
+        uint16 stakedBalanceRate = _getStakedBalanceRate(_vaultAddr, clusterDetails.clusterPubKeyHash);
 
-        // Create the cluster data 
+        // Create the cluster data for the new DV
         ClusterData storage cluster = _clusters[_clusterId];
         cluster.smallestVC = smallestVC;
         cluster.clusterSize = clusterSize;
         cluster.activeTime = block.timestamp;
         cluster.exitTimestamp = block.timestamp + cluster.smallestVC * _ONE_DAY;
 
-        // Update rewards and checkpoint data depending on the conditions 
-        VaultData storage vault = _vaults[_vaultAddr];
-        if (numValidators4 + numValidators7 == 0) {
-            _checkpoint.updateTime = block.timestamp;
-        } else {
-            _handleRewardsAndCheckpointUpdates(_vaultAddr);
-        }
+        // Update the data between the previous checkpoint and the current one
+        _handleCheckpointUpdates(_vaultAddr);
 
-        // Calculate the pectra ratio and add it up to accumulatedPectraRatio
-        IEigenPod eigenPod = eigenPodManager.ownerToPod(_vaultAddr);
-        IEigenPod.ValidatorInfo memory validatorInfo = eigenPod.validatorPubkeyHashToInfo(clusterDetails.clusterPubKeyHash);
-        // Convert restakedBalanceGwei from Gwei to wei and multiply by 100 to preserve 2 decimal places
-        uint16 pectraRatio = uint16((validatorInfo.restakedBalanceGwei * 1e9 * 100) / 32 ether);
-        vault.accumulatedPectraRatio += pectraRatio;
-        
-        // Update validator counter and timestamp 
-        clusterSize == 4 ? ++numValidators4 : ++numValidators7;
+        // Update the data with new bid prices and VCs
+        _checkpoint.totalActivedBids += totalBidPrice;
+        _checkpoint.totalVCs += totalClusterVCs;
+        _checkpoint.totalStakedBalanceRate += stakedBalanceRate;
+        uint64 dailyConsumedVCs = stakedBalanceRate * clusterSize;
+        _checkpoint.totalDailyConsumedVCs += dailyConsumedVCs;
+
+        // Update the vault's accruedStakedBalanceRate and the lastUpdate timestamp
+        vault.accruedStakedBalanceRate += stakedBalanceRate;
         vault.lastUpdate = block.timestamp;
+
+        // Update the validator counter 
+        clusterSize == 4 ? ++numValidators4 : ++numValidators7;
+
+        // Update daily32EthBaseRewards
+        _adjustDaily32EthBaseRewards();
     }
 
     /** 
@@ -165,11 +168,14 @@ contract StakerRewards is
      * @param _vaultAddr Address of the StratVaultETH
      */
     function withdrawCheckpoint(address _vaultAddr) external onlyStratVaultETH {
-        VaultData storage vault = _vaults[_vaultAddr];
-        // Update rewards and checkpoint data depending on the conditions 
-        _handleRewardsAndCheckpointUpdates(_vaultAddr);
+        // Update the data between the previous checkpoint and the current one
+        _handleCheckpointUpdates(_vaultAddr);
+
         // Send the pending rewards from the BidInvestment contract to the vault
-        bidInvestment.sendRewardsToVault(_vaultAddr, vault.pendingRewards);
+        bidInvestment.sendRewardsToVault(_vaultAddr, _vaults[_vaultAddr].pendingRewards);
+
+        // Update daily32EthBaseRewards
+        _adjustDaily32EthBaseRewards();
     }
 
     /* ============== CHAINLINK AUTOMATION FUNCTIONS ============== */
@@ -290,7 +296,7 @@ contract StakerRewards is
        3. Send back the total bid prices of the exited DVs to the Escrow contract
        4. Update totalVCs and totalPendingRewards variables if necessary
        5. Remove the total remaining VCs of the exited DVs from totalVCs if any and decrease the number of clusters4 and/or clusters7
-       6. Recalculate the dailyRewardsPer32ETH if there are still clusters
+       6. Recalculate the daily32EthBaseRewards if there are still clusters
      * @dev Revert if it is called by a non-forwarder address
     */
     function performUpkeep(bytes calldata performData) external override {
@@ -338,9 +344,9 @@ contract StakerRewards is
             _checkpoint.updateTime = block.timestamp;
         }
 
-        // Update dailyRewardsPer32ETH based on the updated data
-        if (numValidators4 + numValidators7 > 0) {
-            _adjustDailyRewards();
+        // Update daily32EthBaseRewards based on the updated data
+        if (numValidators4 + numValidators7 != 0) {
+            _adjustDaily32EthBaseRewards();
         }
     }
 
@@ -349,7 +355,7 @@ contract StakerRewards is
      * @param _forwarderAddress The new address to set
      * @dev Only callable by the StratVaultManager
      */
-    function setForwarderAddress(address _forwarderAddress) external onlyStratVaultManager {
+    function setForwarderAddress(address _forwarderAddress) external onlyOwner {
         forwarderAddress = _forwarderAddress;
     }
 
@@ -358,7 +364,7 @@ contract StakerRewards is
      * @dev Only callable by the StratVaultManager
      * @param _upkeepInterval The new interval between upkeep calls
      */
-    function updateUpkeepInterval(uint256 _upkeepInterval) external onlyStratVaultManager {
+    function updateUpkeepInterval(uint256 _upkeepInterval) external onlyOwner {
         upkeepInterval = _upkeepInterval;
     }
 
@@ -366,18 +372,17 @@ contract StakerRewards is
 
     /**
      * @notice Calculate the pending rewards since last update of a given vault
-     * @param _accumulatedPectraRatio Accumulated pectra ratio of the vault
+     * @param _accruedStakedBalanceRate Accumulated pectra ratio of the vault
      * @param _vaultUpdateTime Last update time of the vault
      */
-    function calculateRewards(uint16 _accumulatedPectraRatio, uint256 _vaultUpdateTime) public view returns (uint256) {
+    function calculateRewards(uint16 _accruedStakedBalanceRate, uint256 _vaultUpdateTime) public view returns (uint256) {
         uint256 elapsedDays = _getElapsedDays(_vaultUpdateTime);
-        // Scale down the accumulatedPectraRatio by 2 decimal places
-        return (_checkpoint.dailyRewardsPer32ETH * elapsedDays * _accumulatedPectraRatio) / 100;
+        return (_checkpoint.daily32EthBaseRewards * elapsedDays * _accruedStakedBalanceRate) / _STAKED_BALANCE_RATE_SCALE;
     }
 
     /**
      * @notice Calculate the allocatable amount of ETH in the StakerRewards contract 
-     * @dev The calculation of the dailyRewardsPer32ETH cannot take into account the rewards that were already distributed to the stakers.
+     * @dev The calculation of the daily32EthBaseRewards cannot take into account the rewards that were already distributed to the stakers.
      */
     function getAllocatableRewards() public view returns (uint256) {
         return _checkpoint.totalActivedBids - _checkpoint.totalPendingRewards;
@@ -416,14 +421,13 @@ contract StakerRewards is
     function _updateVCsAndPendingRewards(uint256 _rewardsToVault) private nonReentrant {
         uint256 elapsedDays = _getElapsedDays(_checkpoint.updateTime);
 
-        // Calculate totalVCs
-        uint256 dailyConsumedVCs = numValidators4 * 4 + numValidators7 * 7;
-        uint256 totalConsumedVCs = elapsedDays * dailyConsumedVCs;
+        // Update totalVCs
+        uint256 totalConsumedVCs = elapsedDays * _checkpoint.totalDailyConsumedVCs;
         if (_checkpoint.totalVCs < totalConsumedVCs) revert TotalVCsLessThanConsumedVCs();
         _checkpoint.totalVCs -= uint64(totalConsumedVCs);
 
         // Update totalPendingRewards
-        uint256 distributedRewards = _checkpoint.dailyRewardsPer32ETH * elapsedDays * (numValidators4 + numValidators7);
+        uint256 distributedRewards = _checkpoint.daily32EthBaseRewards * elapsedDays * _checkpoint.totalStakedBalanceRate;
         if (_rewardsToVault == 0) {
             _checkpoint.totalPendingRewards += distributedRewards;
         } else {
@@ -432,15 +436,16 @@ contract StakerRewards is
     }
 
     /**
-     * @notice Update the checkpoint struct including calculating and updating dailyRewardsPer32ETH
+     * @notice Calculate and update daily32EthBaseRewards based on new values
      * @dev Revert if there are no active DVs or if totalVCs is 0
+     * @dev Checkpoint updateTime should be updated after calculation 
      */
-    function _adjustDailyRewards() private nonReentrant {
+    function _adjustDaily32EthBaseRewards() private nonReentrant {
         if (_checkpoint.totalVCs == 0) revert TotalVCsCannotBeZero();
 
-        uint256 averageVCsUsedPerDayPerValidator = ((numValidators4 * 4 + numValidators7 * 7) * _WAD) / (numValidators4 + numValidators7);
-        uint256 dailyRewardsPer32ETH = (getAllocatableRewards() / _checkpoint.totalVCs) * averageVCsUsedPerDayPerValidator / _WAD;
-        _checkpoint.dailyRewardsPer32ETH = dailyRewardsPer32ETH;
+        uint256 dailyUsedVCsPer32ETH = ((numValidators4 * 4 + numValidators7 * 7) * _WAD) / (numValidators4 + numValidators7);
+        uint256 daily32EthBaseRewards = (getAllocatableRewards() / _checkpoint.totalVCs) * dailyUsedVCsPer32ETH / _WAD;
+        _checkpoint.daily32EthBaseRewards = daily32EthBaseRewards;
         _checkpoint.updateTime = block.timestamp;
     }
 
@@ -472,31 +477,42 @@ contract StakerRewards is
     }
 
     /**
-     * @notice Handle chackpoint data update and sending pending rewards to vault
+     * @notice Handle data updates between the previous checkpoint and the current one
      * @param _vaultAddr Address of the StratVaultETH
      */
-    function _handleRewardsAndCheckpointUpdates(address _vaultAddr) private {
+    function _handleCheckpointUpdates(address _vaultAddr) private {
         VaultData storage vault = _vaults[_vaultAddr];
-        uint16 accumulatedPectraRatio = vault.accumulatedPectraRatio;
+        uint16 accruedStakedBalanceRate = vault.accruedStakedBalanceRate;
         uint256 vaultUpdateTime = vault.lastUpdate;
 
-        bool vaultUpdateNeeded = accumulatedPectraRatio != 0 && _hasTimeElapsed(vaultUpdateTime, _ONE_DAY);
-        bool checkpointUpdateNeeded = numValidators4 + numValidators7 > 0 && _hasTimeElapsed(_checkpoint.updateTime, _ONE_DAY);
+        bool rewardUpdateNeeded = accruedStakedBalanceRate != 0 && _hasTimeElapsed(vaultUpdateTime, _ONE_DAY);
+        bool hasValidators = numValidators4 + numValidators7 != 0;
 
-        if (vaultUpdateNeeded) {
-            // Store the pending rewards of the previous validator in VaultData
-            uint256 pendingRewards = calculateRewards(accumulatedPectraRatio, vaultUpdateTime);
+        if (rewardUpdateNeeded) {
+            // Store the pending rewards generated by the previous validator(s) in VaultData
+            uint256 pendingRewards = calculateRewards(accruedStakedBalanceRate, vaultUpdateTime);
             vault.pendingRewards += pendingRewards;
+
             // Update totalVCs and totalPendingRewards variables
             _updateVCsAndPendingRewards(pendingRewards);
 
-            if (checkpointUpdateNeeded) {
-                _adjustDailyRewards();
-            }
-        } else if (checkpointUpdateNeeded) {
+        } else if (hasValidators) {
+            // Update totalVCs and totalPendingRewards variables
             _updateVCsAndPendingRewards(0);
-            _adjustDailyRewards();
         }
+    }
+
+    /**
+     * @notice Get the staked ETH balance rate of a given validator
+     * @param _vaultAddr Address of the StratVaultETH
+     * @param _clusterPubKeyHash The pubkey hash of the validator
+     */
+    function _getStakedBalanceRate(address _vaultAddr, bytes32 _clusterPubKeyHash) private view returns (uint16) {
+        // Calculate the pectra ratio and add it up to accruedStakedBalanceRate
+        IEigenPod eigenPod = eigenPodManager.ownerToPod(_vaultAddr);
+        IEigenPod.ValidatorInfo memory validatorInfo = eigenPod.validatorPubkeyHashToInfo(_clusterPubKeyHash);
+
+        return uint16((validatorInfo.restakedBalanceGwei * _GWEI_TO_WEI * _STAKED_BALANCE_RATE_SCALE) / 32 ether);
     }
 
     /* ============== MODIFIERS ============== */
