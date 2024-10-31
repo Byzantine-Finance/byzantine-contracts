@@ -113,7 +113,8 @@ contract Deploy_Holesky_From_Scratch is ExistingDeploymentParser {
             strategyVaultManager,
             escrow,
             auction,
-            bidInvestment
+            bidInvestment,
+            eigenPodManager
         );
 
         // Third, upgrade the proxy contracts to use the correct implementation contracts and initialize them.
