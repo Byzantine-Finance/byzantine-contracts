@@ -300,7 +300,7 @@ contract ExistingDeploymentParser is Script, Test {
         auction.initialize(byzantineAdmin, EXPECTED_POS_DAILY_RETURN_WEI, MAX_DISCOUNT_RATE, MIN_VALIDATION_DURATION);
         // StakerRewards
         vm.expectRevert(bytes("Initializable: contract is already initialized"));
-        stakerRewards.initialize(UPKEEP_INTERVAL);
+        stakerRewards.initialize(byzantineAdmin, UPKEEP_INTERVAL);
     }
 
     /// @notice Verify params based on config constants that are updated from calling `_parseInitialDeploymentParams`
@@ -319,6 +319,7 @@ contract ExistingDeploymentParser is Script, Test {
         require(auction.maxDiscountRate() == MAX_DISCOUNT_RATE, "auction: maxDiscountRate not set correctly");
         require(auction.minDuration() == MIN_VALIDATION_DURATION, "auction: minDuration not set correctly");
         // StakerRewards
+        require(stakerRewards.owner() == byzantineAdmin, "stakerRewards: owner not set correctly");
         require(stakerRewards.upkeepInterval() == UPKEEP_INTERVAL, "stakerRewards: upkeepInterval not set correctly");
     }
 
