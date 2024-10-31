@@ -108,6 +108,9 @@ contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
         stakerRewards = StakerRewards(
             payable(address(new TransparentUpgradeableProxy(address(emptyContract), address(byzantineProxyAdmin), "")))
         );
+        bidInvestment = BidInvestmentMock(
+            payable(address(new TransparentUpgradeableProxy(address(emptyContract), address(byzantineProxyAdmin), "")))
+        );
 
         // StrategyVaultETH implementation contract
         IStrategyVault strategyVaultETHImplementation = new StrategyVaultETH(
@@ -159,7 +162,12 @@ contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
             strategyVaultManager,
             escrow,
             auction,
-            bidInvestment
+            bidInvestment,
+            eigenPodManager
+        );
+        BidInvestmentMock bidInvestmentImplementation = new BidInvestmentMock(
+            escrow,
+            stakerRewards
         );
 
         // Third, upgrade the proxy contracts to use the correct implementation contracts and initialize them.
@@ -205,8 +213,15 @@ contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
             address(stakerRewardsImplementation),
             abi.encodeWithSelector(
                 StakerRewards.initialize.selector,
+                byzantineAdmin,
                 upkeepInterval
             )
+        );
+        // Upgrade BidInvestment
+        byzantineProxyAdmin.upgradeAndCall(
+            TransparentUpgradeableProxy(payable(address(bidInvestment))),
+            address(bidInvestmentImplementation),
+            ""
         );
     }
 
