@@ -74,12 +74,9 @@ contract ERC4626MultiRewardVault is Initializable, ERC4626Upgradeable, OwnableUp
     /* =================== FALLBACK =================== */
 
     /**
-     * @notice Payable fallback function that receives ether deposited to the StrategyVault contract
-     * @dev Strategy Vault is the address where to send the principal ethers post exit.
+     * @notice Payable fallback function that receives ether rewards deposited to the StrategyVault contract
      */
-    receive() external virtual payable {
-        // TODO: emit an event to notify
-    }
+    receive() external virtual payable {}
 
     /* ============== EXTERNAL FUNCTIONS ============== */
 
@@ -177,7 +174,7 @@ contract ERC4626MultiRewardVault is Initializable, ERC4626Upgradeable, OwnableUp
 
         // Withdraw assets
         uint256 assetsWithdrawn = super.redeem(sharesToBurn, receiver, owner);
-        
+
         // Burn shares representing reward tokens
         // redeem() must ensure that it burns amount of `shares` specified by the user.
         // If there are reward tokens, user will not have burned all shares in the super.redeem() call.
@@ -303,8 +300,14 @@ contract ERC4626MultiRewardVault is Initializable, ERC4626Upgradeable, OwnableUp
         // Add reward tokens to the arrays
         for (uint i = 0; i < rewardTokens.length; i++) {
             address token = rewardTokens[i];
+            uint256 vaultBalance;
 
-            uint256 vaultBalance = IERC20Upgradeable(token).balanceOf(address(this));
+            if (token == address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE)) {
+                vaultBalance = address(this).balance;
+            } else {
+                vaultBalance = IERC20Upgradeable(token).balanceOf(address(this));
+            }
+
             uint256 userTokenAmount = (vaultBalance * userSharesProportion) / 1e18;
 
             tokenAddresses[i + 1] = token;
@@ -327,11 +330,23 @@ contract ERC4626MultiRewardVault is Initializable, ERC4626Upgradeable, OwnableUp
 
         for (uint i = 0; i < rewardTokens.length; i++) {
             address rewardToken = rewardTokens[i];
-            uint256 rewardBalance = IERC20Upgradeable(rewardToken).balanceOf(address(this));
-            uint256 rewardAmount = (rewardBalance * sharesBurned) / totalShares;
-            if (rewardAmount > 0) {
-                IERC20Upgradeable(rewardToken).safeTransfer(receiver, rewardAmount);
-                emit RewardTokenWithdrawn(receiver, rewardToken, rewardAmount);
+            uint256 rewardBalance;
+            
+            if (rewardToken == address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE)) {
+                rewardBalance = address(this).balance;
+                uint256 rewardAmount = (rewardBalance * sharesBurned) / totalShares;
+                if (rewardAmount > 0) {
+                    (bool success, ) = receiver.call{value: rewardAmount}("");
+                    require(success, "ETH transfer failed");
+                    emit RewardTokenWithdrawn(receiver, rewardToken, rewardAmount);
+                }
+            } else {
+                rewardBalance = IERC20Upgradeable(rewardToken).balanceOf(address(this));
+                uint256 rewardAmount = (rewardBalance * sharesBurned) / totalShares;
+                if (rewardAmount > 0) {
+                    IERC20Upgradeable(rewardToken).safeTransfer(receiver, rewardAmount);
+                    emit RewardTokenWithdrawn(receiver, rewardToken, rewardAmount);
+                }
             }
         }
     }
