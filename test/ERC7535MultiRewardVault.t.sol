@@ -25,7 +25,6 @@ contract ERC7535MultiRewardVaultTest is Test {
     
     MockOracle oracle;
     MockERC20 rewardToken1;
-    MockERC20 rewardToken2;
 
     address alice = address(0x1);
     address bob = address(0x2);
@@ -33,6 +32,7 @@ contract ERC7535MultiRewardVaultTest is Test {
     uint256 internal constant STARTING_BALANCE = 100 ether;
 
     function setUp() public {
+        // Setup oracle
         oracle = new MockOracle();
 
         // Deploy the vault directly without a proxy (cannot test upgradability in this file)
@@ -41,10 +41,10 @@ contract ERC7535MultiRewardVaultTest is Test {
         // Initialize the vault
         vault.initialize(address(oracle));
 
-        // Setup reward tokens
-        rewardToken1 = new MockERC20("Reward Token 1", "RT1");
-        rewardToken2 = new MockERC20("Reward Token 2", "RT2");
+        // Setup reward token
+        rewardToken1 = new MockERC20("Reward Token", "RWD");
 
+        // Distribute ETH to the accounts
         vm.deal(alice, STARTING_BALANCE);
         vm.deal(bob, STARTING_BALANCE);
     }
@@ -89,9 +89,9 @@ contract ERC7535MultiRewardVaultTest is Test {
         // Mint 2 ETH worth of reward tokens to the vault
         rewardToken1.mint(address(vault), 2 * oneEth);
         // Verify the reward token is added
-        assertEq(vault.rewardTokens(0), address(rewardToken1), "Reward token 1 should be added");
+        assertEq(vault.rewardTokens(0), address(rewardToken1), "Reward token should be added");
         // Verify the reward token balance
-        assertEq(rewardToken1.balanceOf(address(vault)), 2 * oneEth, "Vault should have 2 ETH worth of reward token 1");
+        assertEq(rewardToken1.balanceOf(address(vault)), 2 * oneEth, "Vault should have 2 ETH worth of reward token");
 
         console.log("~~~After adding 2 reward tokens~~~");
         console.log("totalAssets", etherToString(vault.totalAssets()));
@@ -176,9 +176,9 @@ contract ERC7535MultiRewardVaultTest is Test {
         // Mint 1 ETH worth of reward tokens to the vault
         rewardToken1.mint(address(vault), 1 ether);
         // Verify the reward token is added
-        assertEq(vault.rewardTokens(0), address(rewardToken1), "Reward token 1 should be added");
+        assertEq(vault.rewardTokens(0), address(rewardToken1), "Reward token should be added");
         // Verify the reward token balance
-        assertEq(rewardToken1.balanceOf(address(vault)), 1 ether, "Vault should have 1 ETH worth of reward token 1");
+        assertEq(rewardToken1.balanceOf(address(vault)), 1 ether, "Vault should have 1 ETH worth of reward token");
         // Verify the total amount of assets on vault
         assertEq(vault.totalAssets(), 2 ether, "Total assets should be 2 ETH");
 
@@ -280,8 +280,8 @@ contract ERC7535MultiRewardVaultTest is Test {
         console.log("bob ETH balance", etherToString(address(bob).balance));
         console.log("bob RWD balance", decimalToString(rewardToken1.balanceOf(bob)));
 
-        console.log("alice total ETH value", etherToString(vault.getUserTotalETHValue(alice)));
-        //console.log("alice proportion withdrawn", halfEth / vault.getUserTotalETHValue(alice));
+        console.log("alice total ETH value", etherToString(vault.getUserTotalValue(alice)));
+        //console.log("alice proportion withdrawn", halfEth / vault.getUserTotalValue(alice));
         (, uint256[] memory assetAmountsAlice) = vault.getUsersOwnedAssetsAndRewards(alice);
         console.log("alice amount of ETH owned", etherToString(assetAmountsAlice[0]));
 
@@ -346,7 +346,7 @@ contract ERC7535MultiRewardVaultTest is Test {
         console.log("bob RWD balance", decimalToString(rewardToken1.balanceOf(bob)));
 
         // Verify reward token addition
-        assertEq(rewardToken1.balanceOf(address(vault)), oneEth, "Vault should have 1 ETH worth of reward token 1");
+        assertEq(rewardToken1.balanceOf(address(vault)), oneEth, "Vault should have 1 ETH worth of reward token");
         assertEq(vault.totalAssets(), 2.5 ether, "Total assets should be 2.5 ETH");
 
         /* ===================== BOB WITHDRAWS 1 ETH ===================== */
@@ -490,7 +490,6 @@ contract ERC7535MultiRewardVaultTest is Test {
         console.log("bob shares", decimalToString(vault.balanceOf(bob)));
 
         assertEq(vault.totalAssets(), 3.5 ether, "Vault should have 3.5 ETH in total value");
-        console.log("~~~Attempting Redeem~~~");
 
         /* ===================== BOB REDEEMS 1 SHARE ===================== */
         uint256 bobSharesToRedeem = 1e18;
@@ -539,9 +538,9 @@ contract ERC7535MultiRewardVaultTest is Test {
     }
 
     function testAddRewardToken() public {
-        /* ===================== ADD REWARD TOKEN 1 ===================== */
+        /* ===================== ADD REWARD TOKEN ===================== */
         vault.addRewardToken(address(rewardToken1));
-        assertEq(vault.rewardTokens(0), address(rewardToken1), "Reward token 1 should be added");
+        assertEq(vault.rewardTokens(0), address(rewardToken1), "Reward token should be added");
     }
 
     function testTotalAssets() public {
@@ -552,7 +551,7 @@ contract ERC7535MultiRewardVaultTest is Test {
         vm.prank(alice);
         vault.deposit{value: oneEth}(oneEth, alice);
 
-        // Add Reward Token 1 (RT1) (worth $1000)
+        // Add Reward Token (RWD) (worth $1000)
         vault.addRewardToken(address(rewardToken1));
         rewardToken1.mint(address(vault), oneEth); // Mint 1 reward token (assuming 18 decimals)
 
@@ -561,7 +560,7 @@ contract ERC7535MultiRewardVaultTest is Test {
         assertEq(vault.totalAssets(), 2 ether, "Total assets should be 2 ether");
     }
 
-    function testGetUserTotalETHValue() public {
+    function testGetUserTotalValue() public {
         uint256 initialDeposit = 1 ether;
         vm.prank(alice);
         vault.deposit{value: initialDeposit}(initialDeposit, alice);
@@ -569,7 +568,7 @@ contract ERC7535MultiRewardVaultTest is Test {
         vault.addRewardToken(address(rewardToken1));
         rewardToken1.mint(address(vault), 1 ether);
 
-        uint256 totalETHValue = vault.getUserTotalETHValue(alice);
+        uint256 totalETHValue = vault.getUserTotalValue(alice);
         assertEq(totalETHValue, 2 ether, "Alice's total ETH value should be 2 ETH");
     }
 
@@ -584,8 +583,8 @@ contract ERC7535MultiRewardVaultTest is Test {
         (address[] memory tokens, uint256[] memory amounts) = vault.getUsersOwnedAssetsAndRewards(alice);
         assertEq(tokens[0], address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE), "First token should be ETH");
         assertEq(amounts[0], 1 ether, "Alice should own 1 ETH");
-        assertEq(tokens[1], address(rewardToken1), "Second token should be reward token 1");
-        assertEq(amounts[1], 1 ether, "Alice should own 1 ETH worth of reward token 1");
+        assertEq(tokens[1], address(rewardToken1), "Second token should be reward token");
+        assertEq(amounts[1], 1 ether, "Alice should own 1 RWD");
     }
 
     function testPreviewDeposit() public {
@@ -633,7 +632,7 @@ contract ERC7535MultiRewardVaultTest is Test {
         vm.prank(alice);
         vault.deposit{value: initialDeposit}(initialDeposit, alice);
 
-        // Add reward token 1 (worth 1 ETH)
+        // Add reward token (worth 1 ETH)
             // totalAssets = 2 ETH
             // totalETH = 1
             // totalRWD = 1

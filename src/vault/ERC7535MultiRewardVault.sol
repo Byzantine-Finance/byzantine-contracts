@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "./ERC7535/ERC7535Upgradeable.sol";
+import {ERC7535Upgradeable} from "./ERC7535/ERC7535Upgradeable.sol";
 import {SafeERC20Upgradeable} from "@openzeppelin-upgrades/contracts/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin-upgrades/contracts/access/OwnableUpgradeable.sol";
 import {IERC20Upgradeable} from "@openzeppelin-upgrades/contracts/token/ERC20/IERC20Upgradeable.sol";
@@ -35,11 +35,12 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
     uint256[44] private __gap;
 
     /* ============== CUSTOM ERRORS ============== */
-    error ETHTransferFailedOnWithdrawal();
+
     error TokenAlreadyAdded();
     error InvalidAddress();
 
     /* ============== EVENTS ============== */
+
     event RewardTokenAdded(address indexed token);
     event OracleUpdated(address newOracle);
     event RewardTokenWithdrawn(address indexed receiver, address indexed rewardToken, uint256 amount);
@@ -66,19 +67,11 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
         oracle = IOracle(_oracle);
     }
 
-    /* =================== FALLBACK =================== */
-    /**
-     * @notice Payable fallback function that receives ether deposited to the StrategyVault contract
-     */
-    receive() external payable virtual override {
-        // TODO: emit an event to notify
-    }
-
     /* ============== EXTERNAL FUNCTIONS ============== */
 
     /**
-     * @notice Deposits ETH into the vault. Amount is determined by ETH depositing.
-     * @param assets The amount of ETH being deposit.
+     * @notice Deposits ETH into the vault in return for vault shares.
+     * @param assets The amount of ETH being deposited.
      * @param receiver The address to receive the Byzantine vault shares.
      * @return The amount of shares minted.
      */
@@ -88,7 +81,7 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
 
     /**
      * @notice Deposits ETH into the vault. Amount is determined by number of shares minting.
-     * @param shares The amount of vault shares to mint.
+     * @param shares The amount of shares to mint.
      * @param receiver The address to receive the Byzantine vault shares.
      * @return The amount of ETH deposited.
      */
@@ -97,7 +90,7 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
     }
 
     /**
-     * @notice Withdraws ETH & Reward Tokens from the vault. Amount is determined by ETH withdrawing
+     * @notice Withdraws ETH and reward tokens from the vault. Amount is determined by ETH withdrawing
      * @dev User proportionally receives ETH and reward tokens that are combined worth the amount of `assets` specified.
      * @param assets The value to withdraw from the vault, in ETH amount.
      * @param receiver The address to receive the ETH.
@@ -108,8 +101,8 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
         // Calculate the amount of shares that will be burned
         uint256 sharesToBurn = previewWithdraw(assets);
 
-        // Get the total ETH value of assets + reward tokens owned by the user
-        uint256 userTotalETHValue = getUserTotalETHValue(owner);
+        // Get the total ETH value of assets and reward tokens owned by the user
+        uint256 userTotalETHValue = getUserTotalValue(owner);
 
         // Calculate the proportion of total value being withdrawn
         uint256 withdrawProportion = (assets * 1e18) / userTotalETHValue;
@@ -120,13 +113,13 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
         // Calculate the amount of ETH that will be withdrawn, based on the withdrawn proportion
         uint256 ethToWithdraw = (tokenAmounts[0] * withdrawProportion) / 1e18;
         
-        // Withdraw ETH
+        // Withdraw assets
         uint256 sharesBurnedForETH = super.withdraw(ethToWithdraw, receiver, owner);
         
-        // Burn shares representing Reward Tokens
+        // Burn shares representing reward tokens
             // withdraw() must ensure that it burns amount of `shares` specified by the user.
-            // If there are Reward Tokens, user will not have burned all shares in the super.withdraw() call.
-            // If there are no Reward Tokens, the user will have burned all shares.
+            // If there are reward tokens, user will not have burned all shares in the super.withdraw() call.
+            // If there are no reward tokens, the user will have burned all shares.
         uint256 sharesBurningForRewardTokens = sharesToBurn - sharesBurnedForETH;
         _burn(owner, sharesBurningForRewardTokens);
 
@@ -170,16 +163,16 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
 
         // Withdraw ETH
         uint256 ethWithdrawn = super.redeem(sharesToBurn, receiver, owner);
-        uint256 totalValueWithdrawn = ethWithdrawn;
 
-        // Burn shares representing Reward Tokens
+        // Burn shares representing reward tokens
         // redeem() must ensure that it burns amount of `shares` specified by the user.
-        // If there are Reward Tokens, user will not have burned all shares in the super.redeem() call.
-        // If there are no Reward Tokens, the user will have burned all shares.
+        // If there are reward tokens, user will not have burned all shares in the super.redeem() call.
+        // If there are no reward tokens, the user will have burned all shares.
         uint256 sharesBurningForRewardTokens = shares - sharesToBurn;
         _burn(owner, sharesBurningForRewardTokens);
 
         // Withdraw proportional amount of each reward token
+        uint256 totalRewardTokenValueWithdrawn;
         for (uint i = 0; i < rewardTokens.length; i++) {
             address token = rewardTokens[i];
 
@@ -195,14 +188,14 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
 
                 // Add the ETH value of the withdrawn reward token to the total
                 uint256 tokenPrice = oracle.getPrice(token);
-
                 uint256 ethPrice = oracle.getPrice(address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE));
-                uint256 tokenValueInEth = (tokensToWithdraw * tokenPrice) / ethPrice;
+                uint256 rewardTokenValueInEth = (tokensToWithdraw * tokenPrice) / ethPrice;
 
-                totalValueWithdrawn += tokenValueInEth;
+                totalRewardTokenValueWithdrawn += rewardTokenValueInEth;
             }
         }
 
+        uint256 totalValueWithdrawn = ethWithdrawn + totalRewardTokenValueWithdrawn;
         return totalValueWithdrawn;
     }
 
@@ -232,18 +225,15 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
     /* ================ VIEW FUNCTIONS ================ */
 
     /**
-     * @notice Returns the total value of assets in the vault.
-     * @return The total value of assets in the vault, in ETH amount.
+     * @notice Returns the total value in the vault.
+     * @return The total value of assets and reward tokens in the vault, in ETH amount.
      * @dev This function is overridden to integrate with an oracle to determine the total value of all tokens in the vault.
-     * @dev This ensures that when depositing or withdrawing, a user receives the correct amount of assets or shares.
-     * @dev Allows for assets to be priced in USD, ETH or any other asset, as long as the oracles are updated accordingly and uniformly.
+     * @dev This ensures that when depositing or withdrawing, a user receives a proportional amount of assets or shares.
      * @dev Assumes that the oracle returns the price in 18 decimals.
      */
-    function totalAssets() public view override returns (uint256) {
-        uint256 ethBalance = _getETHBalance();
+    function totalAssets() public view override returns (uint256) {        
+        // Calculate USD value of reward tokens
         uint256 rewardTokenUSDValue;
-        
-        // Calculate value of reward tokens, add them to the total value
         for (uint i = 0; i < rewardTokens.length; i++) {
             address token = rewardTokens[i];
             uint256 balance = IERC20Upgradeable(token).balanceOf(address(this));
@@ -251,30 +241,25 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
             rewardTokenUSDValue += (balance * price);
         }
         
-        // Convert totalValue from USD to ETH
+        // Convert total value of reward tokens from USD to ETH
         uint256 ethPrice = oracle.getPrice(address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE));
         uint256 rewardTokenETHAmount = rewardTokenUSDValue / ethPrice;
 
+        // Add the ETH value of the reward tokens to the ETH balance to get total ETH amount
+        uint256 ethBalance = _getETHBalance();
         uint256 totalETHAmount = ethBalance + rewardTokenETHAmount;
-
         return totalETHAmount;
     }
 
     /**
-     * @notice Returns the total value of assets in the vault for a user.
-     * @dev Includes ETH amount and ETH value of all reward tokens.
+     * @notice Returns the total ETH value of assets and reward tokens in the vault for a user.
      * @param user The address of the user.
      * @return The total value of assets in the vault for the user, in ETH amount.
      */
-    function getUserTotalETHValue(address user) public view returns (uint256) {
+    function getUserTotalValue(address user) public view returns (uint256) {
         uint256 userShares = balanceOf(user);
-
-        uint256 scalingFactor = 1e18;
-
-        uint256 userSharesProportion = (userShares * scalingFactor) / totalSupply();
-
-        uint256 userTotalETHValue = (userSharesProportion * totalAssets()) / scalingFactor;
-
+        uint256 userSharesProportion = (userShares * 1e18) / totalSupply();
+        uint256 userTotalETHValue = (userSharesProportion * totalAssets()) / 1e18;
         return userTotalETHValue;
     }
 
@@ -287,12 +272,12 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
     function getUsersOwnedAssetsAndRewards(address user) public view returns (address[] memory, uint256[] memory) {
         // Get the proportion of shares (and thus ETH) the user owns
         uint256 userShares = balanceOf(user);
-        uint256 scalingFactor = 1e18;
-        uint256 userSharesProportion = (userShares * scalingFactor) / totalSupply();
+        uint256 userSharesProportion = (userShares * 1e18) / totalSupply();
 
         // Get the amount of ETH owned by the user
-        uint256 userEthAmount = (userSharesProportion * address(this).balance) / scalingFactor;
+        uint256 userEthAmount = (userSharesProportion * address(this).balance) / 1e18;
 
+        // Setup arrays for assets and reward tokens
         address[] memory tokenAddresses = new address[](rewardTokens.length + 1);
         uint256[] memory tokenAmounts = new uint256[](rewardTokens.length + 1);
         
@@ -305,7 +290,7 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
             address token = rewardTokens[i];
 
             uint256 vaultBalance = IERC20Upgradeable(token).balanceOf(address(this));
-            uint256 userTokenAmount = (vaultBalance * userSharesProportion) / scalingFactor;
+            uint256 userTokenAmount = (vaultBalance * userSharesProportion) / 1e18;
 
             tokenAddresses[i + 1] = token;
             tokenAmounts[i + 1] = userTokenAmount;
