@@ -90,7 +90,7 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
     }
 
     /**
-     * @notice Withdraws ETH and reward tokens from the vault. Amount is determined by ETH withdrawing
+     * @notice Withdraws ETH and reward tokens from the vault.
      * @dev User proportionally receives ETH and reward tokens that are combined worth the amount of `assets` specified.
      * @param assets The value to withdraw from the vault, in ETH amount.
      * @param receiver The address to receive the ETH.
@@ -305,11 +305,9 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
      * @dev Distributes rewards to the receiver for all rewardTokens.
      * @param receiver The address to receive the rewards.
      * @param sharesBurned The amount of shares burned.
-     * @param totalSharesPreWithdraw The total number of shares before the withdrawal sequence was initiated.
+     * @param totalShares The total number of shares before the withdrawal sequence was initiated.
      */
-    function _distributeRewards(address receiver, uint256 sharesBurned, uint256 totalSharesPreWithdraw) internal {
-        uint256 totalShares = totalSharesPreWithdraw;
-
+    function _distributeRewards(address receiver, uint256 sharesBurned, uint256 totalShares) internal {
         for (uint i = 0; i < rewardTokens.length; i++) {
             address rewardToken = rewardTokens[i];
             uint256 rewardBalance = IERC20Upgradeable(rewardToken).balanceOf(address(this));

@@ -101,9 +101,9 @@ contract ERC4626MultiRewardVault is Initializable, ERC4626Upgradeable, OwnableUp
     }
 
     /**
-     * @notice Withdraws assets and reward tokens from the vault. Amount is determined by ETH withdrawing
+     * @notice Withdraws assets and reward tokens from the vault.
      * @dev User proportionally receives assets and reward tokens that are combined worth the amount of `assets` specified.
-     * @param assets The value to withdraw from the vault, in ETH amount.
+     * @param assets The value to withdraw from the vault, in asset amount.
      * @param receiver The address to receive the assets.
      * @param owner The address that is withdrawing assets.
      * @return The amount of shares burned.
@@ -140,7 +140,12 @@ contract ERC4626MultiRewardVault is Initializable, ERC4626Upgradeable, OwnableUp
             uint256 tokenAmount = tokenAmounts[i];
             uint256 tokenToWithdraw = (tokenAmount * withdrawProportion) / 1e18;
             if (tokenToWithdraw > 0) {
-                IERC20Upgradeable(token).safeTransfer(receiver, tokenToWithdraw);
+                if (token == address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE)) {
+                    (bool success,) = payable(receiver).call{value: tokenToWithdraw}("");
+                    require(success, "ETH transfer failed");
+                } else {
+                    IERC20Upgradeable(token).safeTransfer(receiver, tokenToWithdraw);
+                }
                 emit RewardTokenWithdrawn(receiver, token, tokenToWithdraw);
             }
         }
@@ -247,7 +252,14 @@ contract ERC4626MultiRewardVault is Initializable, ERC4626Upgradeable, OwnableUp
         uint256 rewardTokenUSDValue;
         for (uint i = 0; i < rewardTokens.length; i++) {
             address token = rewardTokens[i];
-            uint256 balance = IERC20Upgradeable(token).balanceOf(address(this));
+
+            uint256 balance;
+            if (token == address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE)) {
+                balance = address(this).balance;
+            } else {
+                balance = IERC20Upgradeable(token).balanceOf(address(this));
+            }
+
             uint256 price = oracle.getPrice(token);
             rewardTokenUSDValue += (balance * price);
         }
@@ -302,7 +314,7 @@ contract ERC4626MultiRewardVault is Initializable, ERC4626Upgradeable, OwnableUp
             address token = rewardTokens[i];
             uint256 vaultBalance;
 
-            if (token == address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE)) {
+            if (token == 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE) {
                 vaultBalance = address(this).balance;
             } else {
                 vaultBalance = IERC20Upgradeable(token).balanceOf(address(this));
@@ -323,18 +335,17 @@ contract ERC4626MultiRewardVault is Initializable, ERC4626Upgradeable, OwnableUp
      * @dev Distributes rewards to the receiver for all rewardTokens.
      * @param receiver The address to receive the rewards.
      * @param sharesBurned The amount of shares burned.
-     * @param totalSharesPreWithdraw The total number of shares before the withdrawal sequence was initiated.
+     * @param totalShares The total number of shares before the withdrawal sequence was initiated.
      */
-    function _distributeRewards(address receiver, uint256 sharesBurned, uint256 totalSharesPreWithdraw) internal {
-        uint256 totalShares = totalSharesPreWithdraw;
-
+    function _distributeRewards(address receiver, uint256 sharesBurned, uint256 totalShares) internal {
         for (uint i = 0; i < rewardTokens.length; i++) {
             address rewardToken = rewardTokens[i];
             uint256 rewardBalance;
+            uint256 rewardAmount;
             
             if (rewardToken == address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE)) {
                 rewardBalance = address(this).balance;
-                uint256 rewardAmount = (rewardBalance * sharesBurned) / totalShares;
+                rewardAmount = (rewardBalance * sharesBurned) / totalShares;
                 if (rewardAmount > 0) {
                     (bool success, ) = receiver.call{value: rewardAmount}("");
                     require(success, "ETH transfer failed");
@@ -342,7 +353,7 @@ contract ERC4626MultiRewardVault is Initializable, ERC4626Upgradeable, OwnableUp
                 }
             } else {
                 rewardBalance = IERC20Upgradeable(rewardToken).balanceOf(address(this));
-                uint256 rewardAmount = (rewardBalance * sharesBurned) / totalShares;
+                rewardAmount = (rewardBalance * sharesBurned) / totalShares;
                 if (rewardAmount > 0) {
                     IERC20Upgradeable(rewardToken).safeTransfer(receiver, rewardAmount);
                     emit RewardTokenWithdrawn(receiver, rewardToken, rewardAmount);
