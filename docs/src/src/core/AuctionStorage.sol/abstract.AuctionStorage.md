@@ -1,22 +1,60 @@
 # AuctionStorage
-[Git Source](https://github.com/Byzantine-Finance/byzantine-contracts/blob/80b6cda4622c51c2217311610eeb15b655b99e2c/src/core/AuctionStorage.sol)
+[Git Source](https://github.com/Byzantine-Finance/byzantine-contracts/blob/9fb891800d52aaca6ef4f8a781c3003290fa4d2f/src/core/AuctionStorage.sol)
 
 **Inherits:**
 [IAuction](/src/interfaces/IAuction.sol/interface.IAuction.md)
 
 
 ## State Variables
-### _WAD
+### NODE_OP_SPLIT_ALLOCATION
+The split operators allocation
+
 
 ```solidity
-uint256 internal constant _WAD = 1e18;
+uint256 public constant NODE_OP_SPLIT_ALLOCATION = 250_000;
+```
+
+
+### SPLIT_TOTAL_ALLOCATION
+The split total allocation
+
+
+```solidity
+uint256 public constant SPLIT_TOTAL_ALLOCATION = 1_000_000;
 ```
 
 
 ### _BOND
+Bond to pay for the non whitelisted node operators
+
 
 ```solidity
 uint256 internal constant _BOND = 1 ether;
+```
+
+
+### SPLIT_DISTRIBUTION_INCENTIVE
+The split distribution incentive
+
+
+```solidity
+uint16 public constant SPLIT_DISTRIBUTION_INCENTIVE = 20_000;
+```
+
+
+### _CLUSTER_SIZE_4
+Number of nodes in a Distributed Validator
+
+
+```solidity
+uint8 internal constant _CLUSTER_SIZE_4 = 4;
+```
+
+
+### _CLUSTER_SIZE_7
+
+```solidity
+uint8 internal constant _CLUSTER_SIZE_7 = 7;
 ```
 
 
@@ -38,12 +76,66 @@ IStrategyVaultManager public immutable strategyVaultManager;
 ```
 
 
-### _auctionTree
-Auction scores stored in a Red-Black tree (complexity O(log 2n))
+### pushSplitFactory
+0xSplits' PushSplitFactory contract
 
 
 ```solidity
-HitchensOrderStatisticsTreeLib.Tree internal _auctionTree;
+PushSplitFactory public immutable pushSplitFactory;
+```
+
+
+### stakerRewards
+StakerRewards contract
+
+
+```solidity
+IStakerRewards public immutable stakerRewards;
+```
+
+
+### _mainAuctionTree
+Red-Black tree to store the main auction scores (auction gathering DV4, DV7 and already created DVs)
+
+
+```solidity
+HitchensOrderStatisticsTreeLib.Tree internal _mainAuctionTree;
+```
+
+
+### _dv4AuctionTree
+Red-Black tree to store the sub-auction scores (DV4)
+
+
+```solidity
+HitchensOrderStatisticsTreeLib.Tree internal _dv4AuctionTree;
+```
+
+
+### _dv4LatestWinningInfo
+Latest winning info of the dv4 sub-auction
+
+
+```solidity
+LatestWinningInfo internal _dv4LatestWinningInfo;
+```
+
+
+### _dv7AuctionTree
+Red-Black tree to store the sub-auction non-winning scores (DV7)
+
+
+```solidity
+HitchensOrderStatisticsTreeLib.Tree internal _dv7AuctionTree;
+```
+
+
+### _dv7LatestWinningInfo
+Latest winning info of the dv7 sub-auction
+
+
+```solidity
+LatestWinningInfo internal _dv7LatestWinningInfo;
 ```
 
 
@@ -61,16 +153,25 @@ Minimum duration to be part of a DV (in days)
 
 
 ```solidity
-uint160 public minDuration;
+uint32 public minDuration;
 ```
 
 
-### numNodeOpsInAuction
-Number of node operators in auction and seeking for a DV
+### dv4AuctionNumNodeOps
+Number of node operators in the DV4 sub-auction
 
 
 ```solidity
-uint64 public numNodeOpsInAuction;
+uint16 public dv4AuctionNumNodeOps;
+```
+
+
+### dv7AuctionNumNodeOps
+Number of node operators in the DV7 sub-auction
+
+
+```solidity
+uint16 public dv7AuctionNumNodeOps;
 ```
 
 
@@ -83,30 +184,30 @@ uint16 public maxDiscountRate;
 ```
 
 
-### clusterSize
-Number of nodes in a Distributed Validator
+### _nodeOpsDetails
+Node operator address => node operator global details
 
 
 ```solidity
-uint8 public clusterSize;
+mapping(address => NodeOpGlobalDetails) internal _nodeOpsDetails;
 ```
 
 
-### _nodeOpsInfo
-Node operator address => node operator auction details
+### _bidDetails
+Bid id => bid details
 
 
 ```solidity
-mapping(address => AuctionDetails) internal _nodeOpsInfo;
+mapping(bytes32 => BidDetails) internal _bidDetails;
 ```
 
 
-### _nodeOpsWhitelist
-Mapping for the whitelisted node operators
+### _clusterDetails
+Cluster ID => cluster details
 
 
 ```solidity
-mapping(address => bool) internal _nodeOpsWhitelist;
+mapping(bytes32 => ClusterDetails) internal _clusterDetails;
 ```
 
 
@@ -126,6 +227,11 @@ uint256[44] private __gap;
 
 
 ```solidity
-constructor(IEscrow _escrow, IStrategyVaultManager _strategyVaultManager);
+constructor(
+    IEscrow _escrow,
+    IStrategyVaultManager _strategyVaultManager,
+    PushSplitFactory _pushSplitFactory,
+    IStakerRewards _stakerRewards
+);
 ```
 

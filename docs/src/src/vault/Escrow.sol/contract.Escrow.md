@@ -1,19 +1,19 @@
 # Escrow
-[Git Source](https://github.com/Byzantine-Finance/byzantine-contracts/blob/80b6cda4622c51c2217311610eeb15b655b99e2c/src/vault/Escrow.sol)
+[Git Source](https://github.com/Byzantine-Finance/byzantine-contracts/blob/9fb891800d52aaca6ef4f8a781c3003290fa4d2f/src/vault/Escrow.sol)
 
 **Inherits:**
 [IEscrow](/src/interfaces/IEscrow.sol/interface.IEscrow.md)
 
 
 ## State Variables
-### bidPriceReceiver
+### stakerRewards
 Address which receives the bid of the auction winners
 
 *This will be updated to a smart contract vault in the future to distribute the stakers rewards*
 
 
 ```solidity
-address public immutable bidPriceReceiver;
+IStakerRewards public immutable stakerRewards;
 ```
 
 
@@ -29,17 +29,17 @@ IAuction public immutable auction;
 ## Functions
 ### constructor
 
-Constructor to set the bidPriceReceiver address and the auction contract
+Constructor to set the stakerRewards and the auction contracts
 
 
 ```solidity
-constructor(address _bidPriceReceiver, IAuction _auction);
+constructor(IStakerRewards _stakerRewards, IAuction _auction);
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`_bidPriceReceiver`|`address`|Address which receives the bid of the winners and distribute it to the stakers|
+|`_stakerRewards`|`IStakerRewards`|Address which receives the bid of the winners and distribute it to the stakers|
 |`_auction`|`IAuction`|The auction proxy contract|
 
 
