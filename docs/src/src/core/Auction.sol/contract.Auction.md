@@ -1,8 +1,8 @@
 # Auction
-[Git Source](https://github.com/Byzantine-Finance/byzantine-contracts/blob/80b6cda4622c51c2217311610eeb15b655b99e2c/src/core/Auction.sol)
+[Git Source](https://github.com/Byzantine-Finance/byzantine-contracts/blob/9fb891800d52aaca6ef4f8a781c3003290fa4d2f/src/core/Auction.sol)
 
 **Inherits:**
-Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable, [AuctionStorage](/src/core/AuctionStorage.sol/abstract.AuctionStorage.md), DSMath
+Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable, [AuctionStorage](/src/core/AuctionStorage.sol/abstract.AuctionStorage.md)
 
 TODO: Calculation of the reputation score of node operators
 
@@ -14,13 +14,15 @@ TODO: Calculation of the reputation score of node operators
 ```solidity
 constructor(
     IEscrow _escrow,
-    IStrategyVaultManager _strategyVaultManager
-) AuctionStorage(_escrow, _strategyVaultManager);
+    IStrategyVaultManager _strategyVaultManager,
+    PushSplitFactory _pushSplitFactory,
+    IStakerRewards _stakerRewards
+) AuctionStorage(_escrow, _strategyVaultManager, _pushSplitFactory, _stakerRewards);
 ```
 
 ### initialize
 
-*Initializes the address of the initial owner*
+*Initializes the address of the initial owner plus the auction parameters*
 
 
 ```solidity
@@ -28,406 +30,456 @@ function initialize(
     address _initialOwner,
     uint256 _expectedDailyReturnWei,
     uint16 _maxDiscountRate,
-    uint160 _minDuration,
-    uint8 _clusterSize
+    uint32 _minDuration
 ) external initializer;
 ```
 
-### addNodeOpToWhitelist
+### triggerAuction
 
-Add a node operator to the the whitelist to not make him pay the bond.
+Function triggered by the StrategyVaultManager or a StrategyVaultETH every time a staker deposits ETH
 
-*Revert if the node operator is already whitelisted.*
+*It triggers the DV Auction, returns the winning cluster ID and triggers a new sub-auction*
+
+*Reverts if not enough node operators in the protocol*
+
+*Reverts if the caller is not a StrategyVaultETH contract or the StrategyVaultManager*
 
 
 ```solidity
-function addNodeOpToWhitelist(address _nodeOpAddr) external onlyOwner;
+function triggerAuction() external onlyStratVaultETH nonReentrant returns (bytes32);
 ```
-**Parameters**
+**Returns**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`_nodeOpAddr`|`address`||
+|`<none>`|`bytes32`|The id of the winning cluster|
 
-
-### removeNodeOpFromWhitelist
-
-Remove a node operator to the the whitelist.
-
-*Revert if the node operator is not whitelisted.*
-
-
-```solidity
-function removeNodeOpFromWhitelist(address _nodeOpAddr) external onlyOwner;
-```
-**Parameters**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`_nodeOpAddr`|`address`||
-
-
-### getAuctionWinners
-
-Function triggered by the StrategyVaultManager every time a staker deposit 32ETH and ask for a DV.
-It allows the pre-creation of a new DV for the next staker.
-It finds the `clusterSize` node operators with the highest auction scores and put them in a DV.
-
-*Reverts if not enough node operators are available.*
-
-
-```solidity
-function getAuctionWinners() external onlyStategyVaultManager nonReentrant returns (IStrategyVault.Node[] memory);
-```
 
 ### getPriceToPay
 
-Fonction to determine the auction price for a validator according to its bids parameters
+Function to determine the bid price a node operator will have to pay
 
-*Revert if the two entry arrays `_discountRates` and `_timesInDays` have different length*
+*Revert if `_discountRate` or `_timeInDays` don't respect the minimum values set by Byzantine.*
 
-*Revert if `_discountRates` or `_timesInDays` don't respect the values set by the byzantine.*
+*Reverts if the auction type is unknown*
 
 
 ```solidity
 function getPriceToPay(
     address _nodeOpAddr,
-    uint256[] calldata _discountRates,
-    uint256[] calldata _timesInDays
-) public view returns (uint256);
+    uint16 _discountRate,
+    uint32 _timeInDays,
+    AuctionType _auctionType
+) external view returns (uint256);
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
 |`_nodeOpAddr`|`address`||
-|`_discountRates`|`uint256[]`||
-|`_timesInDays`|`uint256[]`||
+|`_discountRate`|`uint16`||
+|`_timeInDays`|`uint32`||
+|`_auctionType`|`AuctionType`||
 
 
 ### bid
 
-Operators set their standing bid(s) parameters and pay their bid(s) to an escrow smart contract.
-If a node op doesn't win the auction, its bids stays in the escrow contract for the next auction.
-An node op who hasn't won an auction can ask the escrow contract to refund its bid(s) if he wants to leave the protocol.
-If a node op wants to update its bid parameters, call `updateBid` function.
+Bid function to join a cluster type specified by `_auctionType`. A call to that function will search the sub-auctions winners, calculate their average score, and put the virtual DV in the main auction.
+Every time a new bid modify the sub-auctions winners, it update the main auction by removing the previous virtual DV and adding the new one.
 
-Non-whitelisted operators will have to pay the 1ETH bond as well.
+*The bid price is sent to an escrow smart contract. As long as the node operator doesn't win the auction, its bids stays in the escrow contract.
+It is possible to ask the escrow contract to refund the bid if the operator wants to leave the protocol (call `withdrawBid`)
+It is possible to update an existing bid parameters (call `updateBid`).*
 
-*By calling this function, the node op insert data in the auction Binary Search Tree (sorted by auction score).*
+*Reverts if the bidder is not whitelisted (permissionless DV will arrive later)*
 
-*Revert if `_discountRates` or `_timesInDays` don't respect the values set by the byzantine or if they don't have the same length.*
+*Reverts if the discount rate is too high or the duration is too short*
 
-*Revert if the ethers sent by the node op are not enough to pay for the bid(s) (and the bond).*
+*Reverts if the ethers sent by the node op are not enough to pay for the bid(s) (and the bond). If too many ethers has been sent the function returns the excess to the sender.*
 
-*Reverts if the transfer of the funds to the Escrow contract failed.*
-
-*If too many ethers has been sent the function give back the excess to the sender.*
+*Reverts if the auction type is unknown*
 
 
 ```solidity
 function bid(
-    uint256[] calldata _discountRates,
-    uint256[] calldata _timesInDays
-) external payable nonReentrant returns (uint256[] memory);
+    uint16 _discountRate,
+    uint32 _timeInDays,
+    AuctionType _auctionType
+) external payable nonReentrant returns (bytes32 bidId);
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`_discountRates`|`uint256[]`||
-|`_timesInDays`|`uint256[]`||
+|`_discountRate`|`uint16`|The desired profit margin in percentage of the operator (scale from 0 to 10000)|
+|`_timeInDays`|`uint32`|Duration of being part of a DV, in days|
+|`_auctionType`|`AuctionType`|cluster type the node operator wants to join (dv4, dv7, private dv, ...)|
 
 **Returns**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`<none>`|`uint256[]`|The array of each bid auction score.|
+|`bidId`|`bytes32`|The id of the bid|
 
 
-### getUpdateOneBidPrice
+### getUpdateBidPrice
 
 TODO: Get the reputation score of msg.sender
 
-Calculate operator's bid details
-TODO: Emit event to associate an auction score to a bid price in the front
+Fonction to determine the price to add if the node operator outbids. Returns 0 if he downbids.
 
-Fonction to determine the price to add in the protocol if the node operator outbids. Returns 0 if he decreases its bid.
+*Reverts if the node op doesn't have a bid with `_bidId`.*
 
-The bid which will be updated will be the last bid with `_auctionScore`
-
-*Reverts if the node op doesn't have a bid with `_auctionScore`.*
-
-*Revert if `_discountRate` or `_timeInDays` don't respect the values set by the byzantine.*
+*Revert if `_newDiscountRate` or `_newTimeInDays` don't respect the values set by the byzantine.*
 
 
 ```solidity
-function getUpdateOneBidPrice(
+function getUpdateBidPrice(
     address _nodeOpAddr,
-    uint256 _auctionScore,
-    uint256 _discountRate,
-    uint256 _timeInDays
-) public view returns (uint256);
+    bytes32 _bidId,
+    uint16 _newDiscountRate,
+    uint32 _newTimeInDays
+) external view returns (uint256);
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
 |`_nodeOpAddr`|`address`||
-|`_auctionScore`|`uint256`||
-|`_discountRate`|`uint256`||
-|`_timeInDays`|`uint256`||
+|`_bidId`|`bytes32`||
+|`_newDiscountRate`|`uint16`||
+|`_newTimeInDays`|`uint32`||
 
 
-### updateOneBid
+### updateBid
 
-Update a bid of a node operator associated to `_auctionScore`. The node op will have to pay more if he outbids.
-If he decreases his bid, the escrow contract will send him back the difference.
+Update a bid of a node operator's `_bidId`. The node op will have to pay more if he outbids.
+If he decreases his bid, the escrow contract will send him back the price difference.
 
-The bid which will be updated will be the last bid with `_auctionScore`
+*Reverts if the node op doesn't have a bid with `_bidId`.*
 
-*Reverts if the node op doesn't have a bid with `_auctionScore`.*
+*Revert if `_newDiscountRate` or `_newTimeInDays` don't respect the values set by the byzantine.*
 
 *Reverts if the transfer of the funds to the Escrow contract failed.*
 
-*Revert if `_discountRate` or `_timeInDays` don't respect the values set by the byzantine.*
-
 
 ```solidity
-function updateOneBid(
-    uint256 _auctionScore,
-    uint256 _newDiscountRate,
-    uint256 _newTimeInDays
-) external payable nonReentrant returns (uint256);
+function updateBid(bytes32 _bidId, uint16 _newDiscountRate, uint32 _newTimeInDays) external payable nonReentrant;
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`_auctionScore`|`uint256`||
-|`_newDiscountRate`|`uint256`||
-|`_newTimeInDays`|`uint256`||
+|`_bidId`|`bytes32`||
+|`_newDiscountRate`|`uint16`||
+|`_newTimeInDays`|`uint32`||
 
 
 ### withdrawBid
 
 TODO: Get the reputation score of msg.sender
 
-Calculate operator's new bid price and new auction score
-
-Allow a node operator to withdraw a specific bid (through its auction score).
+Allow a node operator to withdraw a specific bid (through its bidId).
 The withdrawer will be refund its bid price plus (the bond of he paid it).
 
+*Reverts if the node op doesn't have a bid with `_bidId`.*
+
 
 ```solidity
-function withdrawBid(uint256 _auctionScore) external;
+function withdrawBid(bytes32 _bidId) external;
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`_auctionScore`|`uint256`||
+|`_bidId`|`bytes32`||
 
 
-### updateAuctionConfig
+### updateNodeVCNumber
 
-Update the auction configuration except cluster size
+Update the VC number of a node and the cluster status
+
+*This function is callable only by the StakerRewards contract
+TODO: add a try catch to handle the case where consumedVCs is greater than currentVCs*
 
 
 ```solidity
-function updateAuctionConfig(
-    uint256 _expectedDailyReturnWei,
-    uint16 _maxDiscountRate,
-    uint160 _minDuration
-) external onlyOwner;
+function updateNodeVCNumber(bytes32 _clusterId, uint32 _consumedVCs) external onlyStakerRewards;
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`_expectedDailyReturnWei`|`uint256`||
-|`_maxDiscountRate`|`uint16`||
-|`_minDuration`|`uint160`||
+|`_clusterId`|`bytes32`||
+|`_consumedVCs`|`uint32`||
 
 
-### updateClusterSize
+### updateClusterStatus
 
-Update the cluster size (i.e the number of node operators in a DV)
+Update the status of a cluster
+
+*Callable only by a StrategyVaultETH contract*
+
+*The check to know if the cluster is in the calling vault is done in the StrategyVaultETH contract*
 
 
 ```solidity
-function updateClusterSize(uint8 _clusterSize) external onlyOwner;
+function updateClusterStatus(bytes32 _clusterId, IAuction.ClusterStatus _newStatus) external onlyStratVaultETH;
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`_clusterSize`|`uint8`||
+|`_clusterId`|`bytes32`|The id of the cluster to update the status|
+|`_newStatus`|`IAuction.ClusterStatus`|The new status|
+
+
+### setClusterPubKey
+
+Set the pubkey hash of a cluster
+
+*Callable only by a StrategyVaultETH contract*
+
+*The check to know if the cluster is in the calling vault is done in the StrategyVaultETH contract*
+
+
+```solidity
+function setClusterPubKey(bytes32 _clusterId, bytes calldata _clusterPubkey) external onlyStratVaultETH;
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_clusterId`|`bytes32`|The id of the cluster to set the pubkey hash|
+|`_clusterPubkey`|`bytes`|The pubkey of the cluster|
 
 
 ### isWhitelisted
 
-Return true if the `_nodeOpAddr` is whitelisted, false otherwise.
+Returns true if `_nodeOpAddr` is whitelisted, false otherwise.
 
 
 ```solidity
 function isWhitelisted(address _nodeOpAddr) public view returns (bool);
 ```
 
-### getNodeOpBidNumber
+### getNodeOpDetails
 
-Return the pending bid number of the `_nodeOpAddr`.
+Returns the globaldetails of a specific node operator
 
 
 ```solidity
-function getNodeOpBidNumber(address _nodeOpAddr) public view returns (uint256);
+function getNodeOpDetails(address _nodeOpAddr) public view returns (NodeOpGlobalDetails memory);
 ```
 
-### getNodeOpAuctionScoreBidPrices
+### getNumDVInAuction
 
-Return the pending bid(s) price of the `_nodeOpAddr` corresponding to `_auctionScore`.
-
-*If `_nodeOpAddr` doesn't have `_auctionScore` in his mapping, return an empty array.*
-
-*A same `_auctionScore` can have different bid prices depending on the reputationScore variations.*
+Returns the number of DVs in the main auction
 
 
 ```solidity
-function getNodeOpAuctionScoreBidPrices(
-    address _nodeOpAddr,
-    uint256 _auctionScore
-) public view returns (uint256[] memory);
+function getNumDVInAuction() public view returns (uint256);
+```
+
+### getBidDetails
+
+Returns the details of a specific bid
+
+
+```solidity
+function getBidDetails(bytes32 _bidId) public view returns (BidDetails memory);
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`_nodeOpAddr`|`address`||
-|`_auctionScore`|`uint256`|The auction score of the node operator you want to get the corresponding bid(s) price.|
+|`_bidId`|`bytes32`|The unique identifier of the bid|
 
 **Returns**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`<none>`|`uint256[]`|(uint256[] memory) An array of all the bid price for that specific auctionScore|
+|`<none>`|`BidDetails`|BidDetails struct containing the bid details|
 
 
-### getNodeOpAuctionScoreVcs
+### getClusterDetails
 
-Return the pending VCs number of the `_nodeOpAddr` corresponding to `_auctionScore`.
-
-*If `_nodeOpAddr` doesn't have `_auctionScore` in his mapping, return an empty array.*
-
-*A same `_auctionScore` can have different VCs numbers depending on the reputationScore variations.*
+Returns the details of a specific cluster
 
 
 ```solidity
-function getNodeOpAuctionScoreVcs(address _nodeOpAddr, uint256 _auctionScore) public view returns (uint256[] memory);
+function getClusterDetails(bytes32 _clusterId) public view returns (ClusterDetails memory);
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`_nodeOpAddr`|`address`||
-|`_auctionScore`|`uint256`|The auction score of the node operator you want to get the corresponding VCs numbers.|
+|`_clusterId`|`bytes32`|The unique identifier of the cluster|
 
 **Returns**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`<none>`|`uint256[]`|(uint256[] memory) An array of all the VC numbers for that specific auctionScore|
+|`<none>`|`ClusterDetails`|ClusterDetails struct containing the cluster details|
 
 
-### _calculateDailyVcPrice
+### getWinningCluster
 
-Calculate and returns the daily Validation Credit price (in WEI)
+Returns the id of the cluster with the highest average auction score
 
-*vc_price = Re*(1 - D)/cluster_size*
-
-*The `expectedDailyReturnWei` is set by Byzantine and corresponds to the Ethereum daily staking return.*
+*Returns (bytes32(0), 0) if main tree is empty*
 
 
 ```solidity
-function _calculateDailyVcPrice(uint256 _discountRate) internal view returns (uint256);
+function getWinningCluster() public view returns (bytes32 winningClusterId, uint256 highestAvgAuctionScore);
+```
+
+### whitelistNodeOps
+
+Add node operators to the whitelist
+
+
+```solidity
+function whitelistNodeOps(address[] calldata _nodeOpAddrs) external onlyOwner;
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`_discountRate`|`uint256`||
+|`_nodeOpAddrs`|`address[]`||
 
 
-### _calculateBidPrice
+### updateExpectedDailyReturnWei
 
-Calculate and returns the bid price that should be paid by the node operator (in WEI)
+Remove a node operator to the the whitelist.
 
-*bid_price = time_in_days * vc_price*
+Update the expected daily PoS rewards variable (in Wei)
+
+*Revert if the node operator is not whitelisted.*
+
+*This function is callable only by the Auction contract's owner*
 
 
 ```solidity
-function _calculateBidPrice(uint256 _timeInDays, uint256 _dailyVcPrice) internal pure returns (uint256);
+function updateExpectedDailyReturnWei(uint256 _newExpectedDailyReturnWei) external onlyOwner;
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`_timeInDays`|`uint256`||
-|`_dailyVcPrice`|`uint256`||
+|`_newExpectedDailyReturnWei`|`uint256`||
 
 
-### _calculateAuctionScore
+### updateMinDuration
 
-Calculate and returns the auction score of a node operator
+Update the minimum validation duration
 
-*powerValue = 1.001**_timeInDays, calculated from `_pow` function*
-
-*The result is divided by 1e18 to downscaled from 1e36 to 1e18*
+*This function is callable only by the Auction contract's owner*
 
 
 ```solidity
-function _calculateAuctionScore(
-    uint256 _dailyVcPrice,
-    uint256 _timeInDays,
-    uint256 _reputation
-) internal pure returns (uint256);
+function updateMinDuration(uint32 _newMinDuration) external onlyOwner;
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`_dailyVcPrice`|`uint256`||
-|`_timeInDays`|`uint256`||
-|`_reputation`|`uint256`||
+|`_newMinDuration`|`uint32`||
 
 
-### _pow
+### updateMaxDiscountRate
 
-Calculate the power value of 1.001**_timeInDays
+Update the maximum discount rate
 
-*The result is divided by 1e9 to downscaled to 1e18 as the return value of `rpow` is upscaled to 1e27*
+*This function is callable only by the Auction contract's owner*
 
 
 ```solidity
-function _pow(uint256 _timeIndays) internal pure returns (uint256);
+function updateMaxDiscountRate(uint16 _newMaxDiscountRate) external onlyOwner;
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_newMaxDiscountRate`|`uint16`||
+
+
+### _dv4UpdateMainAuction
+
+
+```solidity
+function _dv4UpdateMainAuction() private;
 ```
 
-### _getAuctionWinners
+### _mainUdateSubAuction
 
-Function to get the auction winners. It returns the node operators addresses with the highest auction score.
-
-*We assume the winners directly accept to join the DV, therefore this function cleans the auction tree and releases the bid price locked in the escrow.*
-
-*A same Eth address can not figure more than one time a same cluster.*
+Called to update the winning cluster's sub-auction tree
 
 
 ```solidity
-function _getAuctionWinners() internal returns (IStrategyVault.Node[] memory);
+function _mainUdateSubAuction(
+    NodeDetails[] memory _nodesToRemove,
+    bytes32 _winningClusterId,
+    AuctionType _auctionType
+) private;
 ```
 
-### onlyStategyVaultManager
+### _updateMainAuctionTree
+
+Update the main auction tree by adding a new virtual cluster and removing the old one
 
 
 ```solidity
-modifier onlyStategyVaultManager();
+function _updateMainAuctionTree(bytes32 _newClusterId, uint256 _newAvgAuctionScore, AuctionType _auctionType) private;
+```
+
+### _createClusterDetails
+
+Create a new entry in the `_clusterDetails` mapping
+
+
+```solidity
+function _createClusterDetails(bytes32 _clusterId, uint256 _averageAuctionScore, NodeDetails[] memory _nodes) private;
+```
+
+### _verifyEthSent
+
+Verify if the bidder has sent enough ethers. Refund the excess if it's the case.
+
+
+```solidity
+function _verifyEthSent(uint256 _ethSent, uint256 _priceToPay) private;
+```
+
+### _transferToEscrow
+
+Transfer `_priceToPay` to the Escrow contract
+
+
+```solidity
+function _transferToEscrow(uint256 _priceToPay) private;
+```
+
+### _createSplitParams
+
+Create the split parameters depending on the winning nodes
+
+
+```solidity
+function _createSplitParams(NodeDetails[] memory _nodes) internal view returns (SplitV2Lib.Split memory);
+```
+
+### onlyStratVaultETH
+
+
+```solidity
+modifier onlyStratVaultETH();
+```
+
+### onlyStakerRewards
+
+
+```solidity
+modifier onlyStakerRewards();
 ```
 
