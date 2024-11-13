@@ -6,7 +6,7 @@ import "@openzeppelin-upgrades/contracts/token/ERC721/ERC721Upgradeable.sol";
 import "@openzeppelin-upgrades/contracts/access/OwnableUpgradeable.sol";
 
 import "../interfaces/IByzNft.sol";
-import "../interfaces/IStrategyModuleManager.sol";    
+import "../interfaces/IStrategyVaultManager.sol";    
 
 contract ByzNft is
     Initializable,
@@ -20,36 +20,37 @@ contract ByzNft is
 
     /**
      * @dev Initializes name, symbol and owner of the ERC721 collection.
-     * @dev owner is the StrategyModuleManager proxy contract
+     * @dev owner is the StrategyVaultManager proxy contract
      */
     function initialize(
-        IStrategyModuleManager _strategyModuleManager
+        IStrategyVaultManager _strategyVaultManager
     ) external initializer {
         __ERC721_init("Byzantine NFT", "byzNFT");
-        _transferOwnership(address(_strategyModuleManager));
+        _transferOwnership(address(_strategyVaultManager));
     }
 
     /**
-     * @notice Gets called when a full staker creates a Strategy Module
-     * @param _to The address of the staker who created the Strategy Module
-     * @param _nounce to calculate the tokenId. This is to prevent minting the same tokenId twice.
-     * @return The tokenId of the newly minted NFT (calculated from the number of Strategy Modules already deployed)
+     * @notice Gets called when a Strategy Vault is created
+     * @param _to The address of the Strategy Vault creator
+     * @param _nounce To prevent minting the same tokenId twice
+     * @return The tokenId of the newly minted ByzNft
      */
     function mint(address _to, uint64 _nounce) external onlyOwner returns (uint256) {
-        uint256 tokenId = uint256(keccak256(abi.encode(_nounce)));
+        uint256 tokenId = uint256(keccak256(abi.encodePacked(block.timestamp, _nounce, _to)));
         _safeMint(_to, tokenId);
         return tokenId;
     }
 
     /**
-     * @dev Overrides `_beforeTokenTransfer` to restrict token transfers to the StrategyModuleManager contract.
+     * @dev Overrides `_beforeTokenTransfer` to restrict token transfers.
      */
     function _beforeTokenTransfer(
         address from,
-        address to,
-        uint256 tokenId
+        address /*to*/,
+        uint256 /*tokenId*/
     ) internal override view {
-        require(msg.sender == owner(), "ByzNft._transfer: Token transfer can only be initiated by the StrategyModuleManager, call StrategyModuleManager.transferStratModOwnership");
+        // Allow transfers only during minting
+        if (from != address(0)) revert("ByzNft is non-transferable");
     }
 
 }

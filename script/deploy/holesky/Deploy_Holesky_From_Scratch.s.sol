@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
 import "../../utils/ExistingDeploymentParser.sol";
@@ -47,7 +47,7 @@ contract Deploy_Holesky_From_Scratch is ExistingDeploymentParser {
          * not yet deployed, we give these proxies an empty contract as the initial implementation, to act as if they have no code.
          */
         emptyContract = new EmptyContract();
-        strategyModuleManager = StrategyModuleManager(
+        strategyVaultManager = StrategyVaultManager(
             address(new TransparentUpgradeableProxy(address(emptyContract), address(byzantineProxyAdmin), ""))
         );
         byzNft = ByzNft(
@@ -59,45 +59,69 @@ contract Deploy_Holesky_From_Scratch is ExistingDeploymentParser {
         escrow = Escrow(
             payable(address(new TransparentUpgradeableProxy(address(emptyContract), address(byzantineProxyAdmin), "")))
         );
-
-        // StrategyModule implementation contract
-        strategyModuleImplementation = new StrategyModule(
-            strategyModuleManager,
-            auction,
-            byzNft,
-            eigenPodManager,
-            delegation
+        stakerRewards = StakerRewards(
+            payable(address(new TransparentUpgradeableProxy(address(emptyContract), address(byzantineProxyAdmin), "")))
         );
-        // StrategyModule beacon contract. The Beacon Proxy contract is deployed in the StrategyModuleManager
-        // This contract points to the implementation contract.
-        strategyModuleBeacon = new UpgradeableBeacon(address(strategyModuleImplementation));
 
-        // Second, deploy the *implementation* contracts, using the *proxy contracts* as inputs
-        strategyModuleManagerImplementation = new StrategyModuleManager(
-            strategyModuleBeacon,
+        // StrategyVaultETH implementation contract
+        strategyVaultETHImplementation = new StrategyVaultETH(
+            strategyVaultManager,
             auction,
             byzNft,
             eigenPodManager,
             delegation,
-            pushSplitFactory
+            stakerRewards,
+            beaconChainAdmin
+        );
+        // StrategyVaultETH beacon contract. The Beacon Proxy contract is deployed in the StrategyVaultManager
+        // This contract points to the implementation contract.
+        strategyVaultETHBeacon = new UpgradeableBeacon(address(strategyVaultETHImplementation));
+
+        // StrategyVaultERC20 implementation contract
+        strategyVaultERC20Implementation = new StrategyVaultERC20(
+            strategyVaultManager,
+            byzNft,
+            delegation,
+            strategyManager
+        );
+        // StrategyVaultERC20 beacon contract. The Beacon Proxy contract is deployed in the StrategyVaultManager
+        // This contract points to the implementation contract.
+        strategyVaultERC20Beacon = new UpgradeableBeacon(address(strategyVaultERC20Implementation));
+
+        // Second, deploy the *implementation* contracts, using the *proxy contracts* as inputs
+        strategyVaultManagerImplementation = new StrategyVaultManager(
+            strategyVaultETHBeacon,
+            strategyVaultERC20Beacon,
+            auction,
+            byzNft,
+            eigenPodManager,
+            delegation,
+            strategyManager
         );
         byzNftImplementation = new ByzNft();
         auctionImplementation = new Auction(
             escrow,
-            strategyModuleManager
+            strategyVaultManager,
+            pushSplitFactory,
+            stakerRewards
         );
         escrowImplementation = new Escrow(
-            bidReceiver,
+            stakerRewards,
+            auction
+        );
+        stakerRewardsImplementation = new StakerRewards(
+            strategyVaultManager,
+            escrow,
             auction
         );
 
         // Third, upgrade the proxy contracts to use the correct implementation contracts and initialize them.
-        // Upgrade StrategyModuleManager
+        // Upgrade StrategyVaultManager
         byzantineProxyAdmin.upgradeAndCall(
-            TransparentUpgradeableProxy(payable(address(strategyModuleManager))),
-            address(strategyModuleManagerImplementation),
+            TransparentUpgradeableProxy(payable(address(strategyVaultManager))),
+            address(strategyVaultManagerImplementation),
             abi.encodeWithSelector(
-                StrategyModuleManager.initialize.selector,
+                StrategyVaultManager.initialize.selector,
                 byzantineAdmin
             )
         );
@@ -107,7 +131,7 @@ contract Deploy_Holesky_From_Scratch is ExistingDeploymentParser {
             address(byzNftImplementation),
             abi.encodeWithSelector(
                 ByzNft.initialize.selector,
-                strategyModuleManager
+                strategyVaultManager
             )
         );
         // Upgrade Auction
@@ -119,8 +143,7 @@ contract Deploy_Holesky_From_Scratch is ExistingDeploymentParser {
                 byzantineAdmin,
                 EXPECTED_POS_DAILY_RETURN_WEI,
                 MAX_DISCOUNT_RATE,
-                MIN_VALIDATION_DURATION,
-                CLUSTER_SIZE
+                MIN_VALIDATION_DURATION
             )
         );
         // Upgrade Escrow
@@ -128,6 +151,15 @@ contract Deploy_Holesky_From_Scratch is ExistingDeploymentParser {
             TransparentUpgradeableProxy(payable(address(escrow))),
             address(escrowImplementation),
             ""
+        );
+        // Upgrade StakerRewards
+        byzantineProxyAdmin.upgradeAndCall(
+            TransparentUpgradeableProxy(payable(address(stakerRewards))),
+            address(stakerRewardsImplementation),
+            abi.encodeWithSelector(
+                StakerRewards.initialize.selector,
+                UPKEEP_INTERVAL
+            )
         );
     }
 }

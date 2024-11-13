@@ -1,17 +1,17 @@
-# StrategyModuleManagerStorage
-[Git Source](https://github.com/Byzantine-Finance/byzantine-contracts/blob/80b6cda4622c51c2217311610eeb15b655b99e2c/src/core/StrategyModuleManagerStorage.sol)
+# StrategyVaultManagerStorage
+[Git Source](https://github.com/Byzantine-Finance/byzantine-contracts/blob/80b6cda4622c51c2217311610eeb15b655b99e2c/src/core/StrategyVaultManagerStorage.sol)
 
 **Inherits:**
-[IStrategyModuleManager](/src/interfaces/IStrategyModuleManager.sol/interface.IStrategyModuleManager.md)
+[IStrategyVaultManager](/src/interfaces/IStrategyVaultManager.sol/interface.IStrategyVaultManager.md)
 
 
 ## State Variables
-### stratModBeacon
-Beacon proxy to which the StrategyModules point
+### stratVaultBeacon
+Beacon proxy to which the StrategyVaults point
 
 
 ```solidity
-IBeacon public immutable stratModBeacon;
+IBeacon public immutable stratVaultBeacon;
 ```
 
 
@@ -51,21 +51,21 @@ IDelegationManager public immutable delegationManager;
 ```
 
 
-### stakerToStratMods
-Staker to its owned StrategyModules
+### stakerToStratVaults
+Staker to its owned StrategyVaults
 
 
 ```solidity
-mapping(address => address[]) public stakerToStratMods;
+mapping(address => address[]) public stakerToStratVaults;
 ```
 
 
-### nftIdToStratMod
-ByzNft tokenId to its tied StrategyModule
+### nftIdToStratVault
+ByzNft tokenId to its tied StrategyVault
 
 
 ```solidity
-mapping(uint256 => address) public nftIdToStratMod;
+mapping(uint256 => address) public nftIdToStratVault;
 ```
 
 
@@ -74,7 +74,7 @@ Mapping to store the pre-created clusters waiting for work
 
 
 ```solidity
-mapping(uint64 => IStrategyModule.ClusterDetails) public pendingClusters;
+mapping(uint64 => IStrategyVault.ClusterDetails) public pendingClusters;
 ```
 
 
@@ -87,12 +87,12 @@ uint64 public numPreCreatedClusters;
 ```
 
 
-### numStratMods
-The number of StratMods that have been deployed
+### numStratVaults
+The number of StratVaults that have been deployed
 
 
 ```solidity
-uint64 public numStratMods;
+uint64 public numStratVaults;
 ```
 
 
@@ -113,7 +113,7 @@ uint256[44] private __gap;
 
 ```solidity
 constructor(
-    IBeacon _stratModBeacon,
+    IBeacon _stratVaultBeacon,
     IAuction _auction,
     IByzNft _byzNft,
     IEigenPodManager _eigenPodManager,

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
 import "../../utils/ExistingDeploymentParser.sol";
@@ -40,7 +40,9 @@ contract AuctionUpgrade is ExistingDeploymentParser {
         // Deploy new implementation contract
         auctionImplementation = new Auction(
             escrow,
-            strategyModuleManager
+            strategyVaultManager,
+            pushSplitFactory,
+            stakerRewards
         );
         // Upgrade Auction
         byzantineProxyAdmin.upgrade(

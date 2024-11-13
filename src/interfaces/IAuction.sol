@@ -1,210 +1,325 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "./IStrategyModule.sol";
-
 interface IAuction {
 
-    /// @notice Stores auction details of node operators
-    struct AuctionDetails {
-        uint128 numBids;
-        uint128 reputationScore;
-        mapping(uint256 => uint256[]) auctionScoreToBidPrices;
-        mapping(uint256 => uint256[]) auctionScoreToVcNumbers;
+    /* ===================== ENUMS ===================== */
+
+    /// @notice Defines the types of auctions available
+    enum AuctionType {
+        NULL,
+        JOIN_CLUSTER_4,
+        JOIN_CLUSTER_7
     }
 
+    /// @notice Defines the status of a cluster
+    enum ClusterStatus {
+        INACTIVE,
+        IN_CREATION,
+        DEPOSITED, // IEigenPod.validatorStatus() to know if the withdrawal credentials are verified or not
+        EXITED
+    }
+
+    /* ===================== STRUCTS ===================== */
+
+    /// @notice Stores the details of a specific bid
+    struct BidDetails {
+        // Necessary to remove the bids from the BSTs
+        uint256 auctionScore;
+        // Price paid (excluding the bond)
+        uint256 bidPrice;
+        // Address of the node operator who placed the bid
+        address nodeOp;
+        // Number of VCs the node operator wishes to buy
+        uint32 vcNumber;
+        // Discount rate of the bid
+        uint16 discountRate;
+        // Auction type to know if we must update a sub-auction tree
+        AuctionType auctionType;
+    }
+
+    /// @notice Stores the node operators global auction's details
+    struct NodeOpGlobalDetails {
+        // Current reputation score of the node operator
+        uint32 reputationScore;
+        // Number of bonds paid by the node operator
+        uint16 numBonds;
+        // Number of pending bids in the DV4 sub-auction
+        uint8 numBidsCluster4;
+        // Number of pending bids in the DV7 sub-auction
+        uint8 numBidsCluster7;
+        // Whether the node operator is whitelisted
+        bool isWhitelisted;
+    }
+
+    /// @notice Stores the threshold above which a virtual cluster changes plus the id of the lastest winning cluster 
+    struct LatestWinningInfo {
+        // The auction score of the latest winning node operator of its sub-auction.
+        // If a new bidder exceeds that score, the last winning node operator will be kicked off from the virtual cluster in favor of the new bidder.
+        uint256 lastestWinningScore;
+        // The cluster ID of the current winning virtual cluster
+        bytes32 latestWinningClusterId;
+    }
+
+    /// @notice Stores the nodes details of a Distributed Validator
+    struct ClusterDetails {
+        // Distributed Validator pubKey hash
+        bytes32 clusterPubKeyHash;
+        // Average auction score of all the node operators in the cluster
+        uint256 averageAuctionScore;
+        // Node operators making up the cluster
+        NodeDetails[] nodes;
+        // Split contract address of the DV
+        address splitAddr;
+        // Status of the cluster
+        ClusterStatus status;
+    }
+
+    /// @notice Stores a node operator DV details through its winning bidId
+    /// @dev When rebuying VCs, take the discount rate of the bidId
+    struct NodeDetails {
+        // Bid Id which allows the node op to join that DV
+        bytes32 bidId;
+        // Current number of VCs of a node operator (if active, 1 VC is deducted per day)
+        uint32 currentVCNumber;
+    }
+
+    /* ===================== EVENTS ===================== */
+
+    /// @notice Emitted when a bid is placed. Track all the bids done on Byzantine.
     event BidPlaced(
         address indexed nodeOpAddr,
-        uint256 reputationScore,
-        uint256 discountRate,
-        uint256 duration,
+        bytes32 bidId,
+        uint16 discountRate,
+        uint32 duration,
         uint256 bidPrice,
-        uint256 auctionScore
+        uint256 auctionScore,
+        AuctionType auctionType
     );
     
+    /// @notice Emitted when a bid is updated
     event BidUpdated(
         address indexed nodeOpAddr,
-        uint256 reputationScore,
-        uint256 oldAuctionScore,
-        uint256 newDuration,
-        uint256 newDiscountRate,
+        bytes32 indexed bidId,
+        uint16 newDiscountRate,
+        uint32 newDuration,
         uint256 newBidPrice,
         uint256 newAuctionScore
     );
 
-    event BidWithdrawn(address indexed nodeOpAddr, uint256 auctionScore); 
+    /// @notice Emitted when a bid is withdrawn
+    event BidWithdrawn(
+        address indexed nodeOpAddr,
+        bytes32 indexed bidId
+    );
 
-    event WinnerJoinedDV(address indexed nodeOpAddr, uint256 auctionScore);
+    /// @notice Emitted when a node operator joins a cluster. Track node operators' clusters.
+    event WinnerJoinedCluster(
+        address indexed nodeOpAddr,
+        bytes32 indexed clusterJoined,
+        bytes32 winningBidId
+    );
 
-    /// @notice Getter of the state variable `numNodeOpsInAuction`
-    function numNodeOpsInAuction() external view returns (uint64);
+    /// @notice Emitted when a cluster is created. Track all the Byzantines' clusters.
+    event ClusterCreated(
+        bytes32 indexed clusterId,
+        uint256 averageAuctionScore,
+        address vaultAddr,
+        address splitAddr,
+        address eigenPodAddr
+    );
 
-    /// @notice Get the daily rewards of Ethereum Pos (in WEI)
+    /* ====================== GETTERS ====================== */
+
+    /// @notice Returns the daily rewards of Ethereum PoS (in WEI)
+    /// @dev Used for the Validation Credit's price calculation
     function expectedDailyReturnWei() external view returns (uint256);
 
-    /// @notice Get the maximum discount rate (i.e the max profit margin of node op) in percentage (upscale 1e2)
+    /// @notice Returns the minimum duration to be part of a DV (in days)
+    function minDuration() external view returns (uint32);
+
+    /// @notice Returns the maximum discount rate (i.e the max profit margin of node op) in percentage (0 to 10_000 -> 100%)
     function maxDiscountRate() external view returns (uint16);
 
-    /// @notice Get the minimum duration to be part of a DV (in days)
-    function minDuration() external view returns (uint160);
+    /* ===================== VIEW FUNCTIONS ===================== */
 
-    /// @notice Get the cluster size of a DV (i.e the number of nodes in a DV)
-    function clusterSize() external view returns (uint8);
+    /// @notice Returns true if `_nodeOpAddr` is whitelisted, false otherwise.
+    function isWhitelisted(address _nodeOpAddr) external view returns (bool);
+
+    /// @notice Returns the globaldetails of a specific node operator
+    function getNodeOpDetails(address _nodeOpAddr) external view returns (NodeOpGlobalDetails memory);
+
+    /// @notice Returns the number of DVs in the main auction
+    function getNumDVInAuction() external view returns (uint256);
 
     /**
-     * @notice Add a node operator to the the whitelist to not make him pay the bond.
-     * @param _nodeOpAddr: the node operator to whitelist.
-     * @dev Revert if the node operator is already whitelisted.
+     * @notice Returns the details of a specific bid
+     * @param _bidId The unique identifier of the bid
+     * @return BidDetails struct containing the bid details
      */
-    function addNodeOpToWhitelist(address _nodeOpAddr) external;
+    function getBidDetails(bytes32 _bidId) external view returns (BidDetails memory);
 
     /**
-     * @notice Remove a node operator to the the whitelist.
-     * @param _nodeOpAddr: the node operator to remove from whitelist.
-     * @dev Revert if the node operator is not whitelisted.
+     * @notice Returns the details of a specific cluster
+     * @param _clusterId The unique identifier of the cluster
+     * @return ClusterDetails struct containing the cluster details
      */
-    function removeNodeOpFromWhitelist(address _nodeOpAddr) external;
+    function getClusterDetails(bytes32 _clusterId) external view returns (ClusterDetails memory);
 
     /**
-     * @notice Function triggered by the StrategyModuleManager every time a staker deposit 32ETH and ask for a DV.
-     * It allows the pre-creation of a new DV for the next staker.
-     * It finds the `clusterSize` node operators with the highest auction scores and put them in a DV.
-     * @dev Reverts if not enough node operators are available.
+     * @notice Returns the id of the cluster with the highest average auction score
+     * @dev Returns 0 if main tree is empty
      */
-    function getAuctionWinners() external returns(IStrategyModule.Node[] memory);
+    function getWinningCluster() external view returns (bytes32, uint256);
+
+    /* ===================== EXTERNAL FUNCTIONS ===================== */
 
     /**
-     * @notice Fonction to determine the auction price for a validator according to its bids parameters
-     * @param _nodeOpAddr: address of the node operator who wants to bid
-     * @param _discountRates: array of discount rates (i.e the desired profit margin) in percentage (scale from 0 to 10000)
-     * @param _timesInDays: array of duration of being a validator, in days
-     * @dev Revert if the two entry arrays `_discountRates` and `_timesInDays` have different length
-     * @dev Revert if `_discountRates` or `_timesInDays` don't respect the values set by the byzantine.
+     * @notice Function triggered by the StrategyVaultManager or a StrategyVaultETH every time a staker deposits ETH
+     * @dev It triggers the DV Auction, returns the winning cluster ID and triggers a new sub-auction
+     * @dev Reverts if not enough node operators in the protocol
+     * @dev Reverts if the caller is not a StrategyVaultETH contract or the StrategyVaultManager
+     * @return The id of the winning cluster
+     */
+    function triggerAuction() external returns (bytes32);
+
+    /**
+     * @notice Function to determine the bid price a node operator will have to pay
+     * @param _nodeOpAddr: address of the node operator who will bid
+     * @param _discountRate: The desired profit margin in percentage of the operator (scale from 0 to 10000)
+     * @param _timeInDays: duration of being part of a DV, in days
+     * @param _auctionType: cluster type the node operator wants to join (dv4, dv7, private dv, ...)
+     * @dev Revert if `_discountRate` or `_timeInDays` don't respect the minimum values set by Byzantine.
+     * @dev Revert if the auction type is unknown
      */
     function getPriceToPay(
         address _nodeOpAddr,
-        uint256[] calldata _discountRates,
-        uint256[] calldata _timesInDays
-    ) 
-        external view returns (uint256);
+        uint16 _discountRate,
+        uint32 _timeInDays,
+        AuctionType _auctionType
+    ) external view returns (uint256);
 
     /**
-     * @notice Operators set their standing bid(s) parameters and pay their bid(s) to an escrow smart contract.
-     * If a node op doesn't win the auction, its bids stays in the escrow contract for the next auction.
-     * An node op who hasn't won an auction can ask the escrow contract to refund its bid(s) if he wants to leave the protocol.
-     * If a node op wants to update its bid parameters, call `updateBid` function.
-     * @notice Non-whitelisted operators will have to pay the 1ETH bond as well.
-     * @param _discountRates: array of discount rates (i.e the desired profit margin) in percentage (scale from 0 to 10000)
-     * @param _timesInDays: array of duration of being a validator, in days
-     * @dev By calling this function, the node op insert data in the auction Binary Search Tree (sorted by auction score).
-     * @dev Revert if `_discountRates` or `_timesInDays` don't respect the values set by the byzantine or if they don't have the same length.
-     * @dev Revert if the ethers sent by the node op are not enough to pay for the bid(s) (and the bond).
-     * @dev Reverts if the transfer of the funds to the Escrow contract failed.
-     * @dev If too many ethers has been sent the function give back the excess to the sender.
-     * @return The array of each bid auction score.
+     * @notice Bid function to join a cluster type specified by `_auctionType`. A call to that function will search the sub-auctions winners, calculate their average score, and put the virtual DV in the main auction.
+     * Every time a new bid modify the sub-auctions winners, it update the main auction by removing the previous virtual DV and adding the new one.
+     * @param _discountRate The desired profit margin in percentage of the operator (scale from 0 to 10000)
+     * @param _timeInDays Duration of being part of a DV, in days
+     * @param _auctionType cluster type the node operator wants to join (dv4, dv7, private dv, ...)
+     * @return bidId The id of the bid
+     * @dev The bid price is sent to an escrow smart contract. As long as the node operator doesn't win the auction, its bids stays in the escrow contract.
+     * It is possible to ask the escrow contract to refund the bid if the operator wants to leave the protocol (call `withdrawBid`)
+     * It is possible to update an existing bid parameters (call `updateBid`).
+     * @dev Reverts if the bidder is not whitelisted (permissionless DV will arrive later)
+     * @dev Reverts if the discount rate is too high or the duration is too short
+     * @dev Reverts if the ethers sent by the node op are not enough to pay for the bid(s) (and the bond). If too many ethers has been sent the function returns the excess to the sender.
+     * @dev Reverts if the auction type is unknown
      */
     function bid(
-        uint256[] calldata _discountRates,
-        uint256[] calldata _timesInDays
-    ) 
-        external payable returns (uint256[] memory);
+        uint16 _discountRate,
+        uint32 _timeInDays,
+        AuctionType _auctionType
+    ) external payable returns (bytes32);
 
     /**
-     * @notice Fonction to determine the price to add in the protocol if the node operator outbids. Returns 0 if he decreases its bid.
-     * @notice The bid which will be updated will be the last bid with `_oldAuctionScore`
+     * @notice Fonction to determine the price to add if the node operator outbids. Returns 0 if he downbids.
      * @param _nodeOpAddr: address of the node operator updating its bid
-     * @param _oldAuctionScore: auction score of the bid to update
-     * @param _newDiscountRate: discount rate (i.e the desired profit margin) in percentage (scale from 0 to 10000)
-     * @param _newTimeInDays: duration of being a validator, in days
-     * @dev Reverts if the node op doesn't have a bid with `_oldAuctionScore`.
+     * @param _bidId: bidId to update
+     * @param _newDiscountRate: the new discount rate (i.e the desired profit margin) in percentage (scale from 0 to 10000)
+     * @param _newTimeInDays: the new duration of being a validator, in days
+     * @dev Reverts if the node op doesn't have a bid with `_bidId`.
      * @dev Revert if `_newDiscountRate` or `_newTimeInDays` don't respect the values set by the byzantine.
      */
-    function getUpdateOneBidPrice(
+    function getUpdateBidPrice(
         address _nodeOpAddr,
-        uint256 _oldAuctionScore,
-        uint256 _newDiscountRate,
-        uint256 _newTimeInDays
-    ) 
-        external view returns (uint256);
+        bytes32 _bidId,
+        uint16 _newDiscountRate,
+        uint32 _newTimeInDays
+    ) external view returns (uint256);
 
     /**
-     * @notice  Update a bid of a node operator associated to `_oldAuctionScore`. The node op will have to pay more if he outbids. 
-     *          If he decreases his bid, the escrow contract will send him back the difference.
-     * @notice  The bid which will be updated will be the last bid with `_oldAuctionScore`
-     * @param _oldAuctionScore: auction score of the bid to update
-     * @param _newDiscountRate: new discount rate (i.e the desired profit margin) in percentage (scale from 0 to 10000)
-     * @param _newTimeInDays: new duration of being a validator, in days
-     * @dev Reverts if the node op doesn't have a bid with `_oldAuctionScore`.
+     * @notice  Update a bid of a node operator's `_bidId`. The node op will have to pay more if he outbids. 
+     *          If he decreases his bid, the escrow contract will send him back the price difference.
+     * @param _bidId: bidId to update
+     * @param _newDiscountRate: the new discount rate (i.e the desired profit margin) in percentage (scale from 0 to 10000)
+     * @param _newTimeInDays: the new duration of being a validator, in days
+     * @dev Reverts if the node op doesn't have a bid with `_bidId`.
+     * @dev Revert if `_newDiscountRate` or `_newTimeInDays` don't respect the values set by the byzantine.
      * @dev Reverts if the transfer of the funds to the Escrow contract failed.
-     * @dev Revert if `_newDiscountRate` or `_newTimeInDays` don't respect the values set by the byzantine.
      */
-    function updateOneBid(
-        uint256 _oldAuctionScore,
-        uint256 _newDiscountRate,
-        uint256 _newTimeInDays
-    ) 
-        external payable returns (uint256);
+    function updateBid(
+        bytes32 _bidId,
+        uint16 _newDiscountRate,
+        uint32 _newTimeInDays
+    ) external payable;
 
     /**
-     * @notice Allow a node operator to withdraw a specific bid (through its auction score).
+     * @notice Allow a node operator to withdraw a specific bid (through its bidId).
      * The withdrawer will be refund its bid price plus (the bond of he paid it).
-     * @param _auctionScore: auction score of the bid to withdraw. Will withdraw the last bid with this score.
+     * @param _bidId: bidId of the bid to withdraw.
+     * @dev Reverts if the node op doesn't have a bid with `_bidId`.
      */
-    function withdrawBid(uint256 _auctionScore) external;
+    function withdrawBid(bytes32 _bidId) external;
 
     /**
-     * @notice Update the auction configuration except cluster size
-     * @param _expectedDailyReturnWei: the new expected daily return of Ethereum staking (in wei)
-     * @param _maxDiscountRate: the new maximum discount rate (i.e the max profit margin of node op) (from 0 to 10000 -> 100%)
-     * @param _minDuration: the new minimum duration of beeing a validator in a DV (in days)
+     * @notice Update the status of a cluster
+     * @param _clusterId The id of the cluster to update the status
+     * @param _newStatus The new status
+     * @dev Callable only by a StrategyVaultETH contract
+     * @dev The check to know if the cluster is in the calling vault is done in the StrategyVaultETH contract
      */
-    function updateAuctionConfig(
-        uint256 _expectedDailyReturnWei,
-        uint16 _maxDiscountRate,
-        uint160 _minDuration
-    )
-        external;
+    function updateClusterStatus(bytes32 _clusterId, IAuction.ClusterStatus _newStatus) external;
 
     /**
-     * @notice Update the cluster size (i.e the number of node operators in a DV)
-     * @param _clusterSize: the new cluster size
+     * @notice Set the pubkey hash of a cluster
+     * @param _clusterId The id of the cluster to set the pubkey hash
+     * @param _clusterPubkey The pubkey of the cluster
+     * @dev Callable only by a StrategyVaultETH contract
+     * @dev The check to know if the cluster is in the calling vault is done in the StrategyVaultETH contract
      */
-    function updateClusterSize(uint8 _clusterSize) external;
+    function setClusterPubKey(bytes32 _clusterId, bytes calldata _clusterPubkey) external;
 
-    /// @notice Return true if the `_nodeOpAddr` is whitelisted, false otherwise.
-    function isWhitelisted(address _nodeOpAddr) external view returns (bool);
-
-    /// @notice Return the pending bid number of the `_nodeOpAddr`.
-    function getNodeOpBidNumber(address _nodeOpAddr) external view returns (uint256);
+    /* ===================== OWNER FUNCTIONS ===================== */
 
     /**
-     * @notice Return the pending bid(s) price of the `_nodeOpAddr` corresponding to `_auctionScore`.
-     * @param _auctionScore The auction score of the node operator you want to get the corresponding bid(s) price.
-     * @return (uint256[] memory) An array of all the bid price for that specific auctionScore
-     * @dev If `_nodeOpAddr` doesn't have `_auctionScore` in his mapping, return an empty array.
-     * @dev A same `_auctionScore` can have different bid prices depending on the reputationScore variations.
+     * @notice Add node operators to the whitelist
+     * @param _nodeOpAddrs: A dynamique array of the addresses to whitelist
      */
-    function getNodeOpAuctionScoreBidPrices(
-        address _nodeOpAddr,
-        uint256 _auctionScore
-    ) 
-        external view returns (uint256[] memory);
+    function whitelistNodeOps(address[] calldata _nodeOpAddrs) external;
 
     /**
-     * @notice Return the pending VCs number of the `_nodeOpAddr` corresponding to `_auctionScore`.
-     * @param _auctionScore The auction score of the node operator you want to get the corresponding VCs numbers.
-     * @return (uint256[] memory) An array of all the VC numbers for that specific auctionScore
-     * @dev If `_nodeOpAddr` doesn't have `_auctionScore` in his mapping, return an empty array.
-     * @dev A same `_auctionScore` can have different VCs numbers depending on the reputationScore variations.
+     * @notice Update the expected daily PoS rewards variable (in Wei)
+     * @dev This function is callable only by the Auction contract's owner
+     * @param _newExpectedDailyReturnWei: the new expected daily return of Ethereum staking (in wei)
      */
-    function getNodeOpAuctionScoreVcs(
-        address _nodeOpAddr,
-        uint256 _auctionScore
-    )
-        external view returns (uint256[] memory);
+    function updateExpectedDailyReturnWei(uint256 _newExpectedDailyReturnWei) external;
 
-    /// @dev Error when unauthorized call to a function callable only by the StrategyModuleManager.
-    error OnlyStrategyModuleManager();
+    /**
+     * @notice Update the minimum validation duration
+     * @dev This function is callable only by the Auction contract's owner
+     * @param _newMinDuration: the new minimum duration of being a validator in a DV (in days)
+     */
+    function updateMinDuration(uint32 _newMinDuration) external;
+
+    /**
+     * @notice Update the maximum discount rate
+     * @dev This function is callable only by the Auction contract's owner
+     * @param _newMaxDiscountRate: the new maximum discount rate (i.e the max profit margin of node op) (from 0 to 10000 -> 100%)
+     */
+    function updateMaxDiscountRate(uint16 _newMaxDiscountRate) external;
+
+    /** 
+     * @notice Update the VC number of a node and the cluster status
+     * @param _clusterId: ID of the cluster
+     * @param _consumedVCs: number of VC to subtract
+     * @dev This function is callable only by the StakerRewards contract
+     */
+    function updateNodeVCNumber(bytes32 _clusterId, uint32 _consumedVCs) external;
+
+    /// @dev Error when unauthorized call to a function callable only by a StratVaultETH.
+    error OnlyStratVaultETH();
+
+    /// @dev Error when unauthorized call to a function callable only by a StakerRewards.
+    error OnlyStakerRewards();
 
     /// @dev Error when address already whitelisted
     error AlreadyWhitelisted();
@@ -223,4 +338,16 @@ interface IAuction {
 
     /// @dev Returned when the deposit to the Escrow contract failed
     error EscrowTransferFailed();
+
+    /// @dev Returned when a bid refund failed
+    error RefundFailed();
+
+    /// @dev Returned when the main auction tree is empty, and therefore when it's not possible to create a new DV
+    error MainAuctionEmpty();
+
+    /// @dev Returned when the sender is not the bidder of the bid to update or withdraw
+    error SenderNotBidder();
+
+    /// @dev Returned when the auction type (i.e the sub-auction) is unknown
+    error InvalidAuctionType();
 }

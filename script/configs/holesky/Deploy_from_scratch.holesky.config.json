@@ -5,13 +5,16 @@
   "auctionConfig": {
     "expected_pos_daily_return_wei": 3243835616438356,
     "max_discount_rate": 2000,
-    "min_Validation_duration": 90,
-    "cluster_size": 4
+    "min_validation_duration": 90
   },
-  "bidReceiver": "0x9c475A3FB5E0ee61B049516b7e1186Cc3F1362C0",
+  "stakerRewardsConfig": {
+    "upkeepInterval": 60
+  },
+  "beaconChainAdmin": "0x5c27a880ec9024F006A70B8f1fB91b82d94ef4D4",
   "eigenLayerContractAddr": {
     "eigenPodManager": "0x30770d7E3e71112d7A6b7259542D1f680a70e315",
-    "delegation": "0xA44151489861Fe9e3055d95adC98FbD462B948e7"
+    "delegation": "0xA44151489861Fe9e3055d95adC98FbD462B948e7",
+    "strategyManager": "0xdfB5f6CE42aAA7830E94ECFCcAd411beF4d4D5b6"
   },
   "splitsContracts": {
     "pushSplitFactory": "0xaDC87646f736d6A82e9a6539cddC488b2aA07f38"
