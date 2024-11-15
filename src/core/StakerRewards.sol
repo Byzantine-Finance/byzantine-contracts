@@ -226,18 +226,23 @@ contract StakerRewards is
             return (false, "");
         }
 
-        // Array of cluster IDs at the size of counter
+        // Stores the cluster IDs that need to exit
         bytes32[] memory listClusterIds = new bytes32[](counter);
-        // Total remaining VCs to remove
-        uint64 remainingVCsToRemove;
-        // Total bid prices to send back to Escrow contract
-        uint256 totalBidsToEscrow;
+        // Stores the remaining VCs to remove for each cluster after exit
+        uint64[] memory remainingVCsToRemove = new uint64[](counter);
+        // Stores the total bid prices that need to be sent back to Escrow for each cluster
+        uint256[] memory totalBidsToEscrow = new uint256[](counter);
+        // Stores the staked balance rate to remove for each cluster
+        uint16[] memory totalStakedBalanceRateToRemove = new uint16[](counter);
+        // Stores the daily consumed VCs to remove for each cluster
+        uint64[] memory totalDailyConsumedVCsToRemove = new uint64[](counter);
 
         upkeepNeeded = false;
         uint256 indexCounter;
 
         // Iterate over the clusters again to set upkeepNeeded to true and prepare the performData
         for (uint256 i; i < stratVaults.length; ) {
+            address stratVaultAddr = stratVaults[i];
             bytes32[] memory clusterIds = IStrategyVaultETH(stratVaults[i]).getAllDVIds();
 
             for (uint256 j; j < clusterIds.length; ) {
@@ -246,24 +251,35 @@ contract StakerRewards is
                 if (cluster.exitTimestamp != 0 && cluster.exitTimestamp < block.timestamp) {
                     // Set the upkeepNeeded to true
                     upkeepNeeded = true;
+
                     // Store the clusterId to the array
                     listClusterIds[indexCounter] = clusterIds[j];
+
                     // Get the total number of VCs and the smallest VC number of the cluster
-                    IAuction.NodeDetails[] memory nodes = auction.getClusterDetails(clusterIds[j]).nodes;
-                    (uint256 totalBidPrice, uint64 totalClusterVCs, uint32 smallestVC, ) = auction.getClusterMetrics(nodes);
-                    // Add up the remaining VC number of each cluster
-                    remainingVCsToRemove += (totalClusterVCs - smallestVC * cluster.clusterSize);
-                    // Calculate the total remaining bid prices of each node
-                    for (uint8 k; k < nodes.length; ) {
-                        IAuction.BidDetails memory bidDetails = auction.getBidDetails(nodes[k].bidId);
+                    IAuction.ClusterDetails memory clusterDetails = auction.getClusterDetails(clusterIds[j]);
+                    (, uint64 totalClusterVCs, uint32 smallestVC, ) = auction.getClusterMetrics(clusterDetails.nodes);
+                    
+                    // Store the remaining VC number
+                    remainingVCsToRemove[indexCounter] = totalClusterVCs - smallestVC * cluster.clusterSize;
+
+                    // Calculate and store total bids to return to escrow
+                    uint256 clusterBidsToEscrow;
+                    for (uint8 k; k < clusterDetails.nodes.length; ) {
+                        IAuction.BidDetails memory bidDetails = auction.getBidDetails(clusterDetails.nodes[k].bidId);
                         uint256 dailyVcPrice = _getDailyVcPrice(bidDetails.bidPrice, bidDetails.vcNumber);
                         uint256 leftVCs = bidDetails.vcNumber - smallestVC;
-                        totalBidsToEscrow += (dailyVcPrice * leftVCs);
+                        clusterBidsToEscrow += (dailyVcPrice * leftVCs);
 
                         unchecked {
                             ++k;
                         }
                     }
+                    totalBidsToEscrow[indexCounter] = clusterBidsToEscrow;
+
+                    // Store staked balance rate metrics
+                    uint16 stakedBalanceRate = _getStakedBalanceRate(stratVaultAddr, clusterDetails.clusterPubKeyHash);
+                    totalStakedBalanceRateToRemove[indexCounter] = stakedBalanceRate;
+                    totalDailyConsumedVCsToRemove[indexCounter] = stakedBalanceRate * cluster.clusterSize;
 
                     ++indexCounter;
                 }
@@ -281,7 +297,13 @@ contract StakerRewards is
         if (!upkeepNeeded) {
             performData = ""; 
         } else {
-            performData = abi.encode(listClusterIds, remainingVCsToRemove, totalBidsToEscrow);
+            performData = abi.encode(
+                listClusterIds, 
+                remainingVCsToRemove,
+                totalBidsToEscrow,
+                totalStakedBalanceRateToRemove,
+                totalDailyConsumedVCsToRemove
+            );
         }
 
         return (upkeepNeeded, performData);
@@ -303,45 +325,52 @@ contract StakerRewards is
         if (msg.sender != forwarderAddress) revert NoPermissionToCallPerformUpkeep();
         lastPerformUpkeep = block.timestamp;
 
-        // Decode `performData` 
-        (bytes32[] memory clusterIds, uint64 remainingVCsToRemove, uint256 totalBidsToEscrow) = abi.decode(performData, (bytes32[], uint64, uint256));
-
-        uint16 numValidators4ToExit;
-        uint16 numValidators7ToExit;
-        
-        for (uint256 i; i < clusterIds.length; ) {
-            ClusterData storage cluster = _clusters[clusterIds[i]];
-            uint32 consumedVCs = cluster.smallestVC;
-
-            // Subtract the consumed VC number for each node
-            auction.updateNodeVCNumber(clusterIds[i], consumedVCs);
-            // Update cluster data to 0
-            cluster.smallestVC = 0;
-            cluster.activeTime = 0;
-            cluster.exitTimestamp = 0;
-            // Add up the number of active DVs to exit
-            cluster.clusterSize == 4 ? ++numValidators4ToExit : ++numValidators7ToExit;
-
-            unchecked {
-                ++i;
-            }
-        }
-
-        // Send back remaining bid prices of exited DVs to the Escrow contract
-        bidInvestment.sendBidsToEscrow(totalBidsToEscrow);
-
-        // Decrease the number of validators
-        numValidators4 -= numValidators4ToExit;
-        numValidators7 -= numValidators7ToExit;
-
-        // Subtract the remaining VCs of the exited DVs from totalVCs
-        if (_checkpoint.totalVCs < remainingVCsToRemove) revert TotalVCsLessThanConsumedVCs(); // TODO: can be removed if TODO3 mentioned above is fixed
-        _checkpoint.totalVCs -= remainingVCsToRemove;
-
         // Update totalVCs and totalPendingRewards variables for the period from the last checkpoint to this checkpoint
         if (_hasTimeElapsed(_checkpoint.updateTime, _ONE_DAY)) {
             _updateVCsAndPendingRewards(0);
             _checkpoint.updateTime = block.timestamp;
+        }
+
+        // Decode arrays in performData
+        (
+            bytes32[] memory clusterIds,
+            uint64[] memory remainingVCsToRemove,
+            uint256[] memory totalBidsToEscrow,
+            uint16[] memory totalStakedBalanceRateToRemove,
+            uint64[] memory totalDailyConsumedVCsToRemove
+        ) = abi.decode(performData, (bytes32[], uint64[], uint256[], uint16[], uint64[]));
+
+        for (uint256 i; i < clusterIds.length; ) {
+            ClusterData storage cluster = _clusters[clusterIds[i]];
+
+            // Double check performData sent by checkUpkeep by checking if the current block timestamp becomes bigger than the exitTimestamp
+            if (cluster.exitTimestamp != 0 && cluster.exitTimestamp < block.timestamp) {
+                uint32 consumedVCs = cluster.smallestVC;
+
+                // Subtract the consumed VC number for each node
+                auction.updateNodeVCNumber(clusterIds[i], consumedVCs);
+                // Update cluster data to 0
+                cluster.smallestVC = 0;
+                cluster.activeTime = 0;
+                cluster.exitTimestamp = 0;
+                // Decrease the number of validators
+                cluster.clusterSize == 4 ? --numValidators4 : --numValidators7;
+
+                // Send back remaining bid prices of exited DVs to the Escrow contract
+                bidInvestment.sendBidsToEscrow(totalBidsToEscrow[i]);
+
+                // Subtract the remaining VCs of the exited DVs from totalVCs
+                if (_checkpoint.totalVCs < remainingVCsToRemove[i]) revert TotalVCsLessThanConsumedVCs();
+                _checkpoint.totalVCs -= remainingVCsToRemove[i];
+
+                // Update total staked balance rate and total daily consumed VCs
+                _checkpoint.totalStakedBalanceRate -= totalStakedBalanceRateToRemove[i];
+                _checkpoint.totalDailyConsumedVCs -= totalDailyConsumedVCsToRemove[i];
+            }
+
+            unchecked {
+                ++i;
+            }
         }
 
         // Update daily32EthBaseRewards based on the updated data
