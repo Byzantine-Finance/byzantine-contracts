@@ -16,6 +16,13 @@ contract Escrow is IEscrow {
     IAuction public immutable auction;
 
     /**
+    * @dev This empty reserved space is put in place to allow future versions to add new
+    * variables without shifting down storage in the inheritance chain.
+    * See https://docs.openzeppelin.com/upgrades-plugins/1.x/writing-upgradeable#modifying-your-contracts
+    */
+    uint256[44] private __gap;
+
+    /**
      * @notice Constructor to set the bidInvestment and the auction contracts
      * @param _bidInvestment Address which receives the bid of the winners
      * @param _auction The auction proxy contract
