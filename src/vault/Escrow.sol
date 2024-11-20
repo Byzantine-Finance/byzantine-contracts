@@ -3,26 +3,32 @@ pragma solidity ^0.8.20;
 
 import {IEscrow} from "../interfaces/IEscrow.sol";
 import {IAuction} from "../interfaces/IAuction.sol";
-import {IStakerRewards} from "../interfaces/IStakerRewards.sol";
+import {BidInvestmentMock} from "../../test/mocks/BidInvestmentMock.sol";
 
 contract Escrow is IEscrow {
 
     /**
      * @notice Address which receives the bid of the auction winners
-     * @dev This will be updated to a smart contract vault in the future to distribute the stakers rewards
      */
-    IStakerRewards public immutable stakerRewards;
+    BidInvestmentMock public immutable bidInvestment;
 
     /// @notice Auction contract
     IAuction public immutable auction;
 
     /**
-     * @notice Constructor to set the stakerRewards and the auction contracts
-     * @param _stakerRewards Address which receives the bid of the winners and distribute it to the stakers
+    * @dev This empty reserved space is put in place to allow future versions to add new
+    * variables without shifting down storage in the inheritance chain.
+    * See https://docs.openzeppelin.com/upgrades-plugins/1.x/writing-upgradeable#modifying-your-contracts
+    */
+    uint256[44] private __gap;
+
+    /**
+     * @notice Constructor to set the bidInvestment and the auction contracts
+     * @param _bidInvestment Address which receives the bid of the winners
      * @param _auction The auction proxy contract
      */
-    constructor(IStakerRewards _stakerRewards, IAuction _auction) {
-        stakerRewards = _stakerRewards;
+    constructor(BidInvestmentMock _bidInvestment, IAuction _auction) {
+        bidInvestment = _bidInvestment;
         auction = _auction;
     }
 
@@ -41,7 +47,7 @@ contract Escrow is IEscrow {
      */
     function releaseFunds(uint256 _bidPrice) public onlyAuction {
         if (address(this).balance < _bidPrice) revert InsufficientFundsInEscrow();
-        (bool success, ) = address(stakerRewards).call{value: _bidPrice}("");
+        (bool success, ) = address(bidInvestment).call{value: _bidPrice}("");
         if (!success) revert FailedToSendEther();
     }
 

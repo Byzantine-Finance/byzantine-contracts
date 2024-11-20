@@ -278,6 +278,12 @@ interface IAuction {
      */
     function setClusterPubKey(bytes32 _clusterId, bytes calldata _clusterPubkey) external;
 
+    /**
+     * @notice Get the total number of VCs and the smallest VC number of a cluster
+     * @param nodes The nodes of the cluster
+     */
+    function getClusterMetrics(NodeDetails[] memory nodes) external view returns (uint256 totalBidPrice, uint64 totalClusterVCs, uint32 smallestVcNumber, uint8 smallClusterSize);
+
     /* ===================== OWNER FUNCTIONS ===================== */
 
     /**

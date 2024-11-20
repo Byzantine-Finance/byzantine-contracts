@@ -8,9 +8,12 @@ interface IStakerRewards {
     /// @notice Checkpoint updated at every new event
     struct Checkpoint {
         uint256 updateTime;
+        uint256 totalActivedBids; // Used to record the total bid prices of the activated DVs
         uint256 totalPendingRewards;
-        uint256 dailyRewardsPer32ETH; // Daily rewards distributed for every 32ETH staked
+        uint256 daily32EthBaseRewards; // Amount of daily rewards distributed to every 32ETH staked
         uint64 totalVCs;
+        uint64 totalDailyConsumedVCs; // Total number of VCs that is supposed to be consumed by the validators on a daily basis
+        uint24 totalStakedBalanceRate; // The accrued staked balance rate that represents the total amount of ETH staked (the rate of 1 = 32 ETH)
     }
 
     /// @notice Record every cluster at dvCreationCheckpoint
@@ -24,55 +27,57 @@ interface IStakerRewards {
     /// @notice Record every StratVaultETH at dvActivationCheckpoint
     struct VaultData {
         uint256 lastUpdate;
-        uint16 numValidatorsInVault;
+        uint16 accruedStakedBalanceRate;
+        uint256 pendingRewards;
     }
 
     /* ============== EXTERNAL FUNCTIONS ============== */
 
     /**
-     * @notice Function called by StratVaultETH when a DV is created to add a new checkpoint and update variables
+     * @notice Function called by StratVaultETH when activating a cluster to create a new checkpoint
+     * 1. Create the cluster data * 2. Update the checkpoint data * 3. Create or update the vault data
+     * 4. Update the validator counter * 5. Update daily32EthBaseRewards
+     * @param _vaultAddr Address of the StratVaultETH
      * @param _clusterId The ID of the cluster
-     */
-    function dvCreationCheckpoint(bytes32 _clusterId) external;
-
-    /**
-     * @notice Function called by StratVaultETH when a DV is activated to add a new checkpoint and update variables
-     * @param _vaultAddr The address of the vault
-     * @param _clusterId The ID of the cluster
+     * @dev Revert if called by non-StratVaultETH
      */
     function dvActivationCheckpoint(address _vaultAddr, bytes32 _clusterId) external; 
 
     /** 
-     * @notice Function called by StratVaultETH when a staker exits the validator (unstake)
-     * @param _vaultAddr The address of the vault
+     * @notice Function called by StratVaultETH when a staker decides to withdraw the rewards
+     * 1. Update the checkpoint data
+     * 2. Send the pending rewards from the BidInvestment contract to the vault
+     * 3. Update daily32EthBaseRewards
+     * @param _vaultAddr Address of the StratVaultETH
+     * @dev Revert if called by non-StratVaultETH
      */
-    function withdrawCheckpoint(address _vaultAddr) external;
+    function withdrawalCheckpoint(address _vaultAddr) external;
 
     /**
-     * @notice Function to update the upkeep interval
-     * @param _upkeepInterval The new upkeep interval
+     * @notice Update upkeepInterval
+     * @dev Only callable by the byzantineAdmin address
+     * @param _upkeepInterval The new interval between upkeep calls
      */
     function updateUpkeepInterval(uint256 _upkeepInterval) external;
 
     /**
-     * @notice Function to set the forwarder address
-     * @param _forwarderAddress The address of the forwarder
+     * @notice Set the address that `performUpkeep` is called from
+     * @param _forwarderAddress The new address to set
+     * @dev Only callable by the byzantineAdmin address
      */
     function setForwarderAddress(address _forwarderAddress) external;
 
     /* ============== VIEW FUNCTIONS ============== */
 
     /**
-     * @notice Calculate the pending rewards since last update
+     * @notice Get the pending rewards of a given vault
      * @param _vaultAddr Address of the StratVaultETH
-     * @param _numDVs Number of validators in the vault
-     * @dev Revert if the last update timestamp is 0
      */
-    function calculateRewards(address _vaultAddr, uint256 _numDVs) external view returns (uint256);
+    function getVaultRewards(address _vaultAddr) external view returns (uint256);
 
     /**
      * @notice Calculate the allocatable amount of ETH in the StakerRewards contract 
-     * @dev The calculation of the dailyRewardsPer32ETH cannot take into account the rewards that were already distributed to the stakers.
+     * @dev The calculation of the daily32EthBaseRewards cannot take into account the rewards that were already distributed to the stakers.
      */
     function getAllocatableRewards() external view returns (uint256);
 
@@ -96,9 +101,6 @@ interface IStakerRewards {
 
     /* ============== ERRORS ============== */
 
-    /// @dev Error when unauthorized call to a function callable only by the StrategyVaultManager.
-    error OnlyStrategyVaultManager();
-
     /// @dev Error when unauthorized call to a function callable only by a StratVaultETH.
     error OnlyStratVaultETH();
 
@@ -110,9 +112,6 @@ interface IStakerRewards {
 
     /// @dev Error when the timestamp is invalid
     error InvalidTimestamp();
-
-    /// @dev Error when there are no active cluster in the StakerRewards contract
-    error NoCreatedClusters();
 
     /// @dev Error when the total VC cannot be zero
     error TotalVCsCannotBeZero();

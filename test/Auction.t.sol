@@ -508,7 +508,7 @@ contract AuctionTest is ByzantineDeployer {
         assertEq(auction.getNumDVInAuction(), 1);
 
         // Check if StakerRewards has received the bids prices
-        assertEq(address(stakerRewards).balance, _getBidIdBidPrice(winningBidIds[0]) + _getBidIdBidPrice(winningBidIds[1]) + _getBidIdBidPrice(winningBidIds[2]) + _getBidIdBidPrice(winningBidIds[3]));
+        assertEq(address(bidInvestment).balance, _getBidIdBidPrice(winningBidIds[0]) + _getBidIdBidPrice(winningBidIds[1]) + _getBidIdBidPrice(winningBidIds[2]) + _getBidIdBidPrice(winningBidIds[3]));
 
         /* ===================== SECOND DV CREATION ===================== */
 

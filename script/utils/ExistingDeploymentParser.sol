@@ -12,6 +12,7 @@ import {ByzNft} from "../../src/tokens/ByzNft.sol";
 import {Auction} from "../../src/core/Auction.sol";
 import {Escrow} from "../../src/vault/Escrow.sol";
 import {StakerRewards} from "../../src/core/StakerRewards.sol";
+import {BidInvestmentMock} from "../../test/mocks/BidInvestmentMock.sol";
 
 import {EigenPodManager} from "eigenlayer-contracts/pods/EigenPodManager.sol";
 import {DelegationManager} from "eigenlayer-contracts/core/DelegationManager.sol";
@@ -41,7 +42,9 @@ contract ExistingDeploymentParser is Script, Test {
     Escrow public escrowImplementation;
     StakerRewards public stakerRewards;
     StakerRewards public stakerRewardsImplementation;
-
+    BidInvestmentMock public bidInvestment;
+    BidInvestmentMock public bidInvestmentImplementation;
+    
     // Beacon Chain Admin address
     address public beaconChainAdmin;
 
@@ -221,8 +224,8 @@ contract ExistingDeploymentParser is Script, Test {
         );
         // Escrow
         require(
-            escrow.stakerRewards() == stakerRewards,
-            "escrow: stakerRewards address not set correctly"
+            escrow.bidInvestment() == bidInvestment,
+            "escrow: bidInvestment address not set correctly"
         );
         require(
             escrow.auction() == auction,
@@ -297,7 +300,7 @@ contract ExistingDeploymentParser is Script, Test {
         auction.initialize(byzantineAdmin, EXPECTED_POS_DAILY_RETURN_WEI, MAX_DISCOUNT_RATE, MIN_VALIDATION_DURATION);
         // StakerRewards
         vm.expectRevert(bytes("Initializable: contract is already initialized"));
-        stakerRewards.initialize(UPKEEP_INTERVAL);
+        stakerRewards.initialize(byzantineAdmin, UPKEEP_INTERVAL);
     }
 
     /// @notice Verify params based on config constants that are updated from calling `_parseInitialDeploymentParams`
@@ -316,6 +319,7 @@ contract ExistingDeploymentParser is Script, Test {
         require(auction.maxDiscountRate() == MAX_DISCOUNT_RATE, "auction: maxDiscountRate not set correctly");
         require(auction.minDuration() == MIN_VALIDATION_DURATION, "auction: minDuration not set correctly");
         // StakerRewards
+        require(stakerRewards.owner() == byzantineAdmin, "stakerRewards: owner not set correctly");
         require(stakerRewards.upkeepInterval() == UPKEEP_INTERVAL, "stakerRewards: upkeepInterval not set correctly");
     }
 

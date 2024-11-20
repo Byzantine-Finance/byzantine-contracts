@@ -413,9 +413,6 @@ contract StrategyVaultETH is StrategyVaultETHStorage, ERC7535MultiRewardVault {
             bytes32 winningClusterId = auction.triggerAuction();
             clusterIdsFIFO.push(winningClusterId);
 
-            // Call dvCreationCheckpoint in StakerRewards contract 
-            stakerRewards.dvCreationCheckpoint(winningClusterId);
-
             unchecked {
                 ++i;
             }

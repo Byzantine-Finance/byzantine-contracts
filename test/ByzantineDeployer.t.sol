@@ -18,7 +18,7 @@ import "../src/tokens/ByzNft.sol";
 import "../src/core/Auction.sol";
 import "../src/vault/Escrow.sol";
 import "../src/core/StakerRewards.sol";
-
+import "../test/mocks/BidInvestmentMock.sol";
 contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
 
     // Byzantine contracts
@@ -30,6 +30,7 @@ contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
     Auction public auction;
     Escrow public escrow;
     StakerRewards public stakerRewards;
+    BidInvestmentMock public bidInvestment;
 
     // Byzantine Admin
     address public byzantineAdmin = address(this);
@@ -107,6 +108,9 @@ contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
         stakerRewards = StakerRewards(
             payable(address(new TransparentUpgradeableProxy(address(emptyContract), address(byzantineProxyAdmin), "")))
         );
+        bidInvestment = BidInvestmentMock(
+            payable(address(new TransparentUpgradeableProxy(address(emptyContract), address(byzantineProxyAdmin), "")))
+        );
 
         // StrategyVaultETH implementation contract
         IStrategyVault strategyVaultETHImplementation = new StrategyVaultETH(
@@ -151,13 +155,19 @@ contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
             stakerRewards
         );
         Escrow escrowImplementation = new Escrow(
-            stakerRewards,
+            bidInvestment,
             auction
         );
         StakerRewards stakerRewardsImplementation = new StakerRewards(
             strategyVaultManager,
             escrow,
-            auction
+            auction,
+            bidInvestment,
+            eigenPodManager
+        );
+        BidInvestmentMock bidInvestmentImplementation = new BidInvestmentMock(
+            escrow,
+            stakerRewards
         );
 
         // Third, upgrade the proxy contracts to use the correct implementation contracts and initialize them.
@@ -203,8 +213,15 @@ contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
             address(stakerRewardsImplementation),
             abi.encodeWithSelector(
                 StakerRewards.initialize.selector,
+                byzantineAdmin,
                 upkeepInterval
             )
+        );
+        // Upgrade BidInvestment
+        byzantineProxyAdmin.upgradeAndCall(
+            TransparentUpgradeableProxy(payable(address(bidInvestment))),
+            address(bidInvestmentImplementation),
+            ""
         );
     }
 
