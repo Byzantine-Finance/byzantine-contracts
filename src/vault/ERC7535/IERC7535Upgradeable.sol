@@ -20,7 +20,14 @@ interface IERC7535Upgradeable is IERC20Upgradeable, IERC20MetadataUpgradeable {
         uint256 shares
     );
 
+    /**
+     * @dev Attempted to deposit assets that are not equal to the msg.value.
+     */
     error ERC7535AssetsShouldBeEqualToMsgVaule();
+
+    /**
+     * @dev Attempted to withdraw assets that failed.
+     */
     error ERC7535WithdrawFailed();
 
     /**
