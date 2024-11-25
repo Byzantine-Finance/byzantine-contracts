@@ -51,12 +51,6 @@ interface IERC7535Upgradeable is IERC20Upgradeable, IERC20MetadataUpgradeable {
     error ERC7535ExceededMaxRedeem(address owner, uint256 shares, uint256 max);
 
     /**
-     * @dev Attempted to deposit less assets than required.
-     */
-    error ERC7535InsufficientAssets(uint256 assetsRequired, uint256 assetsProvided);
-    
-
-    /**
      * @dev Returns the address of the underlying token used for the Vault for accounting, depositing, and withdrawing.
      *
      * - MUST be an ERC-20 token contract.

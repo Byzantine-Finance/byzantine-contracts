@@ -135,7 +135,8 @@ abstract contract ERC7535Upgradeable is Initializable, ERC20Upgradeable, IERC753
      * @dev See {IERC7535-deposit}.
      */
     function deposit(uint256 assets, address receiver) public payable virtual returns (uint256) {
-        if (assets != msg.value) revert AssetsShouldBeEqualToMsgVaule();
+        // Check if the sent ETH (msg.value) is equal to the assets
+        if (assets != msg.value) revert ERC7535AssetsShouldBeEqualToMsgVaule();
         
         uint256 maxAssets = maxDeposit(receiver);
         if (assets > maxAssets) {
@@ -182,8 +183,8 @@ abstract contract ERC7535Upgradeable is Initializable, ERC20Upgradeable, IERC753
             assets = shares.mulDiv(totalAssetsBeforeMint, supply, MathUpgradeable.Rounding.Up);
         }
 
-        // Check if the sent ETH (msg.value) is sufficient to mint the requested shares
-        if (msg.value < assets) revert InsufficientAssets(assets, msg.value);
+        // Check if the sent ETH (msg.value) is equal to the assets
+        if (assets != msg.value) revert ERC7535AssetsShouldBeEqualToMsgVaule();
 
         _deposit(_msgSender(), receiver, assets, shares);
 
@@ -269,7 +270,7 @@ abstract contract ERC7535Upgradeable is Initializable, ERC20Upgradeable, IERC753
 
         _burn(owner, shares);
         (bool success,) = receiver.call{value: assets}("");
-        if (!success) revert WithdrawFailed();
+        if (!success) revert ERC7535WithdrawFailed();
 
         emit Withdraw(caller, receiver, owner, assets, shares);
     }
