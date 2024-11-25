@@ -17,31 +17,6 @@ abstract contract ERC7535Upgradeable is Initializable, ERC20Upgradeable, IERC753
     using MathUpgradeable for uint256;
 
     /**
-     * @dev Attempted to deposit more assets than the max amount for `receiver`.
-     */
-    error ERC7535ExceededMaxDeposit(address receiver, uint256 assets, uint256 max);
-
-    /**
-     * @dev Attempted to mint more shares than the max amount for `receiver`.
-     */
-    error ERC7535ExceededMaxMint(address receiver, uint256 shares, uint256 max);
-
-    /**
-     * @dev Attempted to withdraw more assets than the max amount for `receiver`.
-     */
-    error ERC7535ExceededMaxWithdraw(address owner, uint256 assets, uint256 max);
-
-    /**
-     * @dev Attempted to redeem more shares than the max amount for `receiver`.
-     */
-    error ERC7535ExceededMaxRedeem(address owner, uint256 shares, uint256 max);
-
-    /**
-     * @dev Attempted to deposit less assets than required.
-     */
-    error InsufficientAssets(uint256 assetsRequired, uint256 assetsProvided);
-    
-    /**
      * @dev Public function for initializing the ERC7535 contract.
      */
     function initialize() public initializer() {

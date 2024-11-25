@@ -24,6 +24,32 @@ interface IERC7535Upgradeable is IERC20Upgradeable, IERC20MetadataUpgradeable {
     error WithdrawFailed();
 
     /**
+     * @dev Attempted to deposit more assets than the max amount for `receiver`.
+     */
+    error ERC7535ExceededMaxDeposit(address receiver, uint256 assets, uint256 max);
+
+    /**
+     * @dev Attempted to mint more shares than the max amount for `receiver`.
+     */
+    error ERC7535ExceededMaxMint(address receiver, uint256 shares, uint256 max);
+
+    /**
+     * @dev Attempted to withdraw more assets than the max amount for `receiver`.
+     */
+    error ERC7535ExceededMaxWithdraw(address owner, uint256 assets, uint256 max);
+
+    /**
+     * @dev Attempted to redeem more shares than the max amount for `receiver`.
+     */
+    error ERC7535ExceededMaxRedeem(address owner, uint256 shares, uint256 max);
+
+    /**
+     * @dev Attempted to deposit less assets than required.
+     */
+    error InsufficientAssets(uint256 assetsRequired, uint256 assetsProvided);
+    
+
+    /**
      * @dev Returns the address of the underlying token used for the Vault for accounting, depositing, and withdrawing.
      *
      * - MUST be an ERC-20 token contract.
