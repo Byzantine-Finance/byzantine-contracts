@@ -20,8 +20,8 @@ interface IERC7535Upgradeable is IERC20Upgradeable, IERC20MetadataUpgradeable {
         uint256 shares
     );
 
-    error AssetsShouldBeEqualToMsgVaule();
-    error WithdrawFailed();
+    error ERC7535AssetsShouldBeEqualToMsgVaule();
+    error ERC7535WithdrawFailed();
 
     /**
      * @dev Attempted to deposit more assets than the max amount for `receiver`.
@@ -46,7 +46,7 @@ interface IERC7535Upgradeable is IERC20Upgradeable, IERC20MetadataUpgradeable {
     /**
      * @dev Attempted to deposit less assets than required.
      */
-    error InsufficientAssets(uint256 assetsRequired, uint256 assetsProvided);
+    error ERC7535InsufficientAssets(uint256 assetsRequired, uint256 assetsProvided);
     
 
     /**
