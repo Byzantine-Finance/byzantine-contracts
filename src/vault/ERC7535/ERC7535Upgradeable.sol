@@ -227,7 +227,7 @@ abstract contract ERC7535Upgradeable is Initializable, ERC20Upgradeable, IERC753
      * @dev Internal conversion function (from shares to assets) with support for rounding direction.
      */
     function _convertToAssets(uint256 shares, MathUpgradeable.Rounding rounding) internal view virtual returns (uint256) {
-        // For the first mint, return the number of assets as shares
+        // For the first mint, return the number of shares as assets
         if (totalAssets() == 0 || totalSupply() == 0) {
             return shares;
         }
