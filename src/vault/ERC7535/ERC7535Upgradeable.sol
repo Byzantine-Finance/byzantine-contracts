@@ -143,17 +143,7 @@ abstract contract ERC7535Upgradeable is Initializable, ERC20Upgradeable, IERC753
             revert ERC7535ExceededMaxDeposit(receiver, assets, maxAssets);
         }
 
-        uint256 shares;
-
-        // For the first deposit, return the number of assets as shares
-        if (totalAssets() == 0 || totalSupply() == 0) {
-            shares = assets;
-        } else {
-            uint256 supply = totalSupply() + 10 ** _decimalsOffset(); // Supply includes virtual reserves
-            uint256 totalAssetsAfterDeposit = totalAssets() + 1; // Add 1 to avoid division by zero
-            uint256 totalAssetsBeforeDeposit = totalAssetsAfterDeposit - assets; // Subtract the deposit from the total assets to ensure ERC7535 performs like ERC4626
-            shares = assets.mulDiv(supply, totalAssetsBeforeDeposit, MathUpgradeable.Rounding.Down);
-        }
+        uint256 shares = previewDeposit(assets);
         
         _deposit(_msgSender(), receiver, assets, shares);
 
@@ -172,16 +162,7 @@ abstract contract ERC7535Upgradeable is Initializable, ERC20Upgradeable, IERC753
             revert ERC7535ExceededMaxMint(receiver, shares, maxShares);
         }
 
-        uint256 assets;
-        // For the first mint, return the number of assets as shares
-        if (totalAssets() == 0 || totalSupply() == 0) {
-            assets = shares;
-        } else {
-            uint256 supply = totalSupply() + 10 ** _decimalsOffset(); // Supply includes virtual reserves
-            uint256 totalAssetsAfterMint = totalAssets() + 1; // Add 1 to avoid division by zero
-            uint256 totalAssetsBeforeMint = totalAssetsAfterMint - msg.value; // Subtract the deposit from the total assets to ensure ERC7535 performs like ERC4626
-            assets = shares.mulDiv(totalAssetsBeforeMint, supply, MathUpgradeable.Rounding.Up);
-        }
+        uint256 assets = previewMint(shares);
 
         // Check if the sent ETH (msg.value) is equal to the assets
         if (assets != msg.value) revert ERC7535AssetsShouldBeEqualToMsgVaule();
