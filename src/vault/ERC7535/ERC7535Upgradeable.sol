@@ -213,6 +213,13 @@ abstract contract ERC7535Upgradeable is Initializable, ERC20Upgradeable, IERC753
 
         uint256 supply = totalSupply() + 10 ** _decimalsOffset(); // Supply includes virtual reserves
         uint256 totalAssets_ = totalAssets() + 1; // Add 1 to avoid division by zero
+
+        // If this is called during a mint, ETH is already in contract.
+        // Therefore, we subtract the input amount to get the pre-deposit state.
+        if (msg.value > 0) {
+            totalAssets_ = totalAssets_ - msg.value;
+        }
+        
         return assets.mulDiv(supply, totalAssets_, rounding);
     }
 
@@ -226,6 +233,13 @@ abstract contract ERC7535Upgradeable is Initializable, ERC20Upgradeable, IERC753
         }
         uint256 supply = totalSupply() + 10 ** _decimalsOffset(); // Supply includes virtual reserves
         uint256 totalAssets_ = totalAssets() + 1; // Add 1 to avoid division by zero
+
+        // If this is called during a mint, ETH is already in contract.
+        // Therefore, we subtract the input amount to get the pre-deposit state.
+        if (msg.value > 0) {
+            totalAssets_ = totalAssets_ - msg.value;
+        }
+
         return shares.mulDiv(totalAssets_, supply, rounding);
     }
 
