@@ -157,7 +157,7 @@ contract ERC4626MultiRewardVaultTest is Test {
         console.log("bob shares", decimalToString(vault.balanceOf(bob)));
 
         // Verify Bob's deposit
-        assertApproxEqRel(bobShares, expectedBobShares, 1e14, "Bob should receive 0.333e18 shares (approx)");
+        assertApproxEqAbs(bobShares, expectedBobShares, 2, "Bob should receive approx 0.333e18 shares");
         assertEq(vault.balanceOf(bob), bobShares, "Bob's balance should match received shares");
         assertEq(vault.balanceOf(alice), oneEth, "Alice's balance should remain unchanged");
         assertEq(asset.balanceOf(address(vault)), 2 * oneEth, "Vault should have 2 AST");
@@ -167,8 +167,8 @@ contract ERC4626MultiRewardVaultTest is Test {
         // Verify proportions of ownership
         uint256 aliceProportion = (vault.balanceOf(alice) * 1e18) / vault.totalSupply();
         uint256 bobProportion = (vault.balanceOf(bob) * 1e18) / vault.totalSupply();
-        assertApproxEqRel(aliceProportion, 750000000000000000, 1e14, "Alice should own 75% of the vault");
-        assertApproxEqRel(bobProportion, 250000000000000000, 1e14, "Bob should own 25% of the vault");
+        assertApproxEqAbs(aliceProportion, 750000000000000000, 2, "Alice should own approx 75% of the vault");
+        assertApproxEqAbs(bobProportion, 250000000000000000, 2, "Bob should own approx 25% of the vault");
     }
 
     function testMint() public {
@@ -242,7 +242,7 @@ contract ERC4626MultiRewardVaultTest is Test {
 
         // Verify Bob's mint
         assertEq(bobAssetsDeposited, bobMintAmount, "Bob should deposit 1 AST");
-        assertApproxEqRel(bobShares, expectedBobShares, 1e14, "Bob should receive 0.5e18 shares (approx)");
+        assertApproxEqAbs(bobShares, expectedBobShares, 2, "Bob should receive approx 0.5e18 shares");
         assertEq(vault.balanceOf(alice), 1 ether, "Alice's balance should remain unchanged");
         assertEq(asset.balanceOf(address(vault)), 2 ether, "Vault should have 2 AST");
         assertEq(vault.totalSupply(), aliceShares + bobShares, "Total supply should be sum of Alice and Bob's shares");
@@ -251,8 +251,8 @@ contract ERC4626MultiRewardVaultTest is Test {
         // Verify proportions of ownership
         uint256 aliceProportion = (vault.balanceOf(alice) * 1e18) / vault.totalSupply();
         uint256 bobProportion = (vault.balanceOf(bob) * 1e18) / vault.totalSupply();
-        assertApproxEqRel(aliceProportion, 666666666666666666, 1e14, "Alice should own (approx) 66.66% of the vault");
-        assertApproxEqRel(bobProportion, 333333333333333333, 1e14, "Bob should own (approx) 33.33% of the vault");
+        assertApproxEqAbs(aliceProportion, 666666666666666666, 2, "Alice should own approx 66.66% of the vault");
+        assertApproxEqAbs(bobProportion, 333333333333333333, 2, "Bob should own approx 33.33% of the vault");
 
         /* ===================== ALICE MINTS 1 SHARE ===================== */
         uint256 aliceSharesToMint2 = 1e18;
@@ -419,11 +419,11 @@ contract ERC4626MultiRewardVaultTest is Test {
         // Bob is withdrawing 1 AST, which is 60% of his total AST value (1 / 1.666666666666666666) ≈ 0.6 or 60% .
         // Therefore, Bob should receive 60% of the remaining AST and RWD in the vault.
         // Bob should receive 0.6 AST and 0.4 RWD.
-        assertApproxEqRel(bobWithdrawnAST, 0.6 ether, 1e14, "Bob should receive approx 0.6 AST");
-        assertApproxEqRel(bobWithdrawnRWD, 0.4 ether, 1e14, "Bob should receive approx 0.4 RWD");
-        assertApproxEqRel(asset.balanceOf(address(vault)), 1.5 ether - bobWithdrawnAST, 1e14, "Vault should have approx 0.9 AST remaining");
-        assertApproxEqRel(rewardToken1.balanceOf(address(vault)), 0.6 ether, 1e14, "Vault should have approx 0.6 RWD remaining");
-        assertApproxEqRel(bobWithdrawnRWD + bobWithdrawnAST, 1 ether, 1e14, "Bob should have received approx 1 AST");
+        assertApproxEqAbs(bobWithdrawnAST, 0.6 ether, 2, "Bob should receive approx 0.6 AST");
+        assertApproxEqAbs(bobWithdrawnRWD, 0.4 ether, 2, "Bob should receive approx 0.4 RWD");
+        assertApproxEqAbs(asset.balanceOf(address(vault)), 1.5 ether - bobWithdrawnAST, 2, "Vault should have approx 0.9 AST remaining");
+        assertApproxEqAbs(rewardToken1.balanceOf(address(vault)), 0.6 ether, 2, "Vault should have approx 0.6 RWD remaining");
+        assertApproxEqAbs(bobWithdrawnRWD + bobWithdrawnAST, 1 ether, 2, "Bob should have received approx 1 AST");
     }
 
     function testRedeem() public {
@@ -568,13 +568,13 @@ contract ERC4626MultiRewardVaultTest is Test {
         // Bob is withdrawing 1 share, which is 50% of his value (1 / 2 = 0.5 or 50%)
         // Therefore, Bob should receive 1 AST and 0.4 RWD.
         assertEq(bobSharesAfterRedeem, 1e18, "Bob should have 1 shares left");
-        assertApproxEqRel(vaultWithdrawnAST2, 1 ether, 1e14, "Vault should have lost 1 AST");
-        assertApproxEqRel(bobWithdrawnAST, 1 ether, 1e14, "Bob should have gained 1 AST");
-        assertApproxEqRel(rewardToken1.balanceOf(address(vault)), 0.6 ether, 1e14, "Vault should have 0.6 RWD");
-        assertApproxEqRel(rewardToken1.balanceOf(bob), 0.4 ether, 1e14, "Bob should have 0.4 RWD");
-        assertApproxEqRel(vault.totalAssets(), 2.1 ether, 1e14, "Vault should have 2.1 AST in total value");
-        assertApproxEqRel(asset.balanceOf(address(vault)), 1.5 ether, 1e14, "Vault should have 1.5 AST");
-        assertApproxEqRel(vault.totalSupply(), 1.5e18, 1e14, "Vault should have 1.5 shares");
+        assertApproxEqAbs(vaultWithdrawnAST2, 1 ether, 2, "Vault should have lost approx 1 AST");
+        assertApproxEqAbs(bobWithdrawnAST, 1 ether, 2, "Bob should have gained approx 1 AST");
+        assertApproxEqAbs(rewardToken1.balanceOf(address(vault)), 0.6 ether, 2, "Vault should have approx 0.6 RWD");
+        assertApproxEqAbs(rewardToken1.balanceOf(bob), 0.4 ether, 2, "Bob should have approx 0.4 RWD");
+        assertApproxEqAbs(vault.totalAssets(), 2.1 ether, 2, "Vault should have approx 2.1 AST in total value");
+        assertApproxEqAbs(asset.balanceOf(address(vault)), 1.5 ether, 2, "Vault should have approx 1.5 AST");
+        assertApproxEqAbs(vault.totalSupply(), 1.5e18, 2, "Vault should have approx 1.5 shares");
     }
 
     function testAddRewardToken() public {
@@ -716,7 +716,7 @@ contract ERC4626MultiRewardVaultTest is Test {
         uint256 actualAssets = vault.redeem(redeemAmount, alice, alice);
 
         // User receives slightly more than expectedAssets because of rounding. Rounding is in favour of the user, as per ERC4626 recommendations.
-        assertApproxEqRel(expectedAssets, actualAssets, 1e14, "Preview redeem should match actual redeem assets");
+        assertApproxEqAbs(expectedAssets, actualAssets, 2, "Preview redeem should approx match actual redeem assets");
     }
 
     function testETHAsRewardToken() public {
@@ -794,19 +794,19 @@ contract ERC4626MultiRewardVaultTest is Test {
         // Alice is withdrawing 0.75 AST worth of value
         // She owns 3 AST worth of value, and so is withdrawing 1/4 of her value
         // She should receive 1/4 of each token holdings. 1/4 of 1 AST = 0.25 AST etc.
-        assertApproxEqRel(aliceASTReceived, 0.25 ether, 1e14, "Alice should receive 0.25 AST");
-        assertApproxEqRel(aliceETHReceived, 0.25 ether, 1e14, "Alice should receive 0.25 ETH");
-        assertApproxEqRel(aliceRWDReceived, 0.25 ether, 1e14, "Alice should receive 0.25 RWD");
+        assertApproxEqAbs(aliceASTReceived, 0.25 ether, 2, "Alice should receive approx 0.25 AST");
+        assertApproxEqAbs(aliceETHReceived, 0.25 ether, 2, "Alice should receive approx 0.25 ETH");
+        assertApproxEqAbs(aliceRWDReceived, 0.25 ether, 2, "Alice should receive approx 0.25 RWD");
 
         // Verify total value received equals 0.75 AST
         uint256 totalValueReceived = aliceASTReceived + aliceETHReceived + aliceRWDReceived;
-        assertApproxEqRel(totalValueReceived, 0.75 ether, 1e14, "Total value received should be 0.75 AST");
+        assertApproxEqAbs(totalValueReceived, 0.75 ether, 2, "Total value received should be approx 0.75 AST");
 
         // Verify remaining vault balances
-        assertApproxEqRel(asset.balanceOf(address(vault)), 0.75 ether, 1e14, "Vault should have 0.75 AST remaining");
-        assertApproxEqRel(address(vault).balance, 0.75 ether, 1e14, "Vault should have 0.75 ETH remaining");
-        assertApproxEqRel(rewardToken1.balanceOf(address(vault)), 0.75 ether, 1e14, "Vault should have 0.75 RWD remaining");
-        assertApproxEqRel(vault.totalAssets(), 2.25 ether, 1e14, "Total assets should be 2.25 AST");
+        assertApproxEqAbs(asset.balanceOf(address(vault)), 0.75 ether, 2, "Vault should have approx 0.75 AST remaining");
+        assertApproxEqAbs(address(vault).balance, 0.75 ether, 2, "Vault should have approx 0.75 ETH remaining");
+        assertApproxEqAbs(rewardToken1.balanceOf(address(vault)), 0.75 ether, 2, "Vault should have approx 0.75 RWD remaining");
+        assertApproxEqAbs(vault.totalAssets(), 2.25 ether, 2, "Total assets should be approx 2.25 AST");
     }
 
  function testWBTCAsset() public {
@@ -877,13 +877,13 @@ contract ERC4626MultiRewardVaultTest is Test {
     console.log("vault RWD balance", rewardToken1.balanceOf(address(wbtcVault)));
 
     // Verify withdrawal amounts
-    assertApproxEqRel(aliceWBTCReceived, 12500000, 1e14, "Alice should receive ~0.125 WBTC (in 8 decimals)");
-    assertApproxEqRel(aliceRWDReceived, 250000000000000000, 1e14, "Alice should receive ~0.25 ETH worth of RWD (in 18 decimals)");
+    assertApproxEqAbs(aliceWBTCReceived, 12500000, 2, "Alice should receive approx 0.125 WBTC (in 8 decimals)");
+    assertApproxEqAbs(aliceRWDReceived, 250000000000000000, 2, "Alice should receive approx 0.25 ETH worth of RWD (in 18 decimals)");
 
     // Verify remaining vault balances
-    assertApproxEqRel(wbtcVaultAsset.balanceOf(address(wbtcVault)), 37500000, 1e14, "Vault should have ~0.375 WBTC remaining (in 8 decimals)");
-    assertApproxEqRel(rewardToken1.balanceOf(address(wbtcVault)), 250000000000000000, 1e14, "Vault should have ~0.25 ETH worth of RWD remaining (in 18 decimals)");
-    assertApproxEqRel(wbtcVault.totalAssets(), 75000000, 1e14, "Total assets should be ~0.75 WBTC worth (in 8 decimals)");
+    assertApproxEqAbs(wbtcVaultAsset.balanceOf(address(wbtcVault)), 37500000, 2, "Vault should have approx 0.375 WBTC remaining (in 8 decimals)");
+    assertApproxEqAbs(rewardToken1.balanceOf(address(wbtcVault)), 250000000000000000, 2, "Vault should have approx 0.25 ETH worth of RWD remaining (in 18 decimals)");
+    assertApproxEqAbs(wbtcVault.totalAssets(), 75000000, 2, "Total assets should be approx 0.75 WBTC worth (in 8 decimals)");
 
     /* ===================== BOB DEPOSITS 0.5 WBTC ===================== */
     // Mint and approve WBTC for Bob
@@ -903,7 +903,7 @@ contract ERC4626MultiRewardVaultTest is Test {
     console.log("vault RWD balance", rewardToken1.balanceOf(address(wbtcVault)));
 
     // Bob should receive fewer shares than his deposit amount because the vault has reward tokens
-    assertApproxEqRel(bobShares, 333333333333333333, 1e14, "Bob should receive ~0.33333333 shares (in 18 decimals)");
+    assertApproxEqAbs(bobShares, 333333333333333333, 2, "Bob should receive approx 0.33333333 shares (in 18 decimals)");
     assertEq(wbtcVaultAsset.balanceOf(address(wbtcVault)), 87500000, "Vault should have 0.875 WBTC (in 8 decimals)");
 }
 
