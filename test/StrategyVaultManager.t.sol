@@ -34,7 +34,7 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
     MockOracle public oracle;
 
     /// @notice Random validator deposit data (simulates a Byzantine DV)
-    bytes private pubkey;
+    bytes private globalPubkey;
     bytes private signature;
     bytes32 private depositDataRoot;
 
@@ -69,7 +69,7 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
         bidId = _createMultipleBids();
 
         // Get deposit data of a random validator
-        _getDepositData(abi.encodePacked("./test/test-data/deposit-data-DV0-noPod.json"));
+        // _getDepositData(abi.encodePacked("./test/test-data/deposit-data-DV0-noPod.json"));
     }
 
     function test_byzantineContractsOwnership() public view {
@@ -291,7 +291,7 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
         assertEq(uint256(auction.getClusterDetails(clusterIds[0]).status), uint256(IAuction.ClusterStatus.IN_CREATION));
 
         // The node operators create the DV off-chain
-        // As soon as the DV is created and its deposit data available, it possible to activate it
+        (,bytes32 pubkeyHash, bytes memory pubkey) = _createValidator(_getPodAddress(address(aliceStratVault1)));
 
         // DV activation fails because Alice is not the BeaconChainAdmin
         vm.prank(alice);
@@ -310,11 +310,61 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
         // Verify the DV status has been updated
         assertEq(uint256(auction.getClusterDetails(clusterIds[0]).status), uint256(IAuction.ClusterStatus.DEPOSITED));
         // Verify the pubkey hash has been set
-        assertEq(auction.getClusterDetails(clusterIds[0]).clusterPubKeyHash, sha256(abi.encodePacked(pubkey, bytes16(0))));
+        assertEq(auction.getClusterDetails(clusterIds[0]).clusterPubKeyHash, pubkeyHash);
 
         // Verify the balance of the StratVaultETH
         assertEq(address(aliceStratVault1).balance, 0 ether);
 
+    }
+
+    function test_verifyWithdrawalCredentials() public {
+
+        // Alice creates a StrategyVault and stakes 32 ETH in it
+        vm.prank(alice);
+        IStrategyVaultETH aliceStratVault1 = IStrategyVaultETH(strategyVaultManager.createStratVaultAndStakeNativeETH{value: 32 ether}(true, true, ELOperator1, address(oracle), alice));
+
+        // Get the DV cluster ID
+        bytes32[] memory clusterIds = aliceStratVault1.getAllDVIds();
+        // Create array with two cluster IDs for the revert test
+        bytes32[] memory fakeClusterIds = new bytes32[](2);
+        fakeClusterIds[0] = clusterIds[0];
+        fakeClusterIds[1] = bytes32(0);
+
+        // The node operators create the DV off-chain
+        (uint40[] memory validatorIndices, bytes32 pubkeyHash, bytes memory pubkey) = _createValidator(_getPodAddress(address(aliceStratVault1)));
+
+        // BeaconChainAdmin activates the DV
+        vm.prank(beaconChainAdmin);
+        aliceStratVault1.activateCluster(pubkey, signature, depositDataRoot, clusterIds[0]);
+
+        // Advancing block time to start of next epoch
+        beaconChain.advanceEpoch();
+
+        // Get the Merkle proofs
+        CredentialProofs memory proofs = beaconChain.getCredentialProofs(validatorIndices);
+
+        // Revert because the number of cluster IDs and proofs mismatch
+        vm.expectRevert(IStrategyVaultETH.NumberOfClusterIDsAndProofsMismatch.selector);
+        aliceStratVault1.verifyWithdrawalCredentials({
+            beaconTimestamp: proofs.beaconTimestamp,
+            stateRootProof: proofs.stateRootProof,
+            validatorIndices: validatorIndices,
+            validatorFieldsProofs: proofs.validatorFieldsProofs,
+            validatorFields: proofs.validatorFields,
+            clusterIds: fakeClusterIds
+        });
+
+        // Verify the withdrawal credentials of the validator
+        _verifyWithdrawalCredentials(validatorIndices, aliceStratVault1, clusterIds);
+
+        // Verify the DV status has been updated
+        assertEq(uint256(auction.getClusterDetails(clusterIds[0]).status), uint256(IAuction.ClusterStatus.VERIFIED));
+
+        // Verify the restaked balance of the stratVaultETH
+        uint64 restakedBalance = eigenPodManager.ownerToPod(address(aliceStratVault1)).validatorPubkeyHashToInfo(pubkeyHash).restakedBalanceGwei;
+        int256 numberOfShares = eigenPodManager.podOwnerShares(address(aliceStratVault1));
+        assertEq(restakedBalance, 32 ether / 1 gwei);
+        assertEq(numberOfShares, 32 ether);
     }
 
     /* ===================== HELPER FUNCTIONS ===================== */
@@ -402,13 +452,39 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
         });
     }
 
+    function _getPodAddress(address _podOwner) internal view returns (address podAddress) {
+        podAddress = address(eigenPodManager.ownerToPod(_podOwner));
+    }
+
+    function _createValidator(address _withdrawalAddr) internal returns (uint40[] memory validatorIndices, bytes32 pubkeyHash, bytes memory pubkey) {
+        bytes memory withdrawalCredentials = abi.encodePacked(bytes1(uint8(1)), bytes11(0), _withdrawalAddr);
+        uint40 validatorIndex = beaconChain.newValidator{value: 32 ether}(withdrawalCredentials);
+        validatorIndices = new uint40[](1);
+        validatorIndices[0] = validatorIndex;
+        pubkeyHash = beaconChain.pubkeyHash(validatorIndex);
+        pubkey = beaconChain.pubkey(validatorIndex);
+    }
+
+    function _verifyWithdrawalCredentials(uint40[] memory _validators, IStrategyVaultETH _stratVault, bytes32[] memory _clusterIds) internal {
+        CredentialProofs memory proofs = beaconChain.getCredentialProofs(_validators);
+
+        _stratVault.verifyWithdrawalCredentials({
+            beaconTimestamp: proofs.beaconTimestamp,
+            stateRootProof: proofs.stateRootProof,
+            validatorIndices: _validators,
+            validatorFieldsProofs: proofs.validatorFieldsProofs,
+            validatorFields: proofs.validatorFields,
+            clusterIds: _clusterIds
+        });
+    }
+
     function _getDepositData(
         bytes memory depositFilePath
     ) internal {
         // File generated with the Obol LaunchPad
         setJSON(string(depositFilePath));
 
-        pubkey = getDVPubKeyDeposit();
+        globalPubkey = getDVPubKeyDeposit();
         signature = getDVSignature();
         depositDataRoot = getDVDepositDataRoot();
         //console.logBytes(pubkey);
