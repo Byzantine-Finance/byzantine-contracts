@@ -37,6 +37,7 @@ contract ERC4626MultiRewardVault is Initializable, ERC4626Upgradeable, OwnableUp
 
     error TokenAlreadyAdded();
     error InvalidAddress();
+    error TokenDoesNotHaveDecimalsFunction(address token);
 
     /* ============== EVENTS ============== */
 
@@ -215,11 +216,14 @@ contract ERC4626MultiRewardVault is Initializable, ERC4626Upgradeable, OwnableUp
         return totalValueWithdrawn;
     }
 
-        /**
+    /**
      * @notice Adds a reward token to the vault.
      * @param _token The reward token to add.
      */
     function addRewardToken(address _token) external onlyOwner {
+        // Validate the reward token has decimals() function
+        _validateRewardTokenDecimals(_token);
+        
         // Check if the token is already in the rewardTokens array
         for (uint i = 0; i < rewardTokens.length; i++) {
             if (rewardTokens[i] == _token) revert TokenAlreadyAdded();
@@ -247,29 +251,36 @@ contract ERC4626MultiRewardVault is Initializable, ERC4626Upgradeable, OwnableUp
      * @dev This ensures that when depositing or withdrawing, a user receives a proportional amount of assets or shares.
      * @dev Assumes that the oracle returns the price in 18 decimals.
      */
-    function totalAssets() public view override returns (uint256) {        
+    function totalAssets() public view override returns (uint256) {
         // Calculate USD value of reward tokens
         uint256 rewardTokenUSDValue;
+        uint8 assetDecimals = IERC20MetadataUpgradeable(address(asset())).decimals();
+
         for (uint i = 0; i < rewardTokens.length; i++) {
             address token = rewardTokens[i];
-
             uint256 balance;
+            uint8 tokenDecimals;
+
             if (token == address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE)) {
                 balance = address(this).balance;
+                tokenDecimals = 18;
             } else {
                 balance = IERC20Upgradeable(token).balanceOf(address(this));
+                tokenDecimals = IERC20MetadataUpgradeable(token).decimals();
             }
 
+            // Normalize balance to 18 decimals
+            uint256 normalizedBalance = balance * 10**(18 - tokenDecimals);
             uint256 price = oracle.getPrice(token);
-            rewardTokenUSDValue += (balance * price);
+            rewardTokenUSDValue += (normalizedBalance * price) / 1e18;
         }
 
         // Convert total value of reward tokens from USD to asset token
-        uint256 assetPrice = oracle.getPrice(address(super.asset()));
-        uint256 rewardTokenAssetAmount = rewardTokenUSDValue / assetPrice;
+        uint256 assetPrice = oracle.getPrice(address(asset()));
+        uint256 rewardTokenAssetAmount = (rewardTokenUSDValue * 10**assetDecimals) / assetPrice;
 
         // Add the asset value of the reward tokens to the asset balance to get total asset amount
-        uint256 assetBalance = IERC20Upgradeable(super.asset()).balanceOf(address(this));
+        uint256 assetBalance = IERC20Upgradeable(asset()).balanceOf(address(this));
         uint256 totalAssetAmount = assetBalance + rewardTokenAssetAmount;
         return totalAssetAmount;
     }
@@ -370,4 +381,29 @@ contract ERC4626MultiRewardVault is Initializable, ERC4626Upgradeable, OwnableUp
         return address(this).balance;
     }
 
+    function _validateRewardTokenDecimals(address rewardToken) internal view returns (uint8) {
+        // Skip validation for ETH
+        if (rewardToken == address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE)) {
+            return 18; // ETH has 18 decimals
+        }
+        
+        (bool success, uint8 tokenDecimals) = _tryGetTokenDecimals(rewardToken);
+        if (!success) {
+            revert TokenDoesNotHaveDecimalsFunction(rewardToken);
+        }
+        return tokenDecimals;
+    }
+
+    /**
+    * @dev Attempts to get the decimals of a token, returning a boolean for success
+    * @param token The token to query
+    * @return (bool, uint8) Success and decimals of the token
+    */
+    function _tryGetTokenDecimals(address token) internal view returns (bool, uint8) {
+        try IERC20MetadataUpgradeable(token).decimals() returns (uint8 value) {
+            return (true, value);
+        } catch {
+            return (false, 0);
+        }
+    }
 }

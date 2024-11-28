@@ -38,6 +38,7 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
 
     error TokenAlreadyAdded();
     error InvalidAddress();
+    error TokenDoesNotHaveDecimalsFunction(address token);
 
     /* ============== EVENTS ============== */
 
@@ -204,6 +205,9 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
      * @param _token The reward token to add.
      */
     function addRewardToken(address _token) external onlyOwner {
+        // Validate the reward token has decimals() function
+        _validateRewardTokenDecimals(_token);
+
         // Check if the token is already in the rewardTokens array
         for (uint i = 0; i < rewardTokens.length; i++) {
             if (rewardTokens[i] == _token) revert TokenAlreadyAdded();
@@ -234,23 +238,27 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
     function totalAssets() public view override returns (uint256) {        
         // Calculate USD value of reward tokens
         uint256 rewardTokenUSDValue;
+
         for (uint i = 0; i < rewardTokens.length; i++) {
             address token = rewardTokens[i];
             uint256 balance = IERC20Upgradeable(token).balanceOf(address(this));
+            uint8 tokenDecimals = IERC20MetadataUpgradeable(token).decimals();
+
+            // Normalize balance to 18 decimals before multiplying by price
+            uint256 normalizedBalance = balance * 10**(18 - tokenDecimals);
             uint256 price = oracle.getPrice(token);
-            rewardTokenUSDValue += (balance * price);
+            rewardTokenUSDValue += (normalizedBalance * price) / 1e18;
         }
-        
+
         // Convert total value of reward tokens from USD to ETH
         uint256 ethPrice = oracle.getPrice(address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE));
-        uint256 rewardTokenETHAmount = rewardTokenUSDValue / ethPrice;
+        uint256 rewardTokenETHAmount = (rewardTokenUSDValue * 1e18) / ethPrice;
 
         // Add the ETH value of the reward tokens to the ETH balance to get total ETH amount
         uint256 ethBalance = _getETHBalance();
         uint256 totalETHAmount = ethBalance + rewardTokenETHAmount;
         return totalETHAmount;
     }
-
     /**
      * @notice Returns the total ETH value of assets and reward tokens in the vault for a user.
      * @param user The address of the user.
@@ -327,4 +335,24 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
         return address(this).balance;
     }
 
+    function _validateRewardTokenDecimals(address rewardToken) internal view returns (uint8) {
+        (bool success, uint8 tokenDecimals) = _tryGetTokenDecimals(rewardToken);
+        if (!success) {
+            revert TokenDoesNotHaveDecimalsFunction(rewardToken);
+        }
+        return tokenDecimals;
+    }
+   
+    /**
+    * @dev Attempts to get the decimals of a token, returning a boolean for success
+    * @param token The token to query
+    * @return (bool, uint8) Success and decimals of the token
+    */
+    function _tryGetTokenDecimals(address token) internal view returns (bool, uint8) {
+        try IERC20MetadataUpgradeable(token).decimals() returns (uint8 value) {
+            return (true, value);
+        } catch {
+            return (false, 0);
+        }
+    }
 }
