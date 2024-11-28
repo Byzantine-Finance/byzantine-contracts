@@ -39,7 +39,7 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
     error TokenAlreadyAdded();
     error InvalidAddress();
     error TokenDoesNotHaveDecimalsFunction(address token);
-
+    error TokenHasMoreThan18Decimals(address token);
     /* ============== EVENTS ============== */
 
     event RewardTokenAdded(address indexed token);
@@ -340,6 +340,9 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
         if (!success) {
             revert TokenDoesNotHaveDecimalsFunction(rewardToken);
         }
+
+        if (tokenDecimals > 18) revert TokenHasMoreThan18Decimals(rewardToken);
+
         return tokenDecimals;
     }
    

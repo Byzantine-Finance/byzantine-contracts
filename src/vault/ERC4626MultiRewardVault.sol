@@ -38,6 +38,7 @@ contract ERC4626MultiRewardVault is Initializable, ERC4626Upgradeable, OwnableUp
     error TokenAlreadyAdded();
     error InvalidAddress();
     error TokenDoesNotHaveDecimalsFunction(address token);
+    error TokenHasMoreThan18Decimals(address token);
 
     /* ============== EVENTS ============== */
 
@@ -391,6 +392,9 @@ contract ERC4626MultiRewardVault is Initializable, ERC4626Upgradeable, OwnableUp
         if (!success) {
             revert TokenDoesNotHaveDecimalsFunction(rewardToken);
         }
+
+        if (tokenDecimals > 18) revert TokenHasMoreThan18Decimals(rewardToken);
+
         return tokenDecimals;
     }
 
