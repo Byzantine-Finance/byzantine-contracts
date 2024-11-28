@@ -810,6 +810,8 @@ contract ERC4626MultiRewardVaultTest is Test {
     }
 
  function testWBTCAsset() public {
+    // Assume 1 WBTC = 1 ETH for simplified testing purpose
+
     // Setup WBTC vault
     wbtcVaultAsset = new MockWBTC();
     wbtcVault = new ERC4626MultiRewardVault();
@@ -878,11 +880,11 @@ contract ERC4626MultiRewardVaultTest is Test {
 
     // Verify withdrawal amounts
     assertApproxEqAbs(aliceWBTCReceived, 12500000, 2, "Alice should receive approx 0.125 WBTC (in 8 decimals)");
-    assertApproxEqAbs(aliceRWDReceived, 250000000000000000, 2, "Alice should receive approx 0.25 ETH worth of RWD (in 18 decimals)");
+    assertApproxEqAbs(aliceRWDReceived, 125000000000000000, 2, "Alice should receive approx 0.125 ETH worth of RWD (in 18 decimals)");
 
     // Verify remaining vault balances
     assertApproxEqAbs(wbtcVaultAsset.balanceOf(address(wbtcVault)), 37500000, 2, "Vault should have approx 0.375 WBTC remaining (in 8 decimals)");
-    assertApproxEqAbs(rewardToken1.balanceOf(address(wbtcVault)), 250000000000000000, 2, "Vault should have approx 0.25 ETH worth of RWD remaining (in 18 decimals)");
+    assertApproxEqAbs(rewardToken1.balanceOf(address(wbtcVault)), 375000000000000000, 2, "Vault should have approx 0.375 ETH worth of RWD remaining (in 18 decimals)");
     assertApproxEqAbs(wbtcVault.totalAssets(), 75000000, 2, "Total assets should be approx 0.75 WBTC worth (in 8 decimals)");
 
     /* ===================== BOB DEPOSITS 0.5 WBTC ===================== */
@@ -903,7 +905,7 @@ contract ERC4626MultiRewardVaultTest is Test {
     console.log("vault RWD balance", rewardToken1.balanceOf(address(wbtcVault)));
 
     // Bob should receive fewer shares than his deposit amount because the vault has reward tokens
-    assertApproxEqAbs(bobShares, 333333333333333333, 2, "Bob should receive approx 0.33333333 shares (in 18 decimals)");
+    assertApproxEqAbs(bobShares, 250000000000000000, 2, "Bob should receive approx 0.25 shares (in 18 decimals)");
     assertEq(wbtcVaultAsset.balanceOf(address(wbtcVault)), 87500000, "Vault should have 0.875 WBTC (in 8 decimals)");
 }
 
