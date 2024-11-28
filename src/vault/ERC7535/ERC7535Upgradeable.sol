@@ -61,21 +61,21 @@ abstract contract ERC7535Upgradeable is Initializable, ERC20Upgradeable, IERC753
     function __ERC7535_init_unchained() internal onlyInitializing {
     }
 
-    /**
-     * @dev Attempts to fetch the asset decimals. A return value of false indicates that the attempt failed in some way.
-     */
-    function _tryGetAssetDecimals(IERC20Upgradeable asset_) private view returns (bool, uint8) {
-        (bool success, bytes memory encodedDecimals) = address(asset_).staticcall(
-            abi.encodeWithSelector(IERC20MetadataUpgradeable.decimals.selector)
-        );
-        if (success && encodedDecimals.length >= 32) {
-            uint256 returnedDecimals = abi.decode(encodedDecimals, (uint256));
-            if (returnedDecimals <= type(uint8).max) {
-                return (true, uint8(returnedDecimals));
-            }
-        }
-        return (false, 0);
-    }
+    // /**
+    //  * @dev Attempts to fetch the asset decimals. A return value of false indicates that the attempt failed in some way.
+    //  */
+    // function _tryGetAssetDecimals(IERC20Upgradeable asset_) private view returns (bool, uint8) {
+    //     (bool success, bytes memory encodedDecimals) = address(asset_).staticcall(
+    //         abi.encodeWithSelector(IERC20MetadataUpgradeable.decimals.selector)
+    //     );
+    //     if (success && encodedDecimals.length >= 32) {
+    //         uint256 returnedDecimals = abi.decode(encodedDecimals, (uint256));
+    //         if (returnedDecimals <= type(uint8).max) {
+    //             return (true, uint8(returnedDecimals));
+    //         }
+    //     }
+    //     return (false, 0);
+    // }
 
     /**
      * @dev Decimals are computed by adding the decimal offset on top of the underlying asset's decimals. This
