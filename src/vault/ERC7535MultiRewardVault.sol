@@ -340,10 +340,15 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
     * @return (bool, uint8) Success and decimals of the token
     */
     function _tryGetTokenDecimals(address token) internal view returns (bool, uint8) {
-        try IERC20MetadataUpgradeable(token).decimals() returns (uint8 value) {
-            return (true, value);
-        } catch {
-            return (false, 0);
+        (bool success, bytes memory encodedDecimals) = token.staticcall(
+            abi.encodeCall(IERC20MetadataUpgradeable.decimals, ())
+        );
+        if (success && encodedDecimals.length >= 32) {
+            uint256 returnedDecimals = abi.decode(encodedDecimals, (uint256));
+            if (returnedDecimals <= type(uint8).max) {
+                return (true, uint8(returnedDecimals));
+            }
         }
+        return (false, 0);
     }
 }
