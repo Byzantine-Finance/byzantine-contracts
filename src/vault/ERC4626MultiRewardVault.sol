@@ -120,13 +120,13 @@ contract ERC4626MultiRewardVault is Initializable, ERC4626Upgradeable, OwnableUp
         uint256 userTotalAssetValue = getUserTotalValue(owner);
 
         // Calculate the proportion of total value being withdrawn
-        uint256 withdrawProportion = (assets * 1e18) / userTotalAssetValue;
+        uint256 userWithdrawProportion = (assets * 1e18) / userTotalAssetValue;
 
         // Get user's owned assets and rewards
         (address[] memory tokenAddresses, uint256[] memory tokenAmounts) = getUsersOwnedAssetsAndRewards(owner);
 
         // Calculate the amount of assets that will be withdrawn, based on the withdrawn proportion
-        uint256 assetsToWithdraw = (tokenAmounts[0] * withdrawProportion) / 1e18;
+        uint256 assetsToWithdraw = (tokenAmounts[0] * userWithdrawProportion) / 1e18;
         
         // Withdraw assets
         uint256 sharesBurnedForAssets = super.withdraw(assetsToWithdraw, receiver, owner);
@@ -139,20 +139,7 @@ contract ERC4626MultiRewardVault is Initializable, ERC4626Upgradeable, OwnableUp
         _burn(owner, sharesBurningForRewardTokens);
 
         // Withdraw proportional amount of each reward token
-        for (uint i = 1; i < tokenAddresses.length; i++) {
-            address token = tokenAddresses[i];
-            uint256 tokenAmount = tokenAmounts[i];
-            uint256 tokenToWithdraw = (tokenAmount * withdrawProportion) / 1e18;
-            if (tokenToWithdraw > 0) {
-                if (token == address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE)) {
-                    (bool success,) = payable(receiver).call{value: tokenToWithdraw}("");
-                    require(success, "ETH transfer failed");
-                } else {
-                    IERC20Upgradeable(token).safeTransfer(receiver, tokenToWithdraw);
-                }
-                emit RewardTokenWithdrawn(receiver, token, tokenToWithdraw);
-            }
-        }
+        _distributeRewards(receiver, userWithdrawProportion, tokenAmounts);
 
         uint256 totalSharesBurned = sharesBurnedForAssets + sharesBurningForRewardTokens;
         return totalSharesBurned;
@@ -192,28 +179,7 @@ contract ERC4626MultiRewardVault is Initializable, ERC4626Upgradeable, OwnableUp
         _burn(owner, sharesBurningForRewardTokens);
 
         // Withdraw proportional amount of each reward token
-        uint256 totalRewardTokenValueWithdrawn;
-        for (uint i = 0; i < rewardTokens.length; i++) {
-            address token = rewardTokens[i];
-
-            // Get the total amount of the reward token owned by the user
-            uint256 totalTokenOwnedByUser = tokenAmounts[i + 1];
-
-            // Calculate the amount of the reward token to withdraw
-            uint256 tokensToWithdraw = (totalTokenOwnedByUser * userWithdrawProportion) / 1e18;
-
-            if (tokensToWithdraw > 0) {
-                IERC20Upgradeable(token).safeTransfer(receiver, tokensToWithdraw);
-                emit RewardTokenWithdrawn(receiver, token, tokensToWithdraw);
-
-                // Add the ETH value of the withdrawn reward token to the total
-                uint256 tokenPrice = oracle.getPrice(token);
-                uint256 ethPrice = oracle.getPrice(address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE));
-                uint256 rewardTokenValueInEth = (tokensToWithdraw * tokenPrice) / ethPrice;
-
-                totalRewardTokenValueWithdrawn += rewardTokenValueInEth;
-            }
-        }
+        uint256 totalRewardTokenValueWithdrawn = _distributeRewards(receiver, userWithdrawProportion, tokenAmounts);
 
         uint256 totalValueWithdrawn = assetsWithdrawn + totalRewardTokenValueWithdrawn;
         return totalValueWithdrawn;
@@ -346,34 +312,49 @@ contract ERC4626MultiRewardVault is Initializable, ERC4626Upgradeable, OwnableUp
     /* ============== INTERNAL FUNCTIONS ============== */
 
     /**
-     * @dev Distributes rewards to the receiver for all rewardTokens.
-     * @param receiver The address to receive the rewards.
-     * @param sharesBurned The amount of shares burned.
-     * @param totalShares The total number of shares before the withdrawal sequence was initiated.
-     */
-    function _distributeRewards(address receiver, uint256 sharesBurned, uint256 totalShares) internal {
+    * @dev Distributes rewards to the receiver based on withdrawal proportion
+    * @param receiver The address to receive the rewards
+    * @param withdrawProportion The users proportion being withdrawn (in 1e18)
+    * @return totalRewardTokenValueWithdrawn The total value of reward tokens withdrawn in asset terms
+    */
+    function _distributeRewards(
+        address receiver,
+        uint256 withdrawProportion,
+        uint256[] memory tokenAmounts
+    ) internal returns (uint256 totalRewardTokenValueWithdrawn) {
         for (uint i = 0; i < rewardTokens.length; i++) {
-            address rewardToken = rewardTokens[i];
-            uint256 rewardBalance;
-            uint256 rewardAmount;
+            address token = rewardTokens[i];
+            uint8 tokenDecimals;
             
-            if (rewardToken == address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE)) {
-                rewardBalance = address(this).balance;
-                rewardAmount = (rewardBalance * sharesBurned) / totalShares;
-                if (rewardAmount > 0) {
-                    (bool success, ) = receiver.call{value: rewardAmount}("");
-                    require(success, "ETH transfer failed");
-                    emit RewardTokenWithdrawn(receiver, rewardToken, rewardAmount);
-                }
+            if (token == address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE)) {
+                tokenDecimals = 18;
             } else {
-                rewardBalance = IERC20Upgradeable(rewardToken).balanceOf(address(this));
-                rewardAmount = (rewardBalance * sharesBurned) / totalShares;
-                if (rewardAmount > 0) {
-                    IERC20Upgradeable(rewardToken).safeTransfer(receiver, rewardAmount);
-                    emit RewardTokenWithdrawn(receiver, rewardToken, rewardAmount);
+                tokenDecimals = IERC20MetadataUpgradeable(token).decimals();
+            }
+
+            // Calculate amount to withdraw based on user's balance and withdraw proportion
+            uint256 tokenToWithdraw = (tokenAmounts[i + 1] * withdrawProportion) / 1e18;
+
+            if (tokenToWithdraw > 0) {
+                if (token == address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE)) {
+                    (bool success,) = payable(receiver).call{value: tokenToWithdraw}("");
+                    require(success, "ETH transfer failed");
+                } else {
+                    IERC20Upgradeable(token).safeTransfer(receiver, tokenToWithdraw);
                 }
+                emit RewardTokenWithdrawn(receiver, token, tokenToWithdraw);
+                
+                // Convert reward token value to asset terms
+                uint256 tokenPrice = oracle.getPrice(token);
+                uint256 assetPrice = oracle.getPrice(address(asset()));
+                uint256 normalizedTokenAmount = tokenToWithdraw * 10**(18 - tokenDecimals);
+                uint256 tokenValueInUSD = (normalizedTokenAmount * tokenPrice) / 1e18;
+                uint256 tokenValueInAsset = (tokenValueInUSD * 10**IERC20MetadataUpgradeable(address(asset())).decimals()) / assetPrice;
+                
+                totalRewardTokenValueWithdrawn += tokenValueInAsset;
             }
         }
+        return totalRewardTokenValueWithdrawn;
     }
 
     /**
