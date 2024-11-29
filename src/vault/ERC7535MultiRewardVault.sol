@@ -206,7 +206,7 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
      */
     function addRewardToken(address _token) external onlyOwner {
         // Validate the reward token has decimals() function
-        _validateRewardTokenDecimals(_token);
+        _validateTokenDecimals(_token);
 
         // Check if the token is already in the rewardTokens array
         for (uint i = 0; i < rewardTokens.length; i++) {
@@ -335,7 +335,7 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
         return address(this).balance;
     }
 
-    function _validateRewardTokenDecimals(address rewardToken) internal view returns (uint8) {
+    function _validateTokenDecimals(address rewardToken) internal view returns (uint8) {
         (bool success, uint8 tokenDecimals) = _tryGetTokenDecimals(rewardToken);
         if (!success) {
             revert TokenDoesNotHaveDecimalsFunction(rewardToken);

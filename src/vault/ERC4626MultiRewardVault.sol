@@ -58,6 +58,8 @@ contract ERC4626MultiRewardVault is Initializable, ERC4626Upgradeable, OwnableUp
     }
 
     function __ERC4626MultiRewardVault_init(address _oracle, address _asset) internal onlyInitializing {
+        _validateTokenDecimals(_asset);
+        
         string memory assetSymbol = IERC20MetadataUpgradeable(_asset).symbol();
         string memory vaultName = string(abi.encodePacked(assetSymbol, " Byzantine StrategyVault Token"));
         string memory vaultSymbol = string(abi.encodePacked("bvz", assetSymbol));
@@ -223,7 +225,7 @@ contract ERC4626MultiRewardVault is Initializable, ERC4626Upgradeable, OwnableUp
      */
     function addRewardToken(address _token) external onlyOwner {
         // Validate the reward token has decimals() function
-        _validateRewardTokenDecimals(_token);
+        _validateTokenDecimals(_token);
         
         // Check if the token is already in the rewardTokens array
         for (uint i = 0; i < rewardTokens.length; i++) {
@@ -382,7 +384,7 @@ contract ERC4626MultiRewardVault is Initializable, ERC4626Upgradeable, OwnableUp
         return address(this).balance;
     }
 
-    function _validateRewardTokenDecimals(address rewardToken) internal view returns (uint8) {
+    function _validateTokenDecimals(address rewardToken) internal view returns (uint8) {
         // Skip validation for ETH
         if (rewardToken == address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE)) {
             return 18; // ETH has 18 decimals
