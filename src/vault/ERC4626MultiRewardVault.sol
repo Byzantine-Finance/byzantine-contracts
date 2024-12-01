@@ -123,7 +123,7 @@ contract ERC4626MultiRewardVault is Initializable, ERC4626Upgradeable, OwnableUp
         uint256 userWithdrawProportion = (assets * 1e18) / userTotalAssetValue;
 
         // Get user's owned assets and rewards
-        (address[] memory tokenAddresses, uint256[] memory tokenAmounts) = getUsersOwnedAssetsAndRewards(owner);
+        (, uint256[] memory tokenAmounts) = getUsersOwnedAssetsAndRewards(owner);
 
         // Calculate the amount of assets that will be withdrawn, based on the withdrawn proportion
         uint256 assetsToWithdraw = (tokenAmounts[0] * userWithdrawProportion) / 1e18;
@@ -153,14 +153,11 @@ contract ERC4626MultiRewardVault is Initializable, ERC4626Upgradeable, OwnableUp
      * return The amount of assets withdrawn (includes asset + asset value of all reward tokens).
      */
     function redeem(uint256 shares, address receiver, address owner) public override nonReentrant returns (uint256) {
-        // Calculate the proportion of shares the user owns
-        uint256 userShareProportion = (balanceOf(owner) * 1e18) / totalSupply();
-        
         // Calculate the proportion of shares the user is redeeming
         uint256 userWithdrawProportion = (shares * 1e18) / balanceOf(owner);
 
         // Get user's owned assets and rewards 
-        (address[] memory tokenAddresses, uint256[] memory tokenAmounts) = getUsersOwnedAssetsAndRewards(owner);
+        (, uint256[] memory tokenAmounts) = getUsersOwnedAssetsAndRewards(owner);
 
         // Calculate amount of assets user is withdrawing
         uint256 assetsToWithdraw = (tokenAmounts[0] * userWithdrawProportion) / 1e18;
