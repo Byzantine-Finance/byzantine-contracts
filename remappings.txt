@@ -6,3 +6,6 @@ splits-v2/=lib/splits-contracts-v2/packages/splits-v2/src/
 ds-test/=lib/ds-test/src/
 forge-std/=lib/forge-std/src/
 chainlink/=lib/foundry-chainlink-toolkit/lib/chainlink-brownie-contracts/contracts/src/
+@symbioticfi/burners/=lib/burners/
+@symbioticfi/core/=lib/core/
+@symbioticfi/rewards/=lib/rewards/

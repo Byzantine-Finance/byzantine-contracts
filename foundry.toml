@@ -4,6 +4,7 @@ out = "out"
 libs = ["lib"]
 fs_permissions = [{ access = "read-write", path = "./"}]
 gas_reports = ["*"]
+evm_version = "shanghai"
 
 # Override the Solidity version (this overrides `auto_detect_solc`)
 solc_version = '0.8.23'
