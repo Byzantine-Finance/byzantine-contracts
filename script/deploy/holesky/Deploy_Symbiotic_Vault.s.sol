@@ -49,8 +49,9 @@ contract DeploySymbioticVault is Script {
     bool public constant IS_BURNER_HOOK = true;
 
     // ============= Default Vault Configuration =============
+    // 0x8d09a4502Cc8Cf1547aD300E066060D043f6982D wstETH
     // Basic configuration (for normal users)
-    address public constant DEFAULT_COLLATERAL = 0x8d09a4502Cc8Cf1547aD300E066060D043f6982D;
+    address public vaultCollateral;
     uint48 public constant DEFAULT_EPOCH_DURATION = 7 days;
     bool public constant DEFAULT_DEPOSIT_WHITELIST = true;
     bool public constant DEFAULT_IS_DEPOSIT_LIMIT = true;
@@ -60,22 +61,23 @@ contract DeploySymbioticVault is Script {
 
     // ============= Advanced Configuration =============
     // For advanced users (customizable during deployment)
-    address public collateral;
     uint48 public epochDuration;
     bool public isDepositLimit;
     uint256 public depositLimit;
     uint48 public vetoDuration;
     uint64 public delegatorIndex;
     
-    function run() public {
+    function run(address _collateral) public {
         uint256 privateKey = vm.envUint("PRIVATE_KEY");
         vm.startBroadcast(privateKey);
-        
+
+        vaultCollateral = _collateral;
+
         // 1. Deploy BurnerRouter
         address burnerRouter = IBurnerRouterFactory(BURNER_ROUTER_FACTORY).create(
             IBurnerRouter.InitParams({
                 owner: OWNER,
-                collateral: DEFAULT_COLLATERAL,
+                collateral: _collateral,
                 delay: DELAY,
                 globalReceiver: GLOBAL_RECEIVER,
                 networkReceivers: new IBurnerRouter.NetworkReceiver[](0),
@@ -116,9 +118,9 @@ contract DeploySymbioticVault is Script {
         vm.stopBroadcast();
     }
 
-    function _getVaultParams(address burnerRouter) internal pure returns (bytes memory) {
+    function _getVaultParams(address burnerRouter) internal view returns (bytes memory) {
         return abi.encode(
-            DEFAULT_COLLATERAL,          // collateral
+            vaultCollateral,             // collateral
             burnerRouter,                // burner
             DEFAULT_EPOCH_DURATION,      // epochDuration
             DEFAULT_DEPOSIT_WHITELIST,   // depositWhitelist
