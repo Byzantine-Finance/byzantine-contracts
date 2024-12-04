@@ -26,6 +26,7 @@ contract DeploySymbioticVault is Script {
 
     // ============= Access Control Configuration =============
     address public constant OWNER = address(0); // TO DO: Set actual owner
+    bool public constant DEPOSIT_WHITELIST = true;
     address public constant GLOBAL_RECEIVER = STAKING_MINIVAULT;
     address public constant DEFAULT_ADMIN_ROLE = STAKING_MINIVAULT;
     address public constant DEPOSIT_WHITELIST_SET_ROLE = STAKING_MINIVAULT;
@@ -53,7 +54,6 @@ contract DeploySymbioticVault is Script {
     // Basic configuration (for normal users)
     address public vaultCollateral;
     uint48 public constant DEFAULT_EPOCH_DURATION = 7 days;
-    bool public constant DEFAULT_DEPOSIT_WHITELIST = true;
     bool public constant DEFAULT_IS_DEPOSIT_LIMIT = true;
     uint256 public constant DEFAULT_DEPOSIT_LIMIT = 1000 ether;
     uint48 public constant DEFAULT_VETO_DURATION = 1 days;
