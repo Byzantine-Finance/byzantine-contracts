@@ -1,5 +1,5 @@
 @openzeppelin-upgrades/=lib/openzeppelin-contracts-upgradeable/
-@openzeppelin/=lib/openzeppelin-contracts/
+@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/
 @openzeppelin-v4.9.3/=lib/openzeppelin-contracts-v4.9.3/
 eigenlayer-contracts/=lib/eigenlayer-contracts/src/contracts/
 splits-v2/=lib/splits-contracts-v2/packages/splits-v2/src/
@@ -9,3 +9,6 @@ chainlink/=lib/foundry-chainlink-toolkit/lib/chainlink-brownie-contracts/contrac
 @symbioticfi/burners/=lib/burners/
 @symbioticfi/core/=lib/core/
 @symbioticfi/rewards/=lib/rewards/
+@symbioticfi/core/src/contracts/=lib/core/src/contracts/
+@symbioticfi/core/src/interfaces/=lib/core/src/interfaces/
+@symbioticfi/core/test/mocks/=lib/core/test/mocks/
