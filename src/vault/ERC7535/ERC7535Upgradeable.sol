@@ -17,24 +17,11 @@ abstract contract ERC7535Upgradeable is Initializable, ERC20Upgradeable, IERC753
     using MathUpgradeable for uint256;
 
     /**
-     * @dev Attempted to deposit more assets than the max amount for `receiver`.
+     * @dev Public function for initializing the ERC7535 contract.
      */
-    error ERC7535ExceededMaxDeposit(address receiver, uint256 assets, uint256 max);
-
-    /**
-     * @dev Attempted to mint more shares than the max amount for `receiver`.
-     */
-    error ERC7535ExceededMaxMint(address receiver, uint256 shares, uint256 max);
-
-    /**
-     * @dev Attempted to withdraw more assets than the max amount for `receiver`.
-     */
-    error ERC7535ExceededMaxWithdraw(address owner, uint256 assets, uint256 max);
-
-    /**
-     * @dev Attempted to redeem more shares than the max amount for `receiver`.
-     */
-    error ERC7535ExceededMaxRedeem(address owner, uint256 shares, uint256 max);
+    function initialize() public initializer() {
+        __ERC7535_init();
+    }
     
     /**
      * @dev Initializes the ERC7535 contract. Add calls for initializers of parent contracts here.
@@ -148,15 +135,16 @@ abstract contract ERC7535Upgradeable is Initializable, ERC20Upgradeable, IERC753
      * @dev See {IERC7535-deposit}.
      */
     function deposit(uint256 assets, address receiver) public payable virtual returns (uint256) {
+        // Check if the sent ETH (msg.value) is equal to the assets
+        if (assets != msg.value) revert ERC7535AssetsShouldBeEqualToMsgVaule();
+        
         uint256 maxAssets = maxDeposit(receiver);
         if (assets > maxAssets) {
             revert ERC7535ExceededMaxDeposit(receiver, assets, maxAssets);
         }
 
         uint256 shares = previewDeposit(assets);
-
-        if (assets != msg.value) revert AssetsShouldBeEqualToMsgVaule();
-
+        
         _deposit(_msgSender(), receiver, assets, shares);
 
         return shares;
@@ -176,7 +164,8 @@ abstract contract ERC7535Upgradeable is Initializable, ERC20Upgradeable, IERC753
 
         uint256 assets = previewMint(shares);
 
-        if (assets != msg.value) revert AssetsShouldBeEqualToMsgVaule();
+        // Check if the sent ETH (msg.value) is equal to the assets
+        if (assets != msg.value) revert ERC7535AssetsShouldBeEqualToMsgVaule();
 
         _deposit(_msgSender(), receiver, assets, shares);
 
@@ -217,14 +206,41 @@ abstract contract ERC7535Upgradeable is Initializable, ERC20Upgradeable, IERC753
      * @dev Internal conversion function (from assets to shares) with support for rounding direction.
      */
     function _convertToShares(uint256 assets, MathUpgradeable.Rounding rounding) internal view virtual returns (uint256) {
-        return assets.mulDiv(totalSupply() + 10 ** _decimalsOffset(), totalAssets() + 1, rounding);
+        // For the first deposit, return the number of assets as shares
+        if (totalAssets() == 0 || totalSupply() == 0) {
+            return assets;
+        }
+
+        uint256 supply = totalSupply() + 10 ** _decimalsOffset(); // Supply includes virtual reserves
+        uint256 totalAssets_ = totalAssets() + 1; // Add 1 to avoid division by zero
+
+        // If this is called during a mint, ETH is already in contract.
+        // Therefore, we subtract the input amount to get the pre-deposit state.
+        if (msg.value > 0) {
+            totalAssets_ = totalAssets_ - msg.value;
+        }
+        
+        return assets.mulDiv(supply, totalAssets_, rounding);
     }
 
     /**
      * @dev Internal conversion function (from shares to assets) with support for rounding direction.
      */
     function _convertToAssets(uint256 shares, MathUpgradeable.Rounding rounding) internal view virtual returns (uint256) {
-        return shares.mulDiv(totalAssets() + 1, totalSupply() + 10 ** _decimalsOffset(), rounding);
+        // For the first mint, return the number of shares as assets
+        if (totalAssets() == 0 || totalSupply() == 0) {
+            return shares;
+        }
+        uint256 supply = totalSupply() + 10 ** _decimalsOffset(); // Supply includes virtual reserves
+        uint256 totalAssets_ = totalAssets() + 1; // Add 1 to avoid division by zero
+
+        // If this is called during a mint, ETH is already in contract.
+        // Therefore, we subtract the input amount to get the pre-deposit state.
+        if (msg.value > 0) {
+            totalAssets_ = totalAssets_ - msg.value;
+        }
+
+        return shares.mulDiv(totalAssets_, supply, rounding);
     }
 
     /**
@@ -249,7 +265,7 @@ abstract contract ERC7535Upgradeable is Initializable, ERC20Upgradeable, IERC753
 
         _burn(owner, shares);
         (bool success,) = receiver.call{value: assets}("");
-        if (!success) revert WithdrawFailed();
+        if (!success) revert ERC7535WithdrawFailed();
 
         emit Withdraw(caller, receiver, owner, assets, shares);
     }
