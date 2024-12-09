@@ -21,11 +21,11 @@ contract DeploySymbioticVault is Script {
     address public constant BURNER_ROUTER_FACTORY = 0x32e2AfbdAffB1e675898ABA75868d92eE1E68f3b;
     address public constant VAULT_CONFIGURATOR = 0xD2191FE92987171691d552C219b8caEf186eb9cA;
     address public constant DEFAULT_STAKER_REWARDS_FACTORY = 0x698C36DE44D73AEfa3F0Ce3c0255A8667bdE7cFD;
-    address public constant STAKING_MINIVAULT = 0x0000000000000000000000000000000000000000; // TO DO: Set actual staking minivault
+    address public constant STAKING_MINIVAULT = 0x32e2AfbdAffB1e675898ABA75868d92eE1E68f3b; // TO DO: Set actual staking minivault
     address public constant HOOK = address(0); // TO DO: Set actual hook
 
     // ============= Access Control Configuration =============
-    address public constant OWNER = address(0); // TO DO: Set actual owner
+    address public constant OWNER = 0x32e2AfbdAffB1e675898ABA75868d92eE1E68f3b; // TO DO: Set actual owner
     bool public constant DEPOSIT_WHITELIST = true;
     address public constant GLOBAL_RECEIVER = STAKING_MINIVAULT;
     address public constant DEFAULT_ADMIN_ROLE = STAKING_MINIVAULT;
@@ -123,7 +123,7 @@ contract DeploySymbioticVault is Script {
             vaultCollateral,             // collateral
             burnerRouter,                // burner
             DEFAULT_EPOCH_DURATION,      // epochDuration
-            DEFAULT_DEPOSIT_WHITELIST,   // depositWhitelist
+            DEPOSIT_WHITELIST,           // depositWhitelist
             DEFAULT_IS_DEPOSIT_LIMIT,    // isDepositLimit
             DEFAULT_DEPOSIT_LIMIT,       // depositLimit
             DEFAULT_ADMIN_ROLE,          // defaultAdminRoleHolder

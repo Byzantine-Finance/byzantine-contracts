@@ -15,7 +15,7 @@ interface IProxy {
 /// @author Byzantine Finance
 /// @notice This API3 oracle implementation is used to get the price of an asset from an API3 dAPI.
 /// @dev This implementation has the ability to edit the ETH_USD_PROXY address.
-contract API3OracleImplementation is IOracle, Ownable(msg.sender) {
+contract API3OracleImplementation is IOracle, Ownable {
     error InvalidPrice();
     error StalePrice(uint256 timestamp);
     error InvalidAsset();
