@@ -111,13 +111,13 @@ contract SymbioticVaultManager is Initializable, OwnableUpgradeable {
         );
 
         // Whitelist the StakingMiniVault being the only whitelisted depositor
-        IVault(vault).setDepositorWhitelistStatus(STAKING_MINIVAULT, true);
+        IVault(vault).setDepositorWhitelistStatus(STAKING_MINIVAULT, true); // TODO: Access control need to grant to SymbioticVaultManager?
 
         // Initialize ByzFiNativeSymbioticVault
         ByzFiNativeSymbioticVault(byzFiNativeSymbioticVault).initialize(vault);
         
         // Deploy DefaultStakerRewards
-        defaultStakerRewards = _deployDefaultStakerRewards(stakerRewardsParams);
+        defaultStakerRewards = _deployDefaultStakerRewards(stakerRewardsParams, vault);
 
         return (vault, delegator, slasher, defaultStakerRewards, byzFiNativeSymbioticVault);
     }
@@ -157,11 +157,12 @@ contract SymbioticVaultManager is Initializable, OwnableUpgradeable {
     }
 
     function _deployDefaultStakerRewards(
-        ISymbioticVaultManager.StakerRewardsParams memory params
+        ISymbioticVaultManager.StakerRewardsParams memory params,
+        address vault
     ) private returns (address) {
         return IDefaultStakerRewardsFactory(DEFAULT_STAKER_REWARDS_FACTORY).create(
             IDefaultStakerRewards.InitParams({
-                vault: params.vault,
+                vault: vault,
                 adminFee: params.adminFee,
                 defaultAdminRoleHolder: params.defaultAdminRoleHolder,
                 adminFeeClaimRoleHolder: params.adminFeeClaimRoleHolder,
