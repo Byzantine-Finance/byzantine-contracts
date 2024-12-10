@@ -19,6 +19,8 @@ import "../src/core/Auction.sol";
 import "../src/vault/Escrow.sol";
 import "../src/core/StakerRewards.sol";
 
+import "./mocks/BeaconChainMock.t.sol";
+
 contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
 
     // Byzantine contracts
@@ -30,6 +32,15 @@ contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
     Auction public auction;
     Escrow public escrow;
     StakerRewards public stakerRewards;
+
+    // Contract to simulate the beacon chain
+    BeaconChainMock public beaconChain;
+    // The address of the EIP-4788 beacon block root oracle
+    EIP_4788_Oracle_Mock constant EIP_4788_ORACLE = EIP_4788_Oracle_Mock(0x000F3df6D732807Ef1319fB7B8bB8522d0Beac02);
+
+    // Beacon chain genesis time when running locally
+    // Multiple of 12 for sanity's sake
+    uint64 constant GENESIS_TIME_LOCAL = 1 hours * 12;
 
     // Byzantine Admin
     address public byzantineAdmin = address(this);
@@ -76,6 +87,12 @@ contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
     function setUp() public virtual override(EigenLayerDeployer, SplitsV2Deployer) {
         // deploy locally EigenLayer contracts
         EigenLayerDeployer.setUp();
+        // deploy the mock beacon chain
+        beaconChain = new BeaconChainMock(EigenPodManager(address(eigenPodManager)), GENESIS_TIME_LOCAL);
+        // Etch 4788 precompile
+        vm.etch(address(EIP_4788_ORACLE), type(EIP_4788_Oracle_Mock).runtimeCode);
+        // set the timestamp to the Beacon genesis time
+        vm.warp(GENESIS_TIME_LOCAL);
         // deploy locally SplitsV2 contracts
         SplitsV2Deployer.setUp();
         // deploy locally Byzantine contracts

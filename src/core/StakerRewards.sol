@@ -40,18 +40,6 @@ contract StakerRewards is
 
     /* ============== STATE VARIABLES ============== */
 
-    /// @dev A cluster becomes a validator when it is activated with 32ETH
-    /// @notice Number of created cluster of size 4
-    uint256 public numClusters4;
-    /// @notice Number of created cluster of size 7
-    uint256 public numClusters7;
-    /// @notice Number of validators of size 4
-    uint256 public numValidators4;
-    /// @notice Number of validators of size 7
-    uint256 public numValidators7;
-
-    /// @notice Address deployed by Chainlink at each registration of upkeep, it is the address that calls `performUpkeep`
-    address public forwarderAddress;
     /// @notice Interval of time between two upkeeps
     uint256 public upkeepInterval;
     /// @notice Tracks the last upkeep performed
@@ -65,6 +53,19 @@ contract StakerRewards is
 
     /// @notice StratVaultETH address => VaultData
     mapping(address => VaultData) internal _vaults;
+
+    /// @dev A cluster becomes a validator when it is activated with 32ETH
+    /// @notice Number of created cluster of size 4
+    uint16 public numClusters4;
+    /// @notice Number of created cluster of size 7
+    uint16 public numClusters7;
+    /// @notice Number of validators of size 4
+    uint16 public numValidators4;
+    /// @notice Number of validators of size 7
+    uint16 public numValidators7;
+
+    /// @notice Address deployed by Chainlink at each registration of upkeep, it is the address that calls `performUpkeep`
+    address public forwarderAddress;
 
     /**
     * @dev This empty reserved space is put in place to allow future versions to add new
@@ -110,7 +111,7 @@ contract StakerRewards is
         // Get the total new VCs, the smallest VC and the cluster size
         IAuction.ClusterDetails memory clusterDetails = auction.getClusterDetails(_clusterId);
         IAuction.NodeDetails[] memory nodes = clusterDetails.nodes;
-        (uint256 totalClusterVCs, uint32 smallestVC, uint8 clusterSize) = _getTotalAndSmallestVCs(nodes);
+        (uint64 totalClusterVCs, uint32 smallestVC, uint8 clusterSize) = _getTotalAndSmallestVCs(nodes);
 
         // Update ClusterData
         ClusterData storage cluster = _clusters[_clusterId];
@@ -250,7 +251,7 @@ contract StakerRewards is
         // Array of cluster IDs at the size of counter
         bytes32[] memory listClusterIds = new bytes32[](counter);
         // Total remaining VCs to remove
-        uint256 remainingVCsToRemove;
+        uint64 remainingVCsToRemove;
         // Total bid prices to send back to Escrow contract
         uint256 totalBidsToEscrow;
 
@@ -271,7 +272,7 @@ contract StakerRewards is
                     listClusterIds[indexCounter] = clusterIds[j];
                     // Get the total number of VCs and the smallest VC number of the cluster
                     IAuction.NodeDetails[] memory nodes = auction.getClusterDetails(clusterIds[j]).nodes;
-                    (uint256 totalClusterVCs, uint32 smallestVC, ) = _getTotalAndSmallestVCs(nodes);
+                    (uint64 totalClusterVCs, uint32 smallestVC, ) = _getTotalAndSmallestVCs(nodes);
                     // Add up the remaining VC number of each cluster
                     remainingVCsToRemove += (totalClusterVCs - smallestVC * cluster.clusterSize);
                     // Calculate the total remaining bid prices of each node
@@ -330,10 +331,10 @@ contract StakerRewards is
         lastPerformUpkeep = block.timestamp;
 
         // Decode `performData` 
-        (bytes32[] memory clusterIds, uint256 remainingVCsToRemove, uint256 totalBidsToEscrow) = abi.decode(performData, (bytes32[], uint256, uint256));
+        (bytes32[] memory clusterIds, uint64 remainingVCsToRemove, uint256 totalBidsToEscrow) = abi.decode(performData, (bytes32[], uint64, uint256));
 
-        uint256 numClusters4ToExit;
-        uint256 numClusters7ToExit;
+        uint16 numClusters4ToExit;
+        uint16 numClusters7ToExit;
         
         for (uint256 i; i < clusterIds.length; ) {
             ClusterData storage cluster = _clusters[clusterIds[i]];
@@ -455,11 +456,11 @@ contract StakerRewards is
      * @notice Get the total number of VCs and the smallest VC number of a cluster
      * @param nodes The nodes of the cluster
      */
-    function _getTotalAndSmallestVCs(IAuction.NodeDetails[] memory nodes) internal pure returns (uint256 totalClusterVCs, uint32 smallestVcNumber, uint8 clusterSize) {
-        clusterSize = uint8(nodes.length);
+    function _getTotalAndSmallestVCs(IAuction.NodeDetails[] memory nodes) internal pure returns (uint64 totalClusterVCs, uint32 smallestVcNumber, uint8 smallClusterSize) {
+        uint256 bigClusterSize = nodes.length;
         smallestVcNumber = nodes[0].currentVCNumber; 
         totalClusterVCs = 0;
-        for (uint8 i; i < clusterSize;) {
+        for (uint256 i; i < bigClusterSize;) {
             totalClusterVCs += nodes[i].currentVCNumber; 
             if (nodes[i].currentVCNumber < smallestVcNumber) {
                 smallestVcNumber = nodes[i].currentVCNumber;
@@ -468,6 +469,7 @@ contract StakerRewards is
                 ++i;
             }
         }
+        smallClusterSize = uint8(bigClusterSize);
     }
     
     /**
@@ -480,7 +482,7 @@ contract StakerRewards is
         uint256 dailyConsumedVCs = numValidators4 * 4 + numValidators7 * 7;
         uint256 totalConsumedVCs = _getElapsedDays(_checkpoint.updateTime) * dailyConsumedVCs;
         if (_checkpoint.totalVCs < totalConsumedVCs) revert TotalVCsLessThanConsumedVCs();
-        _checkpoint.totalVCs -= totalConsumedVCs;
+        _checkpoint.totalVCs -= uint64(totalConsumedVCs);
 
         // Update totalPendingRewards
         uint256 elapsedDays = _getElapsedDays(_checkpoint.updateTime);
