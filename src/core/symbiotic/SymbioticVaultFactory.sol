@@ -103,7 +103,7 @@ contract SymbioticVaultFactory is Initializable, OwnableUpgradeable {
         ByzFiNativeSymbioticVault(byzFiNativeSymbioticVault).initialize(byzFiNativeSymbioticVault, vault, stakingMinivault);
 
         // Call whitelistDepositor from ByzFiNativeSymbioticVault to whitelist the StakingMinivault
-        ByzFiNativeSymbioticVault(byzFiNativeSymbioticVault).whitelistDepositor();
+        ByzFiNativeSymbioticVault(byzFiNativeSymbioticVault).whitelistDepositors();
 
         return (vault, delegator, slasher, defaultStakerRewards, byzFiNativeSymbioticVault, stakingMinivault);
     }
