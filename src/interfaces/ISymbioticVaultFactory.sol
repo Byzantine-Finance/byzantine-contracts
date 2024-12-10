@@ -3,7 +3,7 @@ pragma solidity ^0.8.20;
 
 import {IBurnerRouter} from "@symbioticfi/burners/src/interfaces/router/IBurnerRouter.sol";
 
-interface ISymbioticVaultManager {
+interface ISymbioticVaultFactory {
     // Struct of parameters for deploying a BurnerRouter
     struct BurnerRouterParams {
         address owner;

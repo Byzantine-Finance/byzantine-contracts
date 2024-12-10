@@ -13,12 +13,12 @@ import {IBaseDelegator} from "@symbioticfi/core/src/interfaces/delegator/IBaseDe
 import {INetworkRestakeDelegator} from "@symbioticfi/core/src/interfaces/delegator/INetworkRestakeDelegator.sol";
 import {IBaseSlasher} from "@symbioticfi/core/src/interfaces/slasher/IBaseSlasher.sol";
 import {ISlasher} from "@symbioticfi/core/src/interfaces/slasher/ISlasher.sol";
-import {ISymbioticVaultManager} from "../../interfaces/ISymbioticVaultManager.sol";
+import {ISymbioticVaultFactory} from "../../interfaces/ISymbioticVaultFactory.sol";
 import {IVault} from "@symbioticfi/core/src/interfaces/vault/IVault.sol";
 
 import {ByzFiNativeSymbioticVault} from "../../vault/symbiotic/ByzFiNativeSymbioticVault.sol";
 
-contract SymbioticVaultManager is Initializable, OwnableUpgradeable {
+contract SymbioticVaultFactory is Initializable, OwnableUpgradeable {
 
     // ============= Deployment Addresses =============
     address public BURNER_ROUTER_FACTORY;
@@ -76,12 +76,12 @@ contract SymbioticVaultManager is Initializable, OwnableUpgradeable {
      * @param stakerRewardsParams The parameters for the staker rewards.
      */
     function createAdvancedVault(
-        ISymbioticVaultManager.BurnerRouterParams memory burnerRouterParams,
-        ISymbioticVaultManager.VaultParams memory vaultParams,
-        ISymbioticVaultManager.DelegatorParams memory delegatorParams,
-        ISymbioticVaultManager.SlasherParams memory slasherParams,
+        ISymbioticVaultFactory.BurnerRouterParams memory burnerRouterParams,
+        ISymbioticVaultFactory.VaultParams memory vaultParams,
+        ISymbioticVaultFactory.DelegatorParams memory delegatorParams,
+        ISymbioticVaultFactory.SlasherParams memory slasherParams,
         uint64 slasherIndex,
-        ISymbioticVaultManager.StakerRewardsParams memory stakerRewardsParams
+        ISymbioticVaultFactory.StakerRewardsParams memory stakerRewardsParams
     ) external returns (address vault, address delegator, address slasher, address defaultStakerRewards, address payable byzFiNativeSymbioticVault) {
         
         // Deploy ByzFiNativeSymbioticVault
@@ -94,7 +94,7 @@ contract SymbioticVaultManager is Initializable, OwnableUpgradeable {
         vaultParams.burnerRouter = burnerRouter;
 
         // Initialize VaultConfiguratorParams with predefined and input values
-        ISymbioticVaultManager.VaultConfiguratorParams memory vaultConfiguratorParams = ISymbioticVaultManager.VaultConfiguratorParams({
+        ISymbioticVaultFactory.VaultConfiguratorParams memory vaultConfiguratorParams = ISymbioticVaultFactory.VaultConfiguratorParams({
             version: VERSION,
             owner: byzFiNativeSymbioticVault,
             vaultParams: abi.encode(vaultParams),
@@ -124,8 +124,12 @@ contract SymbioticVaultManager is Initializable, OwnableUpgradeable {
 
     /* ===================== PRIVATE FUNCTIONS ===================== */
 
+    /**
+     * @notice Deploys a BurnerRouter with the given parameters.
+     * @param params The parameters for the BurnerRouter.
+     */
     function _deployBurnerRouter(
-        ISymbioticVaultManager.BurnerRouterParams memory params
+        ISymbioticVaultFactory.BurnerRouterParams memory params
     ) private returns (address) {
         return IBurnerRouterFactory(BURNER_ROUTER_FACTORY).create(
             IBurnerRouter.InitParams({
@@ -139,8 +143,12 @@ contract SymbioticVaultManager is Initializable, OwnableUpgradeable {
         );
     }
 
+    /**
+     * @notice Deploys a Vault with the given parameters.
+     * @param configParams The parameters for the Vault.
+     */
     function _deployVault(
-        ISymbioticVaultManager.VaultConfiguratorParams memory configParams
+        ISymbioticVaultFactory.VaultConfiguratorParams memory configParams
     ) private returns (address, address, address) {
         return IVaultConfigurator(VAULT_CONFIGURATOR).create(
             IVaultConfigurator.InitParams({
@@ -156,8 +164,12 @@ contract SymbioticVaultManager is Initializable, OwnableUpgradeable {
         );
     }
 
+    /**
+     * @notice Deploys a DefaultStakerRewards with the given parameters.
+     * @param params The parameters for the DefaultStakerRewards.
+     */
     function _deployDefaultStakerRewards(
-        ISymbioticVaultManager.StakerRewardsParams memory params,
+        ISymbioticVaultFactory.StakerRewardsParams memory params,
         address vault
     ) private returns (address) {
         return IDefaultStakerRewardsFactory(DEFAULT_STAKER_REWARDS_FACTORY).create(

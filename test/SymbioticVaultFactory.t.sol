@@ -2,15 +2,15 @@
 pragma solidity ^0.8.20;
 
 import {Test, console} from "forge-std/Test.sol";
-import {SymbioticVaultManager} from "../src/core/symbiotic/SymbioticVaultManager.sol";
-import {ISymbioticVaultManager} from "../src/interfaces/ISymbioticVaultManager.sol";
+import {SymbioticVaultFactory} from "../src/core/symbiotic/SymbioticVaultFactory.sol";
+import {ISymbioticVaultFactory} from "../src/interfaces/ISymbioticVaultFactory.sol";
 import {IBurnerRouter} from "@symbioticfi/burners/src/interfaces/router/IBurnerRouter.sol";
 
-contract SymbioticVaultManagerTest is Test{
+contract SymbioticVaultFactoryTest is Test{
     uint256 holeskyFork;
     string HOLESKY_RPC_URL = vm.envString("HOLESKY_RPC_URL");
 
-    SymbioticVaultManager symbioticVaultManager;
+    SymbioticVaultFactory symbioticVaultFactory;
 
     // Define the addresses required for the constructor
     address public BURNER_ROUTER_FACTORY = 0x32e2AfbdAffB1e675898ABA75868d92eE1E68f3b;
@@ -36,7 +36,7 @@ contract SymbioticVaultManagerTest is Test{
 
 
         // Deploy the SymbioticVaultManager contract with constructor parameters
-        symbioticVaultManager = new SymbioticVaultManager(
+        symbioticVaultFactory = new SymbioticVaultFactory(
             BURNER_ROUTER_FACTORY,
             VAULT_CONFIGURATOR,
             DEFAULT_STAKER_REWARDS_FACTORY,
@@ -52,7 +52,7 @@ contract SymbioticVaultManagerTest is Test{
     
     function test_createAdvancedVault() public {
         // Define the parameters for the createAdvancedVault function
-        ISymbioticVaultManager.BurnerRouterParams memory burnerRouterParams = ISymbioticVaultManager.BurnerRouterParams({
+        ISymbioticVaultFactory.BurnerRouterParams memory burnerRouterParams = ISymbioticVaultFactory.BurnerRouterParams({
             owner: OWNER,
             collateral: COLLATERAL,
             delay: DELAY,
@@ -67,7 +67,7 @@ contract SymbioticVaultManagerTest is Test{
         burnerRouterParams.operatorNetworkReceivers[0] = IBurnerRouter.OperatorNetworkReceiver({network: network1, operator: operator1, receiver: receiver1});
         burnerRouterParams.operatorNetworkReceivers[1] = IBurnerRouter.OperatorNetworkReceiver({network: network2, operator: operator2, receiver: receiver2});
 
-        ISymbioticVaultManager.VaultParams memory vaultParams = ISymbioticVaultManager.VaultParams({
+        ISymbioticVaultFactory.VaultParams memory vaultParams = ISymbioticVaultFactory.VaultParams({
             collateral: COLLATERAL,
             burnerRouter: address(0), 
             epochDuration: 7 days,
@@ -76,12 +76,12 @@ contract SymbioticVaultManagerTest is Test{
             depositLimit: 0,
             defaultAdminRoleHolder: OWNER,
             depositWhitelistSetRoleHolder: OWNER,
-            depositorWhitelistRoleHolder: address(symbioticVaultManager),
+            depositorWhitelistRoleHolder: address(symbioticVaultFactory),
             isDepositLimitSetRoleHolder: OWNER,
             depositLimitSetRoleHolder: OWNER
         });
 
-        ISymbioticVaultManager.DelegatorParams memory delegatorParams = ISymbioticVaultManager.DelegatorParams({
+        ISymbioticVaultFactory.DelegatorParams memory delegatorParams = ISymbioticVaultFactory.DelegatorParams({
             defaultAdminRoleHolder: OWNER,
             hook: address(0),
             hookSetRoleHolder: OWNER,
@@ -89,13 +89,13 @@ contract SymbioticVaultManagerTest is Test{
             operatorNetworkSharesSetRoleHolders: new address[](0) // Explicitly define as address array
         });
 
-        ISymbioticVaultManager.SlasherParams memory slasherParams = ISymbioticVaultManager.SlasherParams({
+        ISymbioticVaultFactory.SlasherParams memory slasherParams = ISymbioticVaultFactory.SlasherParams({
             isBurnerHook: false
         });
 
         uint64 slasherIndex = 0; 
 
-        ISymbioticVaultManager.StakerRewardsParams memory stakerRewardsParams = ISymbioticVaultManager.StakerRewardsParams({
+        ISymbioticVaultFactory.StakerRewardsParams memory stakerRewardsParams = ISymbioticVaultFactory.StakerRewardsParams({
             vault: address(0), 
             adminFee: 100, 
             defaultAdminRoleHolder: OWNER,
@@ -104,7 +104,7 @@ contract SymbioticVaultManagerTest is Test{
         });
 
         // Call the createAdvancedVault function
-        (address vault, address delegator, address slasher, address defaultStakerRewards, address payable byzFiNativeSymbioticVault) = symbioticVaultManager.createAdvancedVault(
+        (address vault, address delegator, address slasher, address defaultStakerRewards, address payable byzFiNativeSymbioticVault) = symbioticVaultFactory.createAdvancedVault(
             burnerRouterParams,
             vaultParams,
             delegatorParams,
