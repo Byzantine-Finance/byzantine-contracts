@@ -6,8 +6,8 @@ import {IBurnerRouter} from "@symbioticfi/burners/src/interfaces/router/IBurnerR
 interface ISymbioticVaultFactory {
     // Struct of parameters for deploying a BurnerRouter
     struct BurnerRouterParams {
-        address owner;
-        address collateral;
+        // address owner; // predefined
+        // address collateral; 
         uint48 delay;
         address globalReceiver;
         IBurnerRouter.NetworkReceiver[] networkReceivers;
@@ -16,38 +16,38 @@ interface ISymbioticVaultFactory {
 
     // Struct of parameters for deploying a Vault
     struct VaultConfiguratorParams {
-        uint64 version; // predefined at initialization
-        address owner;
-        bytes vaultParams;
-        uint64 delegatorIndex; // predefined at initialization
-        bytes delegatorParams;
-        bool withSlasher; // predefined at initialization
+        // uint64 version; // predefined 
+        // address owner; // predefined 
+        // bytes vaultParams;
+        uint64 delegatorIndex; 
+        // bytes delegatorParams;
+        // bool withSlasher; // predefined 
         uint64 slasherIndex;
-        bytes slasherParams;
+        // bytes slasherParams;
     }
 
     // Struct of parameters for vault configuration
     struct VaultParams {
-        address collateral;
-        address burnerRouter;
+        // address collateral; // predefined
+        // address burnerRouter; // predefined
         uint48 epochDuration;
-        bool depositWhitelist;
+        // bool depositWhitelist; // predefined 
         bool isDepositLimit;
         uint256 depositLimit;
-        address defaultAdminRoleHolder;
-        address depositWhitelistSetRoleHolder;
-        address depositorWhitelistRoleHolder;
-        address isDepositLimitSetRoleHolder;
-        address depositLimitSetRoleHolder;
+        // address defaultAdminRoleHolder; // predefined 
+        // address depositWhitelistSetRoleHolder; // predefined 
+        // address depositorWhitelistRoleHolder; // predefined 
+        // address isDepositLimitSetRoleHolder; // predefined 
+        // address depositLimitSetRoleHolder; // predefined 
     }
 
     // Struct of parameters for delegator configuration
     struct DelegatorParams {
-        address defaultAdminRoleHolder;
+        // address defaultAdminRoleHolder; // predefined
         address hook;
         address hookSetRoleHolder;
-        address[] networkLimitSetRoleHolders;
-        address[] operatorNetworkSharesSetRoleHolders;
+        // address[] networkLimitSetRoleHolders; // predefined
+        // address[] operatorNetworkSharesSetRoleHolders; // predefined
     }
 
     // Struct of parameters for slasher configuration
@@ -57,11 +57,11 @@ interface ISymbioticVaultFactory {
 
     // Struct of parameters for staker rewards configuration
     struct StakerRewardsParams {
-        address vault;
+        // address vault; // predefined
         uint256 adminFee;
-        address defaultAdminRoleHolder;
-        address adminFeeClaimRoleHolder;
-        address adminFeeSetRoleHolder;
+        // address defaultAdminRoleHolder; // predefined
+        // address adminFeeClaimRoleHolder; // predefined
+        // address adminFeeSetRoleHolder; // predefined
     }
 
     /**
@@ -75,15 +75,14 @@ interface ISymbioticVaultFactory {
      * @param vaultParams The parameters for the vault.
      * @param delegatorParams The parameters for the delegator.
      * @param slasherParams The parameters for the slasher.
-     * @param slasherIndex The index of the slasher.
      * @param stakerRewardsParams The parameters for the staker rewards.
      */
     function createAdvancedVault(
-        BurnerRouterParams memory burnerRouterParams,
-        VaultParams memory vaultParams,
-        DelegatorParams memory delegatorParams,
-        SlasherParams memory slasherParams,
-        uint64 slasherIndex,
-        StakerRewardsParams memory stakerRewardsParams
-    ) external returns (address vault, address delegator, address slasher, address defaultStakerRewards);
+        ISymbioticVaultFactory.BurnerRouterParams memory burnerRouterParams,
+        ISymbioticVaultFactory.VaultConfiguratorParams memory configuratorParams,
+        ISymbioticVaultFactory.VaultParams memory vaultParams,
+        ISymbioticVaultFactory.DelegatorParams memory delegatorParams,
+        ISymbioticVaultFactory.SlasherParams memory slasherParams,
+        ISymbioticVaultFactory.StakerRewardsParams memory stakerRewardsParams
+    ) external returns (address vault, address delegator, address slasher, address defaultStakerRewards, address payable byzFiNativeSymbioticVault, address stakingMinivault);
 }
