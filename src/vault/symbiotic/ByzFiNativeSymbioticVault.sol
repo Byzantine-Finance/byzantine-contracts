@@ -6,10 +6,36 @@ import {OwnableUpgradeable} from "@openzeppelin-upgrades/contracts/access/Ownabl
 import "../ERC7535/ERC7535Upgradeable.sol";
 
 import {IVault} from "@symbioticfi/core/src/interfaces/vault/IVault.sol";
+import {StakingMinivaultMock} from "../../../test/mocks/StakingMinivaultMock.sol";
 
 contract ByzFiNativeSymbioticVault is Initializable, OwnableUpgradeable, ERC7535Upgradeable {
+
+    /* ============== CONSTANTS + IMMUTABLES ============== */
+
     /// @notice The vault that this ByzFiNativeSymbioticVault is associated with
     IVault public vault;
+
+    /// @notice The StakingMinivault contract address
+    address public stakingMinivault;
+
+    /* ============== CONSTRUCTOR & INITIALIZER ============== */
+
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        // Disable initializer in the context of the implementation contract
+        _disableInitializers();
+    }
+
+    /**
+     * @dev Initializes the address of the initial owner, the vault address, and the staking minivault address
+     */
+    function initialize(address initialOwner, address _vaultAddress, address _stakingMinivaultAddress) external initializer {
+        vault = IVault(_vaultAddress);
+        stakingMinivault = _stakingMinivaultAddress;
+        _transferOwnership(initialOwner);
+    }
+
+    /* ============== EXTERNAL FUNCTIONS ============== */
 
     /**
      * @notice Payable fallback function that receives ether deposited to the ByzFiNativeSymbioticVault contract
@@ -19,11 +45,10 @@ contract ByzFiNativeSymbioticVault is Initializable, OwnableUpgradeable, ERC7535
     }
 
     /**
-     * @notice Used to initialize the ByzFiNativeSymbioticVault given it's setup parameters.
-     * @param _vaultAddress The address of the vault that this ByzFiNativeSymbioticVault is associated with.
+     * @notice Whitelists the StakingMinivault contract to be able to deposit ETH into the Symbiotic Vault
      */
-    function initialize(address _vaultAddress) external initializer {
-        vault = IVault(_vaultAddress);
+    function whitelistDepositors() external onlyOwner {
+        vault.setDepositorWhitelistStatus(stakingMinivault, true); 
     }
 
     /**
