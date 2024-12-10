@@ -5,17 +5,18 @@ import {Test, console} from "forge-std/Test.sol";
 import {SymbioticVaultFactory} from "../src/core/symbiotic/SymbioticVaultFactory.sol";
 import {ISymbioticVaultFactory} from "../src/interfaces/ISymbioticVaultFactory.sol";
 import {IBurnerRouter} from "@symbioticfi/burners/src/interfaces/router/IBurnerRouter.sol";
+import {ByzFiNativeSymbioticVault} from "../src/vault/symbiotic/ByzFiNativeSymbioticVault.sol";
 
-contract SymbioticVaultFactoryTest is Test{
+contract SymbioticVaultFactoryTest is Test {
     uint256 holeskyFork;
     string HOLESKY_RPC_URL = vm.envString("HOLESKY_RPC_URL");
 
     SymbioticVaultFactory symbioticVaultFactory;
 
     // Define the addresses required for the constructor
-    address public BURNER_ROUTER_FACTORY = 0x32e2AfbdAffB1e675898ABA75868d92eE1E68f3b;
-    address public VAULT_CONFIGURATOR = 0xD2191FE92987171691d552C219b8caEf186eb9cA;
-    address public DEFAULT_STAKER_REWARDS_FACTORY = 0x698C36DE44D73AEfa3F0Ce3c0255A8667bdE7cFD;
+    address public BURNER_ROUTER_FACTORY = 0x32e2AfbdAffB1e675898ABA75868d92eE1E68f3b; // deployed on holesky   
+    address public VAULT_CONFIGURATOR = 0xD2191FE92987171691d552C219b8caEf186eb9cA; // deployed on holesky
+    address public DEFAULT_STAKER_REWARDS_FACTORY = 0x698C36DE44D73AEfa3F0Ce3c0255A8667bdE7cFD; // deployed on holesky
     address public STAKING_MINIVAULT = vm.addr(1); 
 
     // Parameters for the createAdvancedVault function
@@ -30,6 +31,9 @@ contract SymbioticVaultFactoryTest is Test{
     address public receiver1 = vm.addr(7);
     address public receiver2 = vm.addr(8);
 
+    address alice = vm.addr(9);
+    // vm.deal(alice, 1000 ether);
+
     function setUp() public {
         holeskyFork = vm.createFork(HOLESKY_RPC_URL);
         vm.selectFork(holeskyFork);
@@ -39,8 +43,7 @@ contract SymbioticVaultFactoryTest is Test{
         symbioticVaultFactory = new SymbioticVaultFactory(
             BURNER_ROUTER_FACTORY,
             VAULT_CONFIGURATOR,
-            DEFAULT_STAKER_REWARDS_FACTORY,
-            STAKING_MINIVAULT
+            DEFAULT_STAKER_REWARDS_FACTORY
         );
     }
 
@@ -49,67 +52,22 @@ contract SymbioticVaultFactoryTest is Test{
         vm.selectFork(holeskyFork);
         assertEq(vm.activeFork(), holeskyFork);
     }
-    
+
     function test_createAdvancedVault() public {
-        // Define the parameters for the createAdvancedVault function
-        ISymbioticVaultFactory.BurnerRouterParams memory burnerRouterParams = ISymbioticVaultFactory.BurnerRouterParams({
-            owner: OWNER,
-            collateral: COLLATERAL,
-            delay: DELAY,
-            globalReceiver: GLOBAL_RECEIVER,
-            networkReceivers: new IBurnerRouter.NetworkReceiver[](2), // Initialize with correct struct type
-            operatorNetworkReceivers: new IBurnerRouter.OperatorNetworkReceiver[](2) // Initialize with correct struct type
-        });
-
-        // Initialize networkReceivers and operatorNetworkReceivers with actual values
-        burnerRouterParams.networkReceivers[0] = IBurnerRouter.NetworkReceiver({network: network1, receiver: receiver1});
-        burnerRouterParams.networkReceivers[1] = IBurnerRouter.NetworkReceiver({network: network2, receiver: receiver2});
-        burnerRouterParams.operatorNetworkReceivers[0] = IBurnerRouter.OperatorNetworkReceiver({network: network1, operator: operator1, receiver: receiver1});
-        burnerRouterParams.operatorNetworkReceivers[1] = IBurnerRouter.OperatorNetworkReceiver({network: network2, operator: operator2, receiver: receiver2});
-
-        ISymbioticVaultFactory.VaultParams memory vaultParams = ISymbioticVaultFactory.VaultParams({
-            collateral: COLLATERAL,
-            burnerRouter: address(0), 
-            epochDuration: 7 days,
-            depositWhitelist: true,
-            isDepositLimit: false,
-            depositLimit: 0,
-            defaultAdminRoleHolder: OWNER,
-            depositWhitelistSetRoleHolder: OWNER,
-            depositorWhitelistRoleHolder: address(symbioticVaultFactory),
-            isDepositLimitSetRoleHolder: OWNER,
-            depositLimitSetRoleHolder: OWNER
-        });
-
-        ISymbioticVaultFactory.DelegatorParams memory delegatorParams = ISymbioticVaultFactory.DelegatorParams({
-            defaultAdminRoleHolder: OWNER,
-            hook: address(0),
-            hookSetRoleHolder: OWNER,
-            networkLimitSetRoleHolders: new address[](0), // Explicitly define as address array
-            operatorNetworkSharesSetRoleHolders: new address[](0) // Explicitly define as address array
-        });
-
-        ISymbioticVaultFactory.SlasherParams memory slasherParams = ISymbioticVaultFactory.SlasherParams({
-            isBurnerHook: false
-        });
-
-        uint64 slasherIndex = 0; 
-
-        ISymbioticVaultFactory.StakerRewardsParams memory stakerRewardsParams = ISymbioticVaultFactory.StakerRewardsParams({
-            vault: address(0), 
-            adminFee: 100, 
-            defaultAdminRoleHolder: OWNER,
-            adminFeeClaimRoleHolder: OWNER,
-            adminFeeSetRoleHolder: OWNER
-        });
+        ISymbioticVaultFactory.BurnerRouterParams memory burnerRouterParams = createBurnerRouterParams();
+        ISymbioticVaultFactory.VaultConfiguratorParams memory configuratorParams = createConfiguratorParams();
+        ISymbioticVaultFactory.VaultParams memory vaultParams = createVaultParams();
+        ISymbioticVaultFactory.DelegatorParams memory delegatorParams = createDelegatorParams();
+        ISymbioticVaultFactory.SlasherParams memory slasherParams = createSlasherParams();
+        ISymbioticVaultFactory.StakerRewardsParams memory stakerRewardsParams = createStakerRewardsParams();
 
         // Call the createAdvancedVault function
-        (address vault, address delegator, address slasher, address defaultStakerRewards, address payable byzFiNativeSymbioticVault) = symbioticVaultFactory.createAdvancedVault(
+        (address vault, address delegator, address slasher, address defaultStakerRewards, address payable byzFiNativeSymbioticVault, address stakingMinivault) = symbioticVaultFactory.createAdvancedVault(
             burnerRouterParams,
+            configuratorParams,
             vaultParams,
             delegatorParams,
             slasherParams,
-            slasherIndex,
             stakerRewardsParams
         );
 
@@ -124,6 +82,63 @@ contract SymbioticVaultFactoryTest is Test{
         console.log("slasher", slasher);
         console.log("defaultStakerRewards", defaultStakerRewards);
         console.log("byzFiNativeSymbioticVault", byzFiNativeSymbioticVault);    
+
+        // Verifiy if the ByzFiNativeSymbioticVault is initialized with the correct vault address
+        address vaultAddr = address(ByzFiNativeSymbioticVault(byzFiNativeSymbioticVault).vault());
+        assertEq(vaultAddr, vault);
     }
 
+    function test_deposit() public {
+        // TODO To complete
+    }
+
+    function createBurnerRouterParams() internal view returns (ISymbioticVaultFactory.BurnerRouterParams memory) {
+        ISymbioticVaultFactory.BurnerRouterParams memory params = ISymbioticVaultFactory.BurnerRouterParams({
+            delay: DELAY,
+            globalReceiver: GLOBAL_RECEIVER,
+            networkReceivers: new IBurnerRouter.NetworkReceiver[](2), 
+            operatorNetworkReceivers: new IBurnerRouter.OperatorNetworkReceiver[](2) 
+        });
+
+        params.networkReceivers[0] = IBurnerRouter.NetworkReceiver({network: network1, receiver: receiver1});
+        params.networkReceivers[1] = IBurnerRouter.NetworkReceiver({network: network2, receiver: receiver2});
+        params.operatorNetworkReceivers[0] = IBurnerRouter.OperatorNetworkReceiver({network: network1, operator: operator1, receiver: receiver1});
+        params.operatorNetworkReceivers[1] = IBurnerRouter.OperatorNetworkReceiver({network: network2, operator: operator2, receiver: receiver2});
+
+        return params;
+    }
+
+    function createConfiguratorParams() internal view returns (ISymbioticVaultFactory.VaultConfiguratorParams memory) {
+        return ISymbioticVaultFactory.VaultConfiguratorParams({
+            delegatorIndex: 0,
+            slasherIndex: 1
+        });
+    }
+
+    function createVaultParams() internal view returns (ISymbioticVaultFactory.VaultParams memory) {
+        return ISymbioticVaultFactory.VaultParams({
+            epochDuration: 7 days,
+            isDepositLimit: false,
+            depositLimit: 0
+        });
+    }
+
+    function createDelegatorParams() internal view returns (ISymbioticVaultFactory.DelegatorParams memory) {
+        return ISymbioticVaultFactory.DelegatorParams({
+            hook: address(0),
+            hookSetRoleHolder: address(symbioticVaultFactory)
+        });
+    }
+
+    function createSlasherParams() internal view returns (ISymbioticVaultFactory.SlasherParams memory) {
+        return ISymbioticVaultFactory.SlasherParams({
+            isBurnerHook: false
+        });
+    }
+
+    function createStakerRewardsParams() internal view returns (ISymbioticVaultFactory.StakerRewardsParams memory) {
+        return ISymbioticVaultFactory.StakerRewardsParams({
+            adminFee: 100
+        });
+    }
 }
