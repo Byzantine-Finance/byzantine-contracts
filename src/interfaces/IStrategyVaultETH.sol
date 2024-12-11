@@ -52,13 +52,16 @@ interface IStrategyVaultETH is IStrategyVault, IERC7535Upgradeable {
    * @param validatorFieldsProofs proofs of each validator's `validatorFields` against the beacon state root
    * @param validatorFields the fields of the beacon chain "Validator" container. See consensus specs for
    * details: https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/beacon-chain.md#validator
+   * @param clusterIds The IDs of the clusters associated to these proofs.
+   * @dev Revert if the number of cluster IDs and proofs mismatch.
    */
   function verifyWithdrawalCredentials(
       uint64 beaconTimestamp,
       BeaconChainProofs.StateRootProof calldata stateRootProof,
       uint40[] calldata validatorIndices,
       bytes[] calldata validatorFieldsProofs,
-      bytes32[][] calldata validatorFields
+      bytes32[][] calldata validatorFields,
+      bytes32[] calldata clusterIds
   ) external;
 
   /**
@@ -157,4 +160,6 @@ interface IStrategyVaultETH is IStrategyVault, IERC7535Upgradeable {
     /// @dev Returned when trying to interact with a cluster ID not in the vault
     error ClusterNotInVault();
 
+    /// @dev Returned when the number of cluster IDs and proofs mismatch in `verifyWithdrawalCredentials`
+    error NumberOfClusterIDsAndProofsMismatch();
 }

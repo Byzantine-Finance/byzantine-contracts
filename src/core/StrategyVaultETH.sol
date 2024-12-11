@@ -163,14 +163,19 @@ contract StrategyVaultETH is StrategyVaultETHStorage, ERC7535MultiRewardVault {
      * @param validatorFieldsProofs proofs of each validator's `validatorFields` against the beacon state root
      * @param validatorFields the fields of the beacon chain "Validator" container. See consensus specs for
      * details: https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/beacon-chain.md#validator
+     * @param clusterIds The IDs of the clusters associated to these proofs.
+     * @dev Revert if the number of cluster IDs and proofs mismatch.
      */
     function verifyWithdrawalCredentials(
         uint64 beaconTimestamp,
         BeaconChainProofs.StateRootProof calldata stateRootProof,
         uint40[] calldata validatorIndices,
         bytes[] calldata validatorFieldsProofs,
-        bytes32[][] calldata validatorFields
+        bytes32[][] calldata validatorFields,
+        bytes32[] calldata clusterIds
     ) external {
+
+        if (clusterIds.length != validatorIndices.length) revert NumberOfClusterIDsAndProofsMismatch();
 
         IEigenPod myPod = eigenPodManager.ownerToPod(address(this));
 
@@ -181,6 +186,14 @@ contract StrategyVaultETH is StrategyVaultETHStorage, ERC7535MultiRewardVault {
             validatorFieldsProofs,
             validatorFields
         );
+
+        // Change the clusters status to VERIFIED
+        for (uint256 i; i < clusterIds.length;) {
+            auction.updateClusterStatus(clusterIds[i], IAuction.ClusterStatus.VERIFIED);
+            unchecked {
+                i++;
+            }
+        }
     }
 
     /**
