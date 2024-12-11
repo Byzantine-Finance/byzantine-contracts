@@ -42,7 +42,7 @@ contract StrategyVaultERC20 is Initializable, StrategyVaultERC20Storage, ERC4626
     /**
      * @notice Used to initialize the StrategyVault given it's setup parameters.
      * @param _nftId The id of the ByzNft associated to this StrategyVault.
-     * @param _token The address of the token to be staked.
+     * @param _token The address of the token to be staked. 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE if staking ETH.
      * @param _whitelistedDeposit Whether the deposit function is whitelisted or not.
      * @param _upgradeable Whether the StrategyVault is upgradeable or not.
      * @param _oracle The oracle implementation to use for the vault.
@@ -56,7 +56,7 @@ contract StrategyVaultERC20 is Initializable, StrategyVaultERC20Storage, ERC4626
         upgradeable = _upgradeable;
 
         // Initialize the ERC4626MultiRewardVault
-        ERC4626MultiRewardVault.initialize(_oracle, _token);
+        ERC4626MultiRewardVault.initialize(IERC20MetadataUpgradeable(_token), _oracle);
 
         // If contract is not upgradeable, disable initialization (removing ability to upgrade contract)
         if (!_upgradeable) {
@@ -70,7 +70,7 @@ contract StrategyVaultERC20 is Initializable, StrategyVaultERC20Storage, ERC4626
      * @notice Payable fallback function that receives ether deposited to the StrategyVault contract
      * @dev Strategy Vault is the address where to send the principal ethers post exit.
      */
-    receive() external override payable {
+    receive() external payable {
         // TODO: emit an event to notify
     }
 

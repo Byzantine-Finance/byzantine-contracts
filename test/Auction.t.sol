@@ -332,13 +332,10 @@ contract AuctionTest is ByzantineDeployer {
         bytes32[] memory bidIds = _createMultipleBids();
 
         // nodeOps[3] updates its bid
-        bytes32 newBidId = _nodeOpUpdateBid(nodeOps[3], bidIds[8], 1375, 129);
-
-        // Verify updated bidDetails mapping has been deleted
-        assertEq(auction.getBidDetails(bidIds[8]).vcNumber, 0);
+        _nodeOpUpdateBid(nodeOps[3], bidIds[8], 1375, 129);
 
         // Verify the new bidId has been added to the bidDetails mapping
-        IAuction.BidDetails memory newBidDetails = auction.getBidDetails(newBidId);
+        IAuction.BidDetails memory newBidDetails = auction.getBidDetails(bidIds[8]);
         assertEq(newBidDetails.auctionScore, auctionScore_1375_129);
         assertEq(newBidDetails.bidPrice, bidPrice_1375_129);
         assertEq(newBidDetails.nodeOp, nodeOps[3]);
@@ -353,7 +350,7 @@ contract AuctionTest is ByzantineDeployer {
 
         /* ============= Number 1 (nodeOps[3]) downbids to exit the winner set ============= */
 
-        bytes32 newBidId1 = _nodeOpUpdateBid(nodeOps[3], bidIds[8], 5e2, 149);
+        _nodeOpUpdateBid(nodeOps[3], bidIds[8], 5e2, 149);
 
         // Get the winning cluster Id
         (bytes32 winningClusterId,) = auction.getWinningCluster();
@@ -364,11 +361,8 @@ contract AuctionTest is ByzantineDeployer {
         assertEq(nodesAddr[2], nodeOps[4]);
         assertEq(nodesAddr[3], nodeOps[2]);
 
-        // Verify updated bidId mapping has been deleted
-        assertEq(auction.getBidDetails(bidIds[8]).vcNumber, 0);
-
         /* ============= Number last (nodeOps[5]) outbids to be in the winner set ============= */
-        bytes32 newBidId2 = _nodeOpUpdateBid(nodeOps[5], bidIds[10], 2e2, 500);
+        _nodeOpUpdateBid(nodeOps[5], bidIds[10], 2e2, 500);
 
         // Get the winning cluster Id
         (winningClusterId,) = auction.getWinningCluster();
@@ -578,11 +572,11 @@ contract AuctionTest is ByzantineDeployer {
         bytes32 _bidId,
         uint16 _newDiscountRate,
         uint32 _newTimeInDays
-    ) internal returns (bytes32) {
+    ) internal {
         // Get price to pay
         uint256 priceToAdd = auction.getUpdateBidPrice(_nodeOp, _bidId, _newDiscountRate, _newTimeInDays);
         vm.prank(_nodeOp);
-        return auction.updateBid{value: priceToAdd}(_bidId, _newDiscountRate, _newTimeInDays);
+        auction.updateBid{value: priceToAdd}(_bidId, _newDiscountRate, _newTimeInDays);
     }
 
     function _getBidIdAuctionScore(bytes32 _bidId) internal view returns (uint256) {

@@ -31,5 +31,4 @@ contract API3OracleImplementationTest is Test {
         assertTrue(price > 0, "Price should be greater than 0");
         assertTrue(price < 1e23, "Price should be less than $100,000");
     }
-
 }
