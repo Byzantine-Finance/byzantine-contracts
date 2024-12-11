@@ -1,6 +1,7 @@
 @openzeppelin-upgrades/=lib/openzeppelin-contracts-upgradeable/
+@openzeppelin-v5.1.0/=lib/openzeppelin-contracts-v5.1.0/
 @openzeppelin/=lib/openzeppelin-contracts/
-@openzeppelin-v4.9.3/=lib/openzeppelin-contracts-v4.9.3/
+@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/
 eigenlayer-contracts/=lib/eigenlayer-contracts/src/contracts/
 splits-v2/=lib/splits-contracts-v2/packages/splits-v2/src/
 ds-test/=lib/ds-test/src/
