@@ -145,15 +145,12 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
      * @param owner The address that is withdrawing ETH.
      * return The amount of ETH withdrawn (includes ETH + ETH value of all reward tokens).
      */
-    function redeem(uint256 shares, address receiver, address owner) public override nonReentrant returns (uint256) {
-        // Calculate the proportion of shares the user owns
-        uint256 userShareProportion = (balanceOf(owner) * 1e18) / totalSupply();
-        
+    function redeem(uint256 shares, address receiver, address owner) public override nonReentrant returns (uint256) {       
         // Calculate the proportion of shares the user is redeeming
         uint256 userWithdrawProportion = (shares * 1e18) / balanceOf(owner);
 
         // Get user's owned assets and rewards 
-        (address[] memory tokenAddresses, uint256[] memory tokenAmounts) = getUsersOwnedAssetsAndRewards(owner);
+        (, uint256[] memory tokenAmounts) = getUsersOwnedAssetsAndRewards(owner);
 
         // Calculate amount of ETH user is withdrawing
         uint256 ethToWithdraw = (tokenAmounts[0] * userWithdrawProportion) / 1e18;
