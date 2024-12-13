@@ -20,6 +20,8 @@ import "../src/interfaces/IAuction.sol";
 import "../src/core/StrategyVaultETH.sol";
 import "../src/interfaces/IStakerRewards.sol";
 
+import "./mocks/MockOracle.sol";
+
 import {console} from "forge-std/console.sol";
 
 contract StakerRewardsTest is ProofParsing, ByzantineDeployer {
@@ -28,6 +30,9 @@ contract StakerRewardsTest is ProofParsing, ByzantineDeployer {
 
     /// @notice Array of all the bid ids
     bytes32[] internal bidId;
+
+    /// @notice Mock oracle to simulate the price of ETH
+    MockOracle public oracle;
 
     /// @notice Random validator deposit data (simulates a Byzantine DV)
     bytes private pubkey;
@@ -40,6 +45,9 @@ contract StakerRewardsTest is ProofParsing, ByzantineDeployer {
     function setUp() public override {
         // deploy locally EigenLayer and Byzantine contracts
         ByzantineDeployer.setUp();
+
+        // Deploy the mock oracle
+        oracle = new MockOracle();
 
         // Set forwarder address
         vm.prank(address(strategyVaultManager));
@@ -732,7 +740,7 @@ contract StakerRewardsTest is ProofParsing, ByzantineDeployer {
 
     function _createStratVaultETHAndStake(address _staker, uint256 _amount) internal returns (IStrategyVaultETH) {
         vm.prank(_staker);
-        IStrategyVaultETH stratVaultETH = IStrategyVaultETH(strategyVaultManager.createStratVaultAndStakeNativeETH{value: _amount}(true, true, ELOperator1, address(0), _staker));
+        IStrategyVaultETH stratVaultETH = IStrategyVaultETH(strategyVaultManager.createStratVaultAndStakeNativeETH{value: _amount}(true, true, ELOperator1, address(oracle), _staker));
         return stratVaultETH;
     }
 

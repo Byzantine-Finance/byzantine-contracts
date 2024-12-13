@@ -1,3 +1,4 @@
+@openzeppelin-upgrades-v5.1.0/=lib/openzeppelin-contracts-upgradeable-v5.1.0/
 @openzeppelin-upgrades/=lib/openzeppelin-contracts-upgradeable/
 @openzeppelin-v5.1.0/=lib/openzeppelin-contracts-v5.1.0/
 @openzeppelin/=lib/openzeppelin-contracts/
