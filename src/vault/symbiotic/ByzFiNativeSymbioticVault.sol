@@ -55,19 +55,19 @@ contract ByzFiNativeSymbioticVault is Initializable, OwnableUpgradeable, ERC7535
      * @notice Deposits ETH into the vault. Amount is determined by ETH depositing.
      * @param assets The amount of ETH being deposit.
      * @param receiver The address to receive the Native Restaking Vaultshares (NRVS).
-     * @return The amount of shares minted.
+     * @return The amount of NRVS shares minted.
      */
     function deposit(uint256 assets, address receiver) public virtual override payable returns (uint256) {
         // Deposit ETH into the vault to receive NRVS
-        uint256 shares = super.deposit(assets, receiver);
+        uint256 nrvShares = super.deposit(assets, receiver);
 
         // Send the ETH to the Staking Minivault to be staked on the beacon chain and mint the corresponding Staking vaultshares (SVS) 
-        // TODO: implement
+        uint256 svShares = StakingMinivault(stakingMinivault).deposit{value: assets}(assets, receiver);
 
         // Restake the SVS into the Symbiotic Vault
         // TODO: implement
         
-        return shares;
+        return nrvsShares;
     }
 
     /**
@@ -81,7 +81,7 @@ contract ByzFiNativeSymbioticVault is Initializable, OwnableUpgradeable, ERC7535
         uint256 assets = super.mint(shares, receiver);
 
         // Send the ETH to the Staking Minivault to be staked on the beacon chain and mint the corresponding Staking vaultshares (SVS) 
-        // TODO: implement
+        uint256 stakingAssets = StakingMinivault(stakingMinivault).mint{value: assets}(shares, receiver);
 
         // Restake the SVS into the Symbiotic Vault
         // TODO: implement
