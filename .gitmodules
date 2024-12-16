@@ -31,3 +31,7 @@
 [submodule "lib/symbiotic-rewards"]
 	path = lib/symbiotic-rewards
 	url = https://github.com/symbioticfi/rewards
+[submodule "lib/obol-splits"]
+	path = lib/obol-splits
+	url = https://github.com/ObolNetwork/obol-splits
+	branch = feat/symbioticfi
