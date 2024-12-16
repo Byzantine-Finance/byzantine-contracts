@@ -12,3 +12,4 @@ chainlink/=lib/foundry-chainlink-toolkit/lib/chainlink-brownie-contracts/contrac
 @symbioticfi/symbiotic-core/src/contracts/=lib/symbiotic-core/src/contracts/
 @symbioticfi/symbiotic-core/src/interfaces/=lib/symbiotic-core/src/interfaces/
 @symbioticfi/symbiotic-core/test/mocks/=lib/symbiotic-core/test/mocks/
+obol-splits/=lib/obol-splits/src/

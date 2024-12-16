@@ -2,11 +2,25 @@
 pragma solidity ^0.8.20;
 
 import {ERC7535Upgradeable} from "../ERC7535/ERC7535Upgradeable.sol";
-import {IAuction} from "../interfaces/IAuction.sol";
-import {ISymPodFactory} from "../symbiotic/interfaces/ISymPodFactory.sol";
-import {ISymPod} from "../symbiotic/interfaces/ISymPod.sol";
-import {BeaconChainProofs} from "../libraries/BeaconChainProofs.sol";
-import {FIFOLib} from "../libraries/FIFOLib.sol";
+import {IAuction} from "../../interfaces/IAuction.sol";
+import {ISymPod} from "obol-splits/interfaces/ISymPod.sol";
+import {FIFOLib} from "../../libraries/FIFOLib.sol";
+
+interface ISymPodFactory {
+    function createSymPod(
+        string memory podName,
+        string memory podSymbol,
+        address slasher,
+        address admin,
+        address withdrawalAddress,
+        address recoveryRecipient
+    ) external returns (address symPod);
+    error SymPodFactory__InvalidAdmin();
+    error SymPodFactory__InvalidWithdrawalRecipient();
+    error SymPodFactory__InvalidRecoveryRecipient();
+
+    event CreateSymPod(address symPod);
+}
 
 /**
  * @title StakingMinivault
@@ -14,7 +28,6 @@ import {FIFOLib} from "../libraries/FIFOLib.sol";
  * @notice ERC7535 vault for staking ETH through SymPod
  */
 contract StakingMinivault is ERC7535Upgradeable {
-    using BeaconChainProofs for bytes32[];
     using FIFOLib for FIFOLib.FIFO;
 
     /* =================== MODIFIERS =================== */
@@ -73,55 +86,42 @@ contract StakingMinivault is ERC7535Upgradeable {
     /* =================== CONSTRUCTOR & INITIALIZER =================== */
     
         /// @custom:oz-upgrades-unsafe-allow constructor
-    constructor() {
+    constructor(
+        address _symPodFactory,
+        address _auction,
+        address _beaconChainAdmin
+    ) {
+        symPodFactory = ISymPodFactory(_symPodFactory);
+        auction = IAuction(_auction);
+        beaconChainAdmin = _beaconChainAdmin;
         _disableInitializers();
     }
 
     function initialize(
-        address _symPodFactory,
-        address _auction, 
-        address _beaconChainAdmin,
         bool _whitelistedDeposit,
         address _creator
     ) external initializer {
         __StakingMinivault_init(
-            _symPodFactory,
-            _auction,
-            _beaconChainAdmin,
             _whitelistedDeposit,
             _creator
         );
     }
 
     function __StakingMinivault_init(
-        address _symPodFactory,
-        address _auction,
-        address _beaconChainAdmin,
         bool _whitelistedDeposit,
         address _creator
     ) internal onlyInitializing {
         __ERC7535_init();
         __StakingMinivault_init_unchained(
-            _symPodFactory,
-            _auction,
-            _beaconChainAdmin,
             _whitelistedDeposit,
             _creator
         );
     }
 
     function __StakingMinivault_init_unchained(
-        address _symPodFactory,
-        address _auction,
-        address _beaconChainAdmin,
         bool _whitelistedDeposit,
         address _creator
     ) internal onlyInitializing {
-        // Set the contract references
-        symPodFactory = ISymPodFactory(_symPodFactory);
-        auction = IAuction(_auction);
-        beaconChainAdmin = _beaconChainAdmin;
-
         // Initialize SymPod
         symPod = ISymPod(symPodFactory.createSymPod(
             "ByzFi Staking Pod",

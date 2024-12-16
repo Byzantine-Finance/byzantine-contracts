@@ -16,7 +16,7 @@ contract ByzFiNativeSymbioticVault is Initializable, OwnableUpgradeable, ERC7535
     IVault public vault;
 
     /// @notice The StakingMinivault contract address
-    address public stakingMinivault;
+    address payable public stakingMinivault;
 
     /* ============== CONSTRUCTOR & INITIALIZER ============== */
 
@@ -29,17 +29,11 @@ contract ByzFiNativeSymbioticVault is Initializable, OwnableUpgradeable, ERC7535
     function initialize(
         address initialOwner, 
         address _vaultAddress,
-        address _symPodFactory,
-        address _auction,
-        address _beaconChainAdmin,
         bool _whitelistedDeposit
     ) external initializer {
         __ByzFiNativeSymbioticVault_init(
             initialOwner,
             _vaultAddress,
-            _symPodFactory,
-            _auction,
-            _beaconChainAdmin,
             _whitelistedDeposit
         );
     }
@@ -47,9 +41,6 @@ contract ByzFiNativeSymbioticVault is Initializable, OwnableUpgradeable, ERC7535
     function __ByzFiNativeSymbioticVault_init(
         address initialOwner,
         address _vaultAddress,
-        address _symPodFactory,
-        address _auction,
-        address _beaconChainAdmin,
         bool _whitelistedDeposit
     ) internal onlyInitializing {
         // Initialize parent contracts
@@ -60,9 +51,6 @@ contract ByzFiNativeSymbioticVault is Initializable, OwnableUpgradeable, ERC7535
         __ByzFiNativeSymbioticVault_init_unchained(
             initialOwner,
             _vaultAddress,
-            _symPodFactory,
-            _auction,
-            _beaconChainAdmin,
             _whitelistedDeposit
         );
     }
@@ -70,20 +58,18 @@ contract ByzFiNativeSymbioticVault is Initializable, OwnableUpgradeable, ERC7535
     function __ByzFiNativeSymbioticVault_init_unchained(
         address initialOwner,
         address _vaultAddress,
-        address _symPodFactory,
-        address _auction,
-        address _beaconChainAdmin,
         bool _whitelistedDeposit
     ) internal onlyInitializing {
         // Set vault reference
         vault = IVault(_vaultAddress);
 
         // Deploy and initialize StakingMinivault
-        stakingMinivault = new StakingMinivault();
-        stakingMinivault.initialize(
-            _symPodFactory,
-            _auction,
-            _beaconChainAdmin,
+        stakingMinivault = payable(address(new StakingMinivault(
+            address(0),                 // _symPodFactory (mock)
+            address(0),                 // _auction (mock)
+            address(0)                  // _beaconChainAdmin (mock)
+        )));
+        StakingMinivault(stakingMinivault).initialize(
             _whitelistedDeposit,
             initialOwner
         );
