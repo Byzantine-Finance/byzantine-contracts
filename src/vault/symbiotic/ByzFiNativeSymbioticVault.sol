@@ -6,7 +6,7 @@ import {OwnableUpgradeable} from "@openzeppelin-upgrades/contracts/access/Ownabl
 import "../ERC7535/ERC7535Upgradeable.sol";
 
 import {IVault} from "@symbioticfi/core/src/interfaces/vault/IVault.sol";
-import {StakingMinivaultMock} from "../../../test/mocks/StakingMinivaultMock.sol";
+import {StakingMinivault} from "./StakingMinivault.sol";
 
 contract ByzFiNativeSymbioticVault is Initializable, OwnableUpgradeable, ERC7535Upgradeable {
 
@@ -26,12 +26,69 @@ contract ByzFiNativeSymbioticVault is Initializable, OwnableUpgradeable, ERC7535
         _disableInitializers();
     }
 
-    /**
-     * @dev Initializes the address of the initial owner, the vault address, and the staking minivault address
-     */
-    function initialize(address initialOwner, address _vaultAddress, address _stakingMinivaultAddress) external initializer {
+    function initialize(
+        address initialOwner, 
+        address _vaultAddress,
+        address _symPodFactory,
+        address _auction,
+        address _beaconChainAdmin,
+        bool _whitelistedDeposit
+    ) external initializer {
+        __ByzFiNativeSymbioticVault_init(
+            initialOwner,
+            _vaultAddress,
+            _symPodFactory,
+            _auction,
+            _beaconChainAdmin,
+            _whitelistedDeposit
+        );
+    }
+
+    function __ByzFiNativeSymbioticVault_init(
+        address initialOwner,
+        address _vaultAddress,
+        address _symPodFactory,
+        address _auction,
+        address _beaconChainAdmin,
+        bool _whitelistedDeposit
+    ) internal onlyInitializing {
+        // Initialize parent contracts
+        __Ownable_init();
+        __ERC7535_init();
+
+        // Initialize the contract
+        __ByzFiNativeSymbioticVault_init_unchained(
+            initialOwner,
+            _vaultAddress,
+            _symPodFactory,
+            _auction,
+            _beaconChainAdmin,
+            _whitelistedDeposit
+        );
+    }
+
+    function __ByzFiNativeSymbioticVault_init_unchained(
+        address initialOwner,
+        address _vaultAddress,
+        address _symPodFactory,
+        address _auction,
+        address _beaconChainAdmin,
+        bool _whitelistedDeposit
+    ) internal onlyInitializing {
+        // Set vault reference
         vault = IVault(_vaultAddress);
-        stakingMinivault = _stakingMinivaultAddress;
+
+        // Deploy and initialize StakingMinivault
+        stakingMinivault = new StakingMinivault();
+        stakingMinivault.initialize(
+            _symPodFactory,
+            _auction,
+            _beaconChainAdmin,
+            _whitelistedDeposit,
+            initialOwner
+        );
+
+        // Transfer ownership
         _transferOwnership(initialOwner);
     }
 

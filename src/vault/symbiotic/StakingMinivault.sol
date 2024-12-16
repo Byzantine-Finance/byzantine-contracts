@@ -72,32 +72,57 @@ contract StakingMinivault is ERC7535Upgradeable {
 
     /* =================== CONSTRUCTOR & INITIALIZER =================== */
     
-    /// @custom:oz-upgrades-unsafe-allow constructor
-    constructor(
-        address _symPodFactory,
-        address _auction,
-        address _beaconChainAdmin
-    ) {
-        symPodFactory = ISymPodFactory(_symPodFactory);
-        auction = IAuction(_auction);
-        beaconChainAdmin = _beaconChainAdmin;
+        /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
         _disableInitializers();
     }
 
     function initialize(
+        address _symPodFactory,
+        address _auction, 
+        address _beaconChainAdmin,
         bool _whitelistedDeposit,
         address _creator
     ) external initializer {
-        __ERC7535_init();
-        __StakingMinivault_init(_whitelistedDeposit, _creator);
+        __StakingMinivault_init(
+            _symPodFactory,
+            _auction,
+            _beaconChainAdmin,
+            _whitelistedDeposit,
+            _creator
+        );
     }
 
     function __StakingMinivault_init(
+        address _symPodFactory,
+        address _auction,
+        address _beaconChainAdmin,
         bool _whitelistedDeposit,
         address _creator
     ) internal onlyInitializing {
+        __ERC7535_init();
+        __StakingMinivault_init_unchained(
+            _symPodFactory,
+            _auction,
+            _beaconChainAdmin,
+            _whitelistedDeposit,
+            _creator
+        );
+    }
 
-        // Initialize parent contracts (SymPod)
+    function __StakingMinivault_init_unchained(
+        address _symPodFactory,
+        address _auction,
+        address _beaconChainAdmin,
+        bool _whitelistedDeposit,
+        address _creator
+    ) internal onlyInitializing {
+        // Set the contract references
+        symPodFactory = ISymPodFactory(_symPodFactory);
+        auction = IAuction(_auction);
+        beaconChainAdmin = _beaconChainAdmin;
+
+        // Initialize SymPod
         symPod = ISymPod(symPodFactory.createSymPod(
             "ByzFi Staking Pod",
             "bSTK",
@@ -107,14 +132,7 @@ contract StakingMinivault is ERC7535Upgradeable {
             address(this)
         ));
 
-        // Initialize state variables
-        __StakingMinivault_init_unchained(_whitelistedDeposit, _creator);
-    }
-
-    function __StakingMinivault_init_unchained(
-        bool _whitelistedDeposit,
-        address _creator
-    ) internal onlyInitializing {
+        // Initialize whitelist settings
         whitelistedDeposit = _whitelistedDeposit;
         if (_whitelistedDeposit) {
             isWhitelisted[_creator] = true;
