@@ -124,7 +124,7 @@ contract ByzFiNativeSymbioticVault is Initializable, OwnableUpgradeable, ERC7535
         // Restake the SVS into the Symbiotic Vault
         // TODO: implement
         
-        return nrvsShares;
+        return nrvShares;
     }
 
     /**
