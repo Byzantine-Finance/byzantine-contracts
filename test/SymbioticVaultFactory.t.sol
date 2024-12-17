@@ -132,7 +132,9 @@ contract SymbioticVaultFactoryTest is Test {
 
     function createSlasherParams() internal view returns (ISymbioticVaultFactory.SlasherParams memory) {
         return ISymbioticVaultFactory.SlasherParams({
-            isBurnerHook: false
+            isBurnerHook: true,
+            vetoDuration: 2 days,
+            resolverSetEpochsDelay: 10
         });
     }
 
