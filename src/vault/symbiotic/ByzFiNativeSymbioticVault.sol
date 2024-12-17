@@ -20,11 +20,11 @@ contract ByzFiNativeSymbioticVault is Initializable, OwnableUpgradeable, ERC7535
 
     /* ============== CONSTRUCTOR & INITIALIZER ============== */
 
-    /// @custom:oz-upgrades-unsafe-allow constructor
-    constructor() {
-        // Disable initializer in the context of the implementation contract
-        _disableInitializers();
-    }
+    // /// @custom:oz-upgrades-unsafe-allow constructor
+    // constructor() {
+    //     // Disable initializer in the context of the implementation contract
+    //     _disableInitializers();
+    // }
 
     /**
      * @dev Initializes the address of the initial owner, the vault address, and the staking minivault address
