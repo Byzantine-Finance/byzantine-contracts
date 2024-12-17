@@ -14,6 +14,7 @@ import {INetworkRestakeDelegator} from "@symbioticfi/core/src/interfaces/delegat
 import {IFullRestakeDelegator} from "@symbioticfi/core/src/interfaces/delegator/IFullRestakeDelegator.sol";
 import {IBaseSlasher} from "@symbioticfi/core/src/interfaces/slasher/IBaseSlasher.sol";
 import {ISlasher} from "@symbioticfi/core/src/interfaces/slasher/ISlasher.sol";
+import {IVetoSlasher} from "@symbioticfi/core/src/interfaces/slasher/IVetoSlasher.sol";
 import {ISymbioticVaultFactory} from "../../interfaces/ISymbioticVaultFactory.sol";
 import {IVault} from "@symbioticfi/core/src/interfaces/vault/IVault.sol";
 
@@ -103,7 +104,7 @@ contract SymbioticVaultFactory is Initializable, OwnableUpgradeable {
         ByzFiNativeSymbioticVault(byzFiNativeSymbioticVault).initialize(byzFiNativeSymbioticVault, vault, stakingMinivault);
 
         // Call whitelistDepositor from ByzFiNativeSymbioticVault to whitelist the StakingMinivault
-        ByzFiNativeSymbioticVault(byzFiNativeSymbioticVault).whitelistDepositors();
+        // ByzFiNativeSymbioticVault(byzFiNativeSymbioticVault).whitelistDepositors();
 
         return (vault, delegator, slasher, defaultStakerRewards, byzFiNativeSymbioticVault, stakingMinivault);
     }
@@ -165,7 +166,8 @@ contract SymbioticVaultFactory is Initializable, OwnableUpgradeable {
 
         // Initialize slasherInitParams
         bytes memory slasherInitParams = _initializeSlasherInitParams(
-            slasherParams
+            slasherParams,
+            configuratorParams.slasherIndex
         );
 
         uint64 delegatorIndex = configuratorParams.delegatorIndex;
@@ -279,14 +281,29 @@ contract SymbioticVaultFactory is Initializable, OwnableUpgradeable {
     }
 
     function _initializeSlasherInitParams(
-        ISymbioticVaultFactory.SlasherParams memory slasherParams
+        ISymbioticVaultFactory.SlasherParams memory slasherParams,
+        uint64 slasherIndex
     ) internal pure returns (bytes memory) {
+
+        // Initialize ISlasher.InitParams if slasherIndex is 0, otherwise initialize IVetoSlasher.InitParams
+        if (slasherIndex == 0) {
         return abi.encode(
-            ISlasher.InitParams({
-                baseParams: IBaseSlasher.BaseParams({
-                    isBurnerHook: slasherParams.isBurnerHook
+                ISlasher.InitParams({
+                    baseParams: IBaseSlasher.BaseParams({
+                        isBurnerHook: slasherParams.isBurnerHook
+                    })
                 })
-            })
-        );
+            );
+        } else {
+            return abi.encode(
+                IVetoSlasher.InitParams({
+                    baseParams: IBaseSlasher.BaseParams({
+                        isBurnerHook: slasherParams.isBurnerHook
+                    }),
+                    vetoDuration: slasherParams.vetoDuration,
+                    resolverSetEpochsDelay: slasherParams.resolverSetEpochsDelay
+                })
+            );
+        }
     }
 }

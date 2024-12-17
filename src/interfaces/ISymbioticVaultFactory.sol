@@ -53,6 +53,8 @@ interface ISymbioticVaultFactory {
     // Struct of parameters for slasher configuration
     struct SlasherParams {
         bool isBurnerHook;
+        uint48 vetoDuration;
+        uint256 resolverSetEpochsDelay;
     }
 
     // Struct of parameters for staker rewards configuration
