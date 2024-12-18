@@ -6,6 +6,7 @@ import {SymbioticVaultFactory} from "../src/core/symbiotic/SymbioticVaultFactory
 import {ISymbioticVaultFactory} from "../src/interfaces/ISymbioticVaultFactory.sol";
 import {IBurnerRouter} from "@symbioticfi/burners/src/interfaces/router/IBurnerRouter.sol";
 import {ByzFiNativeSymbioticVault} from "../src/vault/symbiotic/ByzFiNativeSymbioticVault.sol";
+import {IVault} from "@symbioticfi/core/src/interfaces/vault/IVault.sol";
 
 contract SymbioticVaultFactoryTest is Test {
     uint256 holeskyFork;
@@ -86,6 +87,14 @@ contract SymbioticVaultFactoryTest is Test {
         // Verifiy if the ByzFiNativeSymbioticVault is initialized with the correct vault address
         address vaultAddr = address(ByzFiNativeSymbioticVault(byzFiNativeSymbioticVault).vault());
         assertEq(vaultAddr, vault);
+
+        // Verify if the ByzFiNativeSymbioticVault is initialized with the correct staking minivault address
+        address stakingMinivaultAddr = ByzFiNativeSymbioticVault(byzFiNativeSymbioticVault).stakingMinivault();
+        assertEq(stakingMinivaultAddr, stakingMinivault);
+        console.log("stakingMinivaultAddr", stakingMinivaultAddr);
+
+        // Verify if the stakingMinivault is whitelisted
+        assertEq(IVault(vault).isDepositorWhitelisted(stakingMinivault), true);
     }
 
     function test_deposit() public {
