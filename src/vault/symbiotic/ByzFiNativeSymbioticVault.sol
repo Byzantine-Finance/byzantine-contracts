@@ -32,6 +32,7 @@ contract ByzFiNativeSymbioticVault is Initializable, OwnableUpgradeable, ERC7535
     function initialize(address initialOwner, address _vaultAddress, address _stakingMinivaultAddress) external initializer {
         vault = IVault(_vaultAddress);
         stakingMinivault = _stakingMinivaultAddress;
+        vault.setDepositorWhitelistStatus(stakingMinivault, true); 
         _transferOwnership(initialOwner);
     }
 
@@ -44,12 +45,12 @@ contract ByzFiNativeSymbioticVault is Initializable, OwnableUpgradeable, ERC7535
         // TODO: emit an event to notify
     }
 
-    /**
-     * @notice Whitelists the StakingMinivault contract to be able to deposit ETH into the Symbiotic Vault
-     */
-    function whitelistDepositors() external onlyOwner {
-        vault.setDepositorWhitelistStatus(stakingMinivault, true); 
-    }
+    // /**
+    //  * @notice Whitelists the StakingMinivault contract to be able to deposit ETH into the Symbiotic Vault
+    //  */
+    // function whitelistDepositors() external onlyOwner {
+    //     vault.setDepositorWhitelistStatus(stakingMinivault, true); 
+    // }
 
     /**
      * @notice Deposits ETH into the vault. Amount is determined by ETH depositing.

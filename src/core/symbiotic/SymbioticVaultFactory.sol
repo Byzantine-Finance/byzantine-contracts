@@ -62,19 +62,20 @@ contract SymbioticVaultFactory is Initializable, OwnableUpgradeable {
     /* ===================== EXTERNAL FUNCTIONS ===================== */
 
     /**
-     * @notice Creates a standard vault with a burner router, delegator, and default staker rewards.
+     * @notice Creates a standard vault with a burner router, delegator, and default staker rewards
      */
     function createStandardVault() external returns (address vault, address delegator, address defaultStakerRewards) {
         // TODO: Implement standard vault creation
     }
 
     /**
-     * @notice Creates an advanced vault with a burner router, delegator, slasher, and default staker rewards.
-     * @param burnerRouterParams The parameters for the burner router.
-     * @param vaultParams The parameters for the vault.
-     * @param delegatorParams The parameters for the delegator.
-     * @param slasherParams The parameters for the slasher.
-     * @param stakerRewardsParams The parameters for the staker rewards.
+     * @notice Creates an advanced vault with a burner router, delegator, slasher, and default staker rewards
+     * @param burnerRouterParams The parameters for the burner router
+     * @param configuratorParams The parameters for the vault configurator
+     * @param vaultParams The parameters for the vault
+     * @param delegatorParams The parameters for the delegator
+     * @param slasherParams The parameters for the slasher
+     * @param stakerRewardsParams The parameters for the staker rewards
      */
     function createAdvancedVault(
         ISymbioticVaultFactory.BurnerRouterParams memory burnerRouterParams,
@@ -100,11 +101,8 @@ contract SymbioticVaultFactory is Initializable, OwnableUpgradeable {
         // Deploy DefaultStakerRewards
         defaultStakerRewards = _deployDefaultStakerRewards(stakerRewardsParams, vault, byzFiNativeSymbioticVault);
 
-        // Initialize ByzFiNativeSymbioticVault
+        // Initialize ByzFiNativeSymbioticVault and whitelist the stakingMinivault as a depositor
         ByzFiNativeSymbioticVault(byzFiNativeSymbioticVault).initialize(byzFiNativeSymbioticVault, vault, stakingMinivault);
-
-        // Call whitelistDepositor from ByzFiNativeSymbioticVault to whitelist the StakingMinivault
-        // ByzFiNativeSymbioticVault(byzFiNativeSymbioticVault).whitelistDepositors();
 
         return (vault, delegator, slasher, defaultStakerRewards, byzFiNativeSymbioticVault, stakingMinivault);
     }
@@ -112,8 +110,10 @@ contract SymbioticVaultFactory is Initializable, OwnableUpgradeable {
     /* ===================== PRIVATE FUNCTIONS ===================== */
 
     /**
-     * @notice Deploys a BurnerRouter with the given parameters.
-     * @param params The parameters for the BurnerRouter.
+     * @notice Deploys a BurnerRouter with the given parameters
+     * @param params The parameters for the BurnerRouter
+     * @param byzFiNativeSymbioticVault The address of the ByzFiNativeSymbioticVault
+     * @param stakingMinivault The address of the StakingMinivault
      */
     function _deployBurnerRouter(
         ISymbioticVaultFactory.BurnerRouterParams memory params,
@@ -133,12 +133,14 @@ contract SymbioticVaultFactory is Initializable, OwnableUpgradeable {
     }
 
     /**
-     * @notice Deploys a Vault with the given parameters.
-     * @param vaultParams The parameters for the Vault.
-     * @param delegatorParams The parameters for the Delegator.
-     * @param slasherParams The parameters for the Slasher.
-     * @param burnerRouter The address of the BurnerRouter.
-     * @param byzFiNativeSymbioticVault The address of the ByzFiNativeSymbioticVault.
+     * @notice Deploys a Vault with the given parameters
+     * @param configuratorParams The parameters for the Vault Configurator
+     * @param vaultParams The parameters for the Vault
+     * @param delegatorParams The parameters for the Delegator
+     * @param slasherParams The parameters for the Slasher
+     * @param burnerRouter The address of the BurnerRouter
+     * @param byzFiNativeSymbioticVault The address of the ByzFiNativeSymbioticVault
+     * @param stakingMinivault The address of the StakingMinivault
      */
     function _deployVault(
         ISymbioticVaultFactory.VaultConfiguratorParams memory configuratorParams,

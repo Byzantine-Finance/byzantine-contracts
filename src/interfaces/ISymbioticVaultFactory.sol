@@ -6,48 +6,29 @@ import {IBurnerRouter} from "@symbioticfi/burners/src/interfaces/router/IBurnerR
 interface ISymbioticVaultFactory {
     // Struct of parameters for deploying a BurnerRouter
     struct BurnerRouterParams {
-        // address owner; // predefined
-        // address collateral; 
         uint48 delay;
         address globalReceiver;
         IBurnerRouter.NetworkReceiver[] networkReceivers;
         IBurnerRouter.OperatorNetworkReceiver[] operatorNetworkReceivers;
     }
 
-    // Struct of parameters for deploying a Vault
+    // Struct of parameters for the vault configurator
     struct VaultConfiguratorParams {
-        // uint64 version; // predefined 
-        // address owner; // predefined 
-        // bytes vaultParams;
         uint64 delegatorIndex; 
-        // bytes delegatorParams;
-        // bool withSlasher; // predefined 
         uint64 slasherIndex;
-        // bytes slasherParams;
     }
 
-    // Struct of parameters for vault configuration
+    // Struct of parameters for the vault
     struct VaultParams {
-        // address collateral; // predefined
-        // address burnerRouter; // predefined
         uint48 epochDuration;
-        // bool depositWhitelist; // predefined 
         bool isDepositLimit;
         uint256 depositLimit;
-        // address defaultAdminRoleHolder; // predefined 
-        // address depositWhitelistSetRoleHolder; // predefined 
-        // address depositorWhitelistRoleHolder; // predefined 
-        // address isDepositLimitSetRoleHolder; // predefined 
-        // address depositLimitSetRoleHolder; // predefined 
     }
 
     // Struct of parameters for delegator configuration
     struct DelegatorParams {
-        // address defaultAdminRoleHolder; // predefined
         address hook;
         address hookSetRoleHolder;
-        // address[] networkLimitSetRoleHolders; // predefined
-        // address[] operatorNetworkSharesSetRoleHolders; // predefined
     }
 
     // Struct of parameters for slasher configuration
@@ -59,11 +40,7 @@ interface ISymbioticVaultFactory {
 
     // Struct of parameters for staker rewards configuration
     struct StakerRewardsParams {
-        // address vault; // predefined
         uint256 adminFee;
-        // address defaultAdminRoleHolder; // predefined
-        // address adminFeeClaimRoleHolder; // predefined
-        // address adminFeeSetRoleHolder; // predefined
     }
 
     /**
@@ -74,6 +51,7 @@ interface ISymbioticVaultFactory {
     /**
      * @notice Creates an advanced vault with a burner router, delegator, slasher, and default staker rewards.
      * @param burnerRouterParams The parameters for the burner router.
+     * @param configuratorParams The parameters for the vault configurator.
      * @param vaultParams The parameters for the vault.
      * @param delegatorParams The parameters for the delegator.
      * @param slasherParams The parameters for the slasher.
