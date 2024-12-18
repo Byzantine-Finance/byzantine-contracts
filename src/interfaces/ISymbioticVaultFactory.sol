@@ -44,25 +44,22 @@ interface ISymbioticVaultFactory {
     }
 
     /**
-     * @notice Creates a standard vault with a burner router, delegator, and default staker rewards.
+     * @notice Creates a vault with a burner router, delegator, slasher, and default staker rewards based on whether it is a standard or advanced vault
+     * @param burnerRouterParams The parameters for the burner router
+     * @param configuratorParams The parameters for the vault configurator
+     * @param vaultParams The parameters for the vault
+     * @param delegatorParams The parameters for the delegator
+     * @param slasherParams The parameters for the slasher
+     * @param stakerRewardsParams The parameters for the staker rewards
+     * @param isStandardVault Whether to create a standard or advanced vault
      */
-    function createStandardVault() external returns (address vault, address delegator, address defaultStakerRewards);
-
-    /**
-     * @notice Creates an advanced vault with a burner router, delegator, slasher, and default staker rewards.
-     * @param burnerRouterParams The parameters for the burner router.
-     * @param configuratorParams The parameters for the vault configurator.
-     * @param vaultParams The parameters for the vault.
-     * @param delegatorParams The parameters for the delegator.
-     * @param slasherParams The parameters for the slasher.
-     * @param stakerRewardsParams The parameters for the staker rewards.
-     */
-    function createAdvancedVault(
+    function createVault(
         ISymbioticVaultFactory.BurnerRouterParams memory burnerRouterParams,
         ISymbioticVaultFactory.VaultConfiguratorParams memory configuratorParams,
         ISymbioticVaultFactory.VaultParams memory vaultParams,
         ISymbioticVaultFactory.DelegatorParams memory delegatorParams,
         ISymbioticVaultFactory.SlasherParams memory slasherParams,
-        ISymbioticVaultFactory.StakerRewardsParams memory stakerRewardsParams
+        ISymbioticVaultFactory.StakerRewardsParams memory stakerRewardsParams,
+        bool isStandardVault
     ) external returns (address vault, address delegator, address slasher, address defaultStakerRewards, address payable byzFiNativeSymbioticVault, address stakingMinivault);
 }

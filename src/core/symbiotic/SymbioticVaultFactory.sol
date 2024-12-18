@@ -30,10 +30,17 @@ contract SymbioticVaultFactory is Initializable, OwnableUpgradeable {
     address public VAULT_CONFIGURATOR;
     address public DEFAULT_STAKER_REWARDS_FACTORY;
 
-    /// @notice Vault Configuration
+    /// @notice Standardized parameters for all vaults
     uint64 public constant VERSION = 1; // 1: standard vault, 2: tokenized vault
     bool public constant WITH_SLASHER = true;
     uint64 public constant DEFAULT_DELEGATOR_INDEX = 0; // 0: NetworkRestakeDelegator, 1: FullRestakeDelegatorWithSlasher
+
+    /// @notice Standardized parameters for standard vaults
+    uint64 public constant DELEGATOR_INDEX = 0;
+    uint64 public constant SLASHER_INDEX = 1;
+    bool public constant IS_DEPOSIT_LIMIT = false;
+    uint256 public constant DEPOSIT_LIMIT = 0;
+    bool public constant IS_BURNER_HOOK = true;
 
     /* ===================== CONSTRUCTOR & INITIALIZER ===================== */
 
@@ -62,28 +69,23 @@ contract SymbioticVaultFactory is Initializable, OwnableUpgradeable {
     /* ===================== EXTERNAL FUNCTIONS ===================== */
 
     /**
-     * @notice Creates a standard vault with a burner router, delegator, and default staker rewards
-     */
-    function createStandardVault() external returns (address vault, address delegator, address defaultStakerRewards) {
-        // TODO: Implement standard vault creation
-    }
-
-    /**
-     * @notice Creates an advanced vault with a burner router, delegator, slasher, and default staker rewards
+     * @notice Creates a vault with a burner router, delegator, slasher, and default staker rewards based on whether it is a standard or advanced vault
      * @param burnerRouterParams The parameters for the burner router
      * @param configuratorParams The parameters for the vault configurator
      * @param vaultParams The parameters for the vault
      * @param delegatorParams The parameters for the delegator
      * @param slasherParams The parameters for the slasher
      * @param stakerRewardsParams The parameters for the staker rewards
+     * @param isStandardVault Whether to create a standard or advanced vault
      */
-    function createAdvancedVault(
+    function createVault(
         ISymbioticVaultFactory.BurnerRouterParams memory burnerRouterParams,
         ISymbioticVaultFactory.VaultConfiguratorParams memory configuratorParams,
         ISymbioticVaultFactory.VaultParams memory vaultParams,
         ISymbioticVaultFactory.DelegatorParams memory delegatorParams,
         ISymbioticVaultFactory.SlasherParams memory slasherParams,
-        ISymbioticVaultFactory.StakerRewardsParams memory stakerRewardsParams
+        ISymbioticVaultFactory.StakerRewardsParams memory stakerRewardsParams,
+        bool isStandardVault
     ) external returns (address vault, address delegator, address slasher, address defaultStakerRewards, address payable byzFiNativeSymbioticVault, address stakingMinivault) {
         
         // Deploy ByzFiNativeSymbioticVault
@@ -95,9 +97,22 @@ contract SymbioticVaultFactory is Initializable, OwnableUpgradeable {
         // Deploy BurnerRouter
         address burnerRouter = _deployBurnerRouter(burnerRouterParams, byzFiNativeSymbioticVault, stakingMinivault);
 
+        if (isStandardVault) {
+            // Use the preset parameters for the vault configurator
+            configuratorParams.delegatorIndex = DELEGATOR_INDEX;
+            configuratorParams.slasherIndex = SLASHER_INDEX;
+
+            // Use the preset parameters for the vault
+            vaultParams.isDepositLimit = IS_DEPOSIT_LIMIT;
+            vaultParams.depositLimit = DEPOSIT_LIMIT;
+
+            // Use the preset parameters for the slasher
+            slasherParams.isBurnerHook = IS_BURNER_HOOK;
+        }
+
         // Deploy Vault
         (vault, delegator, slasher) = _deployVault(configuratorParams, vaultParams, delegatorParams, slasherParams, burnerRouter, byzFiNativeSymbioticVault, stakingMinivault);
-        
+
         // Deploy DefaultStakerRewards
         defaultStakerRewards = _deployDefaultStakerRewards(stakerRewardsParams, vault, byzFiNativeSymbioticVault);
 
@@ -176,7 +191,6 @@ contract SymbioticVaultFactory is Initializable, OwnableUpgradeable {
         uint64 slasherIndex = configuratorParams.slasherIndex;
 
         // Deploy Vault using the VaultConfigurator from Symbiotic
-        // TODO: continue from here: EVM REVERT on test_createAdvancedVault
         return IVaultConfigurator(VAULT_CONFIGURATOR).create(
             IVaultConfigurator.InitParams({
                 version: VERSION,
