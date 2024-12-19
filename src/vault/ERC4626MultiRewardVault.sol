@@ -395,4 +395,50 @@ contract ERC4626MultiRewardVault is Initializable, ERC4626Upgradeable, OwnableUp
         }
         return (false, 0);
     }
+
+    /**
+     * @dev Overrides _convertToShares to fix breaking change introduced in OpenZeppelin 4.9.
+     * OZ changed empty vault conversions to use 1-to-1 rate ignoring decimal differences.
+     * We scale to 18 decimals to ensure all vaults use same decimal precision regardless of asset.
+     */
+    function _convertToShares(uint256 assets, MathUpgradeable.Rounding rounding) internal view virtual override returns (uint256) {
+        uint256 supply = totalSupply();
+        uint8 assetDecimals = IERC20MetadataUpgradeable(asset()).decimals();
+        
+        if (supply == 0) {
+            return assets * 10**(18 - assetDecimals);
+        }
+
+        uint256 scaledAssets = assets * 10**(18 - assetDecimals);
+        uint256 scaledTotal = totalAssets() * 10**(18 - assetDecimals);
+
+        return scaledAssets.mulDiv(
+            supply,
+            scaledTotal,
+            rounding
+        );
+    }
+
+    /**
+     * @dev Overrides _convertToAssets to maintain consistency with _convertToShares.
+     * Scales calculations to 18 decimals before converting back to asset decimals.
+     */
+    function _convertToAssets(uint256 shares, MathUpgradeable.Rounding rounding) internal view virtual override returns (uint256) {
+        uint256 supply = totalSupply();
+        uint8 assetDecimals = IERC20MetadataUpgradeable(asset()).decimals();
+        
+        if (supply == 0) {
+            return shares / 10**(18 - assetDecimals);
+        }
+
+        uint256 scaledTotal = totalAssets() * 10**(18 - assetDecimals);
+
+        uint256 scaledAssets = shares.mulDiv(
+            scaledTotal,
+            supply,
+            rounding
+        );
+
+        return scaledAssets / 10**(18 - assetDecimals);
+    }
 }
