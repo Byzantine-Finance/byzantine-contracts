@@ -7,6 +7,9 @@ import {ISymbioticVaultFactory} from "../src/interfaces/ISymbioticVaultFactory.s
 import {IBurnerRouter} from "@symbioticfi/burners/src/interfaces/router/IBurnerRouter.sol";
 import {ByzFiNativeSymbioticVault} from "../src/vault/symbiotic/ByzFiNativeSymbioticVault.sol";
 import {IVault} from "@symbioticfi/core/src/interfaces/vault/IVault.sol";
+import {IVetoSlasher} from "@symbioticfi/core/src/interfaces/slasher/IVetoSlasher.sol";
+import {INetworkRestakeDelegator} from "@symbioticfi/core/src/interfaces/delegator/INetworkRestakeDelegator.sol";
+import {IFullRestakeDelegator} from "@symbioticfi/core/src/interfaces/delegator/IFullRestakeDelegator.sol";
 
 contract SymbioticVaultFactoryTest is Test {
     uint256 holeskyFork;
@@ -20,11 +23,8 @@ contract SymbioticVaultFactoryTest is Test {
     address public DEFAULT_STAKER_REWARDS_FACTORY = 0x698C36DE44D73AEfa3F0Ce3c0255A8667bdE7cFD; // deployed on holesky
     address public STAKING_MINIVAULT = vm.addr(1); 
 
-    // Parameters for the createAdvancedVault function
-    address public OWNER = vm.addr(2);
-    address public COLLATERAL = 0x25133c2c49A343F8312bb6e896C1ea0Ad8CD0EBd; // address of the collateral - wstETH
-    uint48 public DELAY = 21 days;
-    address public GLOBAL_RECEIVER = 0x0000000000000000000000000000000000000000;
+    // Parameters to be used or the createVault function
+    address public hook = vm.addr(2);
     address public network1 = vm.addr(3);
     address public network2 = vm.addr(4);
     address public operator1 = vm.addr(5);
@@ -36,6 +36,7 @@ contract SymbioticVaultFactoryTest is Test {
     // vm.deal(alice, 1000 ether);
 
     function setUp() public {
+        // Make forked tests on Holesky
         holeskyFork = vm.createFork(HOLESKY_RPC_URL);
         vm.selectFork(holeskyFork);
 
@@ -55,21 +56,47 @@ contract SymbioticVaultFactoryTest is Test {
     }
 
     function test_createAdvancedVault() public {
-        ISymbioticVaultFactory.BurnerRouterParams memory burnerRouterParams = createBurnerRouterParams();
-        ISymbioticVaultFactory.VaultConfiguratorParams memory configuratorParams = createConfiguratorParams();
-        ISymbioticVaultFactory.VaultParams memory vaultParams = createVaultParams();
-        ISymbioticVaultFactory.DelegatorParams memory delegatorParams = createDelegatorParams();
-        ISymbioticVaultFactory.SlasherParams memory slasherParams = createSlasherParams();
-        ISymbioticVaultFactory.StakerRewardsParams memory stakerRewardsParams = createStakerRewardsParams();
+        // Define the parameters for _createBurnerRouterParams
+        uint48 delay = 21 days;
+        address globalReceiver = 0x0000000000000000000000000000000000000000;
+        IBurnerRouter.NetworkReceiver[] memory networkReceivers = new IBurnerRouter.NetworkReceiver[](2);
+        IBurnerRouter.OperatorNetworkReceiver[] memory operatorNetworkReceivers = new IBurnerRouter.OperatorNetworkReceiver[](2);
+        networkReceivers[0] = IBurnerRouter.NetworkReceiver({network: network1, receiver: receiver1});
+        networkReceivers[1] = IBurnerRouter.NetworkReceiver({network: network2, receiver: receiver2});
+        operatorNetworkReceivers[0] = IBurnerRouter.OperatorNetworkReceiver({network: network1, operator: operator1, receiver: receiver1});
+        operatorNetworkReceivers[1] = IBurnerRouter.OperatorNetworkReceiver({network: network2, operator: operator2, receiver: receiver2}); 
+        // Define the parameters for _createConfiguratorParams
+        uint64 delegatorIndex = 1;
+        uint64 slasherIndex = 0;
+        // Define the parameters for _createVaultParams
+        uint48 epochDuration = 21 days;
+        bool isDepositLimit = true;
+        uint256 depositLimit = 1000 ether;
+        // Define the parameters for _createDelegatorParams
+        address hookSetRoleHolder = address(symbioticVaultFactory);
+        // Define the parameters for _createSlasherParams
+        bool isBurnerHook = true;
+        uint48 vetoDuration = 2 days;
+        uint256 resolverSetEpochsDelay = 21 days;
+        // Define the parameters for _createStakerRewardsParams
+        uint256 adminFee = 100;
+
+        ISymbioticVaultFactory.BurnerRouterParams memory burnerRouterParams = _createBurnerRouterParams(delay, globalReceiver, networkReceivers, operatorNetworkReceivers);
+        ISymbioticVaultFactory.VaultConfiguratorParams memory configuratorParams = _createConfiguratorParams(delegatorIndex, slasherIndex);
+        ISymbioticVaultFactory.VaultParams memory vaultParams = _createVaultParams(epochDuration, isDepositLimit, depositLimit);
+        ISymbioticVaultFactory.DelegatorParams memory delegatorParams = _createDelegatorParams(hook, hookSetRoleHolder);
+        ISymbioticVaultFactory.SlasherParams memory slasherParams = _createSlasherParams(isBurnerHook, vetoDuration, resolverSetEpochsDelay);
+        ISymbioticVaultFactory.StakerRewardsParams memory stakerRewardsParams = _createStakerRewardsParams(adminFee);
 
         // Call the createAdvancedVault function
-        (address vault, address delegator, address slasher, address defaultStakerRewards, address payable byzFiNativeSymbioticVault, address stakingMinivault) = symbioticVaultFactory.createAdvancedVault(
+        (address vault, address delegator, address slasher, address defaultStakerRewards, address payable byzFiNativeSymbioticVault, address stakingMinivault) = symbioticVaultFactory.createVault(
             burnerRouterParams,
             configuratorParams,
             vaultParams,
             delegatorParams,
             slasherParams,
-            stakerRewardsParams
+            stakerRewardsParams,
+            false // isStandardVault
         );
 
         // Verify if the vault and other contracts are deployed
@@ -95,61 +122,123 @@ contract SymbioticVaultFactoryTest is Test {
 
         // Verify if the stakingMinivault is whitelisted
         assertEq(IVault(vault).isDepositorWhitelisted(stakingMinivault), true);
+
+        // Verify if depositLimit is set to 1000 ether, meaning that an advanced vault is created
+        uint256 limit = IVault(vault).depositLimit();
+        assertEq(limit, 1000 ether); 
     }
 
-    function test_deposit() public {
-        // TODO To complete
+
+    function test_createStandardizedVault() public {
+        // Define the parameters for _createBurnerRouterParams
+        uint48 delay = 21 days;
+        address globalReceiver = 0x0000000000000000000000000000000000000000;
+        IBurnerRouter.NetworkReceiver[] memory networkReceivers = new IBurnerRouter.NetworkReceiver[](2);
+        IBurnerRouter.OperatorNetworkReceiver[] memory operatorNetworkReceivers = new IBurnerRouter.OperatorNetworkReceiver[](2);
+        networkReceivers[0] = IBurnerRouter.NetworkReceiver({network: network1, receiver: receiver1});
+        networkReceivers[1] = IBurnerRouter.NetworkReceiver({network: network2, receiver: receiver2});
+        operatorNetworkReceivers[0] = IBurnerRouter.OperatorNetworkReceiver({network: network1, operator: operator1, receiver: receiver1});
+        operatorNetworkReceivers[1] = IBurnerRouter.OperatorNetworkReceiver({network: network2, operator: operator2, receiver: receiver2}); 
+        // Define the parameters for _createConfiguratorParams
+        uint64 delegatorIndex = 1; // FullRestakeDelegator but NetworkRestakeDelegator is preset for standard vaults
+        uint64 slasherIndex = 0; // instant slasher but veto slasher is preset for standard vaults
+        // Define the parameters for _createVaultParams
+        uint48 epochDuration = 21 days;
+        bool isDepositLimit = true; // false is preset for standard vaults
+        uint256 depositLimit = 1000 ether; // 0 is preset for standard vaults
+        // Define the parameters for _createDelegatorParams
+        address hookSetRoleHolder = address(symbioticVaultFactory);
+        // Define the parameters for _createSlasherParams
+        bool isBurnerHook = true;
+        uint48 vetoDuration = 2 days;
+        uint256 resolverSetEpochsDelay = 21 days;
+        // Define the parameters for _createStakerRewardsParams
+        uint256 adminFee = 100;
+
+        ISymbioticVaultFactory.BurnerRouterParams memory burnerRouterParams = _createBurnerRouterParams(delay, globalReceiver, networkReceivers, operatorNetworkReceivers);
+        ISymbioticVaultFactory.VaultConfiguratorParams memory configuratorParams = _createConfiguratorParams(delegatorIndex, slasherIndex);
+        ISymbioticVaultFactory.VaultParams memory vaultParams = _createVaultParams(epochDuration, isDepositLimit, depositLimit);
+        ISymbioticVaultFactory.DelegatorParams memory delegatorParams = _createDelegatorParams(hook, hookSetRoleHolder);
+        ISymbioticVaultFactory.SlasherParams memory slasherParams = _createSlasherParams(isBurnerHook, vetoDuration, resolverSetEpochsDelay);
+        ISymbioticVaultFactory.StakerRewardsParams memory stakerRewardsParams = _createStakerRewardsParams(adminFee);
+
+        // Call the createAdvancedVault function
+        (address vault, address delegator, address slasher, , , ) = symbioticVaultFactory.createVault(
+            burnerRouterParams,
+            configuratorParams,
+            vaultParams,
+            delegatorParams,
+            slasherParams,
+            stakerRewardsParams,
+            true // isStandardVault
+        );
+
+        // Verify if isDepositLimit is set to false and depositLimit is set to 0, meaning that a standardized vault is created
+        bool isLimit = IVault(vault).isDepositLimit();
+        assertEq(isLimit, false);
+        uint256 limit = IVault(vault).depositLimit();
+        assertEq(limit, 0);
+
+        // Verify if operatorNetworkSharesSetRoleHolders is set to byzFiNativeSymbioticVault
+        bytes32 role = INetworkRestakeDelegator(delegator).OPERATOR_NETWORK_SHARES_SET_ROLE();
+        assertNotEq(role, 0);
+
+        // Verify if vetoDuration is set to 2 days
+        uint48 duration = IVetoSlasher(slasher).vetoDuration();
+        assertEq(duration, 2 days);
     }
 
-    function createBurnerRouterParams() internal view returns (ISymbioticVaultFactory.BurnerRouterParams memory) {
+    /* ===================== HELPER FUNCTIONS ===================== */
+
+    function _createBurnerRouterParams(
+        uint48 _delay,
+        address _globalReceiver,
+        IBurnerRouter.NetworkReceiver[] memory _networkReceivers,
+        IBurnerRouter.OperatorNetworkReceiver[] memory _operatorNetworkReceivers
+    ) private pure returns (ISymbioticVaultFactory.BurnerRouterParams memory) {
         ISymbioticVaultFactory.BurnerRouterParams memory params = ISymbioticVaultFactory.BurnerRouterParams({
-            delay: DELAY,
-            globalReceiver: GLOBAL_RECEIVER,
-            networkReceivers: new IBurnerRouter.NetworkReceiver[](2), 
-            operatorNetworkReceivers: new IBurnerRouter.OperatorNetworkReceiver[](2) 
+            delay: _delay,
+            globalReceiver: _globalReceiver,
+            networkReceivers: _networkReceivers, 
+            operatorNetworkReceivers: _operatorNetworkReceivers 
         });
-
-        params.networkReceivers[0] = IBurnerRouter.NetworkReceiver({network: network1, receiver: receiver1});
-        params.networkReceivers[1] = IBurnerRouter.NetworkReceiver({network: network2, receiver: receiver2});
-        params.operatorNetworkReceivers[0] = IBurnerRouter.OperatorNetworkReceiver({network: network1, operator: operator1, receiver: receiver1});
-        params.operatorNetworkReceivers[1] = IBurnerRouter.OperatorNetworkReceiver({network: network2, operator: operator2, receiver: receiver2});
 
         return params;
     }
 
-    function createConfiguratorParams() internal view returns (ISymbioticVaultFactory.VaultConfiguratorParams memory) {
+    function _createConfiguratorParams(uint64 _delegatorIndex, uint64 _slasherIndex) private pure returns (ISymbioticVaultFactory.VaultConfiguratorParams memory) {
         return ISymbioticVaultFactory.VaultConfiguratorParams({
-            delegatorIndex: 0,
-            slasherIndex: 1
+            delegatorIndex: _delegatorIndex,
+            slasherIndex: _slasherIndex
         });
     }
 
-    function createVaultParams() internal view returns (ISymbioticVaultFactory.VaultParams memory) {
+    function _createVaultParams(uint48 _epochDuration, bool _isDepositLimit, uint256 _depositLimit) private pure returns (ISymbioticVaultFactory.VaultParams memory) {
         return ISymbioticVaultFactory.VaultParams({
-            epochDuration: 7 days,
-            isDepositLimit: false,
-            depositLimit: 0
+            epochDuration: _epochDuration,
+            isDepositLimit: _isDepositLimit,
+            depositLimit: _depositLimit
         });
     }
 
-    function createDelegatorParams() internal view returns (ISymbioticVaultFactory.DelegatorParams memory) {
+    function _createDelegatorParams(address _hook, address _hookSetRoleHolder) private pure returns (ISymbioticVaultFactory.DelegatorParams memory) {
         return ISymbioticVaultFactory.DelegatorParams({
-            hook: address(0),
-            hookSetRoleHolder: address(symbioticVaultFactory)
+            hook: _hook,
+            hookSetRoleHolder: _hookSetRoleHolder
         });
     }
 
-    function createSlasherParams() internal view returns (ISymbioticVaultFactory.SlasherParams memory) {
+    function _createSlasherParams(bool _isBurnerHook, uint48 _vetoDuration, uint256 _resolverSetEpochsDelay) private pure returns (ISymbioticVaultFactory.SlasherParams memory) {
         return ISymbioticVaultFactory.SlasherParams({
-            isBurnerHook: true,
-            vetoDuration: 2 days,
-            resolverSetEpochsDelay: 10
+            isBurnerHook: _isBurnerHook,
+            vetoDuration: _vetoDuration,
+            resolverSetEpochsDelay: _resolverSetEpochsDelay
         });
     }
 
-    function createStakerRewardsParams() internal view returns (ISymbioticVaultFactory.StakerRewardsParams memory) {
+    function _createStakerRewardsParams(uint256 adminFee) private pure returns (ISymbioticVaultFactory.StakerRewardsParams memory) {
         return ISymbioticVaultFactory.StakerRewardsParams({
-            adminFee: 100
+            adminFee: adminFee
         });
     }
 }
