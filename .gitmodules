@@ -13,12 +13,15 @@
 [submodule "lib/eigenlayer-contracts"]
 	path = lib/eigenlayer-contracts
 	url = https://github.com/Layr-Labs/eigenlayer-contracts
-[submodule "lib/splits-contracts-v2"]
-	path = lib/splits-contracts-v2
-	url = https://github.com/asanson1404/splits-contracts-monorepo
-[submodule "lib/openzeppelin-contracts-v4.9.3"]
-	path = lib/openzeppelin-contracts-v4.9.3
-	url = https://github.com/OpenZeppelin/openzeppelin-contracts
 [submodule "lib/foundry-chainlink-toolkit"]
 	path = lib/foundry-chainlink-toolkit
 	url = https://github.com/smartcontractkit/foundry-chainlink-toolkit
+[submodule "lib/openzeppelin-contracts-v5.1.0"]
+	path = lib/openzeppelin-contracts-v5.1.0
+	url = https://github.com/OpenZeppelin/openzeppelin-contracts
+[submodule "lib/openzeppelin-contracts-upgradeable-v5.1.0"]
+	path = lib/openzeppelin-contracts-upgradeable-v5.1.0
+	url = https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable
+[submodule "lib/splits-contracts-v2"]
+	path = lib/splits-contracts-v2
+	url = https://github.com/asanson1404/splits-contracts-monorepo
