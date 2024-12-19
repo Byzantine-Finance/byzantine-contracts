@@ -38,7 +38,8 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
 
     error TokenAlreadyAdded();
     error InvalidAddress();
-
+    error TokenDoesNotHaveDecimalsFunction(address token);
+    error TokenHasMoreThan18Decimals(address token);
     /* ============== EVENTS ============== */
 
     event RewardTokenAdded(address indexed token);
@@ -90,7 +91,7 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
     }
 
     /**
-     * @notice Withdraws ETH and reward tokens from the vault. Amount is determined by ETH withdrawing
+     * @notice Withdraws ETH and reward tokens from the vault.
      * @dev User proportionally receives ETH and reward tokens that are combined worth the amount of `assets` specified.
      * @param assets The value to withdraw from the vault, in ETH amount.
      * @param receiver The address to receive the ETH.
@@ -105,13 +106,13 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
         uint256 userTotalETHValue = getUserTotalValue(owner);
 
         // Calculate the proportion of total value being withdrawn
-        uint256 withdrawProportion = (assets * 1e18) / userTotalETHValue;
+        uint256 userWithdrawProportion = (assets * 1e18) / userTotalETHValue;
 
         // Get user's owned assets and rewards
-        (address[] memory tokenAddresses, uint256[] memory tokenAmounts) = getUsersOwnedAssetsAndRewards(owner);
+        (, uint256[] memory tokenAmounts) = getUsersOwnedAssetsAndRewards(owner);
 
         // Calculate the amount of ETH that will be withdrawn, based on the withdrawn proportion
-        uint256 ethToWithdraw = (tokenAmounts[0] * withdrawProportion) / 1e18;
+        uint256 ethToWithdraw = (tokenAmounts[0] * userWithdrawProportion) / 1e18;
         
         // Withdraw assets
         uint256 sharesBurnedForETH = super.withdraw(ethToWithdraw, receiver, owner);
@@ -124,15 +125,7 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
         _burn(owner, sharesBurningForRewardTokens);
 
         // Withdraw proportional amount of each reward token
-        for (uint i = 1; i < tokenAddresses.length; i++) {
-            address token = tokenAddresses[i];
-            uint256 tokenAmount = tokenAmounts[i];
-            uint256 tokenToWithdraw = (tokenAmount * withdrawProportion) / 1e18;
-            if (tokenToWithdraw > 0) {
-                IERC20Upgradeable(token).safeTransfer(receiver, tokenToWithdraw);
-                emit RewardTokenWithdrawn(receiver, token, tokenToWithdraw);
-            }
-        }
+        _distributeRewards(receiver, userWithdrawProportion, tokenAmounts);
 
         uint256 totalSharesBurned = sharesBurnedForETH + sharesBurningForRewardTokens;
         return totalSharesBurned;
@@ -145,7 +138,7 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
      * @param owner The address that is withdrawing ETH.
      * return The amount of ETH withdrawn (includes ETH + ETH value of all reward tokens).
      */
-    function redeem(uint256 shares, address receiver, address owner) public override nonReentrant returns (uint256) {       
+    function redeem(uint256 shares, address receiver, address owner) public override nonReentrant returns (uint256) {
         // Calculate the proportion of shares the user is redeeming
         uint256 userWithdrawProportion = (shares * 1e18) / balanceOf(owner);
 
@@ -169,28 +162,7 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
         _burn(owner, sharesBurningForRewardTokens);
 
         // Withdraw proportional amount of each reward token
-        uint256 totalRewardTokenValueWithdrawn;
-        for (uint i = 0; i < rewardTokens.length; i++) {
-            address token = rewardTokens[i];
-
-            // Get the total amount of the reward token owned by the user
-            uint256 totalTokenOwnedByUser = tokenAmounts[i + 1];
-
-            // Calculate the amount of the reward token to withdraw
-            uint256 tokensToWithdraw = (totalTokenOwnedByUser * userWithdrawProportion) / 1e18;
-
-            if (tokensToWithdraw > 0) {
-                IERC20Upgradeable(token).safeTransfer(receiver, tokensToWithdraw);
-                emit RewardTokenWithdrawn(receiver, token, tokensToWithdraw);
-
-                // Add the ETH value of the withdrawn reward token to the total
-                uint256 tokenPrice = oracle.getPrice(token);
-                uint256 ethPrice = oracle.getPrice(address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE));
-                uint256 rewardTokenValueInEth = (tokensToWithdraw * tokenPrice) / ethPrice;
-
-                totalRewardTokenValueWithdrawn += rewardTokenValueInEth;
-            }
-        }
+        uint256 totalRewardTokenValueWithdrawn = _distributeRewards(receiver, userWithdrawProportion, tokenAmounts);
 
         uint256 totalValueWithdrawn = ethWithdrawn + totalRewardTokenValueWithdrawn;
         return totalValueWithdrawn;
@@ -201,6 +173,9 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
      * @param _token The reward token to add.
      */
     function addRewardToken(address _token) external onlyOwner {
+        // Validate the reward token has decimals() function
+        _validateTokenDecimals(_token);
+
         // Check if the token is already in the rewardTokens array
         for (uint i = 0; i < rewardTokens.length; i++) {
             if (rewardTokens[i] == _token) revert TokenAlreadyAdded();
@@ -231,23 +206,27 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
     function totalAssets() public view override returns (uint256) {        
         // Calculate USD value of reward tokens
         uint256 rewardTokenUSDValue;
+
         for (uint i = 0; i < rewardTokens.length; i++) {
             address token = rewardTokens[i];
             uint256 balance = IERC20Upgradeable(token).balanceOf(address(this));
+            uint8 tokenDecimals = IERC20MetadataUpgradeable(token).decimals();
+
+            // Normalize balance to 18 decimals before multiplying by price
+            uint256 normalizedBalance = balance * 10**(18 - tokenDecimals);
             uint256 price = oracle.getPrice(token);
-            rewardTokenUSDValue += (balance * price);
+            rewardTokenUSDValue += (normalizedBalance * price) / 1e18;
         }
-        
+
         // Convert total value of reward tokens from USD to ETH
         uint256 ethPrice = oracle.getPrice(address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE));
-        uint256 rewardTokenETHAmount = rewardTokenUSDValue / ethPrice;
+        uint256 rewardTokenETHAmount = (rewardTokenUSDValue * 1e18) / ethPrice;
 
         // Add the ETH value of the reward tokens to the ETH balance to get total ETH amount
         uint256 ethBalance = _getETHBalance();
         uint256 totalETHAmount = ethBalance + rewardTokenETHAmount;
         return totalETHAmount;
     }
-
     /**
      * @notice Returns the total ETH value of assets and reward tokens in the vault for a user.
      * @param user The address of the user.
@@ -299,23 +278,38 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
     /* ============== INTERNAL FUNCTIONS ============== */
 
     /**
-     * @dev Distributes rewards to the receiver for all rewardTokens.
-     * @param receiver The address to receive the rewards.
-     * @param sharesBurned The amount of shares burned.
-     * @param totalSharesPreWithdraw The total number of shares before the withdrawal sequence was initiated.
-     */
-    function _distributeRewards(address receiver, uint256 sharesBurned, uint256 totalSharesPreWithdraw) internal {
-        uint256 totalShares = totalSharesPreWithdraw;
-
+    * @dev Distributes rewards to the receiver based on withdrawal proportion
+    * @param receiver The address to receive the rewards
+    * @param withdrawProportion The users proportion being withdrawn (in 1e18)
+    * @return totalRewardTokenValueWithdrawn The total value of reward tokens withdrawn in asset terms
+    */
+    function _distributeRewards(
+        address receiver,
+        uint256 withdrawProportion,
+        uint256[] memory tokenAmounts
+    ) internal returns (uint256 totalRewardTokenValueWithdrawn) {
         for (uint i = 0; i < rewardTokens.length; i++) {
-            address rewardToken = rewardTokens[i];
-            uint256 rewardBalance = IERC20Upgradeable(rewardToken).balanceOf(address(this));
-            uint256 rewardAmount = (rewardBalance * sharesBurned) / totalShares;
-            if (rewardAmount > 0) {
-                IERC20Upgradeable(rewardToken).safeTransfer(receiver, rewardAmount);
-                emit RewardTokenWithdrawn(receiver, rewardToken, rewardAmount);
+            address token = rewardTokens[i];
+            uint8 tokenDecimals = IERC20MetadataUpgradeable(token).decimals();
+
+            // Calculate amount to withdraw based on user's balance and withdraw proportion
+            uint256 tokenToWithdraw = (tokenAmounts[i + 1] * withdrawProportion) / 1e18;
+
+            if (tokenToWithdraw > 0) {
+                IERC20Upgradeable(token).safeTransfer(receiver, tokenToWithdraw);
+                emit RewardTokenWithdrawn(receiver, token, tokenToWithdraw);
+                
+                // Convert reward token value to ETH terms
+                uint256 tokenPrice = oracle.getPrice(token);
+                uint256 ethPrice = oracle.getPrice(address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE));
+                uint256 normalizedTokenAmount = tokenToWithdraw * 10**(18 - tokenDecimals);
+                uint256 tokenValueInUSD = (normalizedTokenAmount * tokenPrice) / 1e18;
+                uint256 tokenValueInETH = (tokenValueInUSD * 1e18) / ethPrice;
+                
+                totalRewardTokenValueWithdrawn += tokenValueInETH;
             }
         }
+        return totalRewardTokenValueWithdrawn;
     }
 
     /**
@@ -326,4 +320,32 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
         return address(this).balance;
     }
 
+    function _validateTokenDecimals(address rewardToken) internal view returns (uint8) {
+        (bool success, uint8 tokenDecimals) = _tryGetTokenDecimals(rewardToken);
+        if (!success) {
+            revert TokenDoesNotHaveDecimalsFunction(rewardToken);
+        }
+
+        if (tokenDecimals > 18) revert TokenHasMoreThan18Decimals(rewardToken);
+
+        return tokenDecimals;
+    }
+   
+    /**
+    * @dev Attempts to get the decimals of a token, returning a boolean for success
+    * @param token The token to query
+    * @return (bool, uint8) Success and decimals of the token
+    */
+    function _tryGetTokenDecimals(address token) internal view returns (bool, uint8) {
+        (bool success, bytes memory encodedDecimals) = token.staticcall(
+            abi.encodeCall(IERC20MetadataUpgradeable.decimals, ())
+        );
+        if (success && encodedDecimals.length >= 32) {
+            uint256 returnedDecimals = abi.decode(encodedDecimals, (uint256));
+            if (returnedDecimals <= type(uint8).max) {
+                return (true, uint8(returnedDecimals));
+            }
+        }
+        return (false, 0);
+    }
 }
