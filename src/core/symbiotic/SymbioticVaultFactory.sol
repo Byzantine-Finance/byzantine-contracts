@@ -33,10 +33,9 @@ contract SymbioticVaultFactory is Initializable, OwnableUpgradeable {
     /// @notice Standardized parameters for all vaults
     uint64 public constant VERSION = 1; // 1: standard vault, 2: tokenized vault
     bool public constant WITH_SLASHER = true;
-    uint64 public constant DEFAULT_DELEGATOR_INDEX = 0; // 0: NetworkRestakeDelegator, 1: FullRestakeDelegatorWithSlasher
 
     /// @notice Standardized parameters for standard vaults
-    uint64 public constant DELEGATOR_INDEX = 0;
+    uint64 public constant DELEGATOR_INDEX = 0; // 0: NetworkRestakeDelegator, 1: FullRestakeDelegatorWithSlasher
     uint64 public constant SLASHER_INDEX = 1;
     bool public constant IS_DEPOSIT_LIMIT = false;
     uint256 public constant DEPOSIT_LIMIT = 0;
@@ -97,6 +96,7 @@ contract SymbioticVaultFactory is Initializable, OwnableUpgradeable {
         // Deploy BurnerRouter
         address burnerRouter = _deployBurnerRouter(burnerRouterParams, byzFiNativeSymbioticVault, stakingMinivault);
 
+        // If it is a standard vault, use the preset parameters for the vault configurator
         if (isStandardVault) {
             // Use the preset parameters for the vault configurator
             configuratorParams.delegatorIndex = DELEGATOR_INDEX;
@@ -239,7 +239,7 @@ contract SymbioticVaultFactory is Initializable, OwnableUpgradeable {
         address burnerRouter,
         address byzFiNativeSymbioticVault,
         address stakingMinivault
-    ) internal pure returns (bytes memory) {
+    ) private pure returns (bytes memory) {
         return abi.encode(IVault.InitParams({
             collateral: stakingMinivault,
             burner: burnerRouter,
@@ -266,7 +266,7 @@ contract SymbioticVaultFactory is Initializable, OwnableUpgradeable {
         ISymbioticVaultFactory.VaultConfiguratorParams memory configuratorParams,
         ISymbioticVaultFactory.DelegatorParams memory delegatorParams,
         address byzFiNativeSymbioticVault
-    ) internal pure returns (bytes memory) {
+    ) private pure returns (bytes memory) {
         // Initialize BaseParams of Symbiotic IBaseDelegator
         IBaseDelegator.BaseParams memory delegatorBaseParams = IBaseDelegator.BaseParams({
             defaultAdminRoleHolder: byzFiNativeSymbioticVault,
@@ -299,7 +299,7 @@ contract SymbioticVaultFactory is Initializable, OwnableUpgradeable {
     function _initializeSlasherInitParams(
         ISymbioticVaultFactory.SlasherParams memory slasherParams,
         uint64 slasherIndex
-    ) internal pure returns (bytes memory) {
+    ) private pure returns (bytes memory) {
 
         // Initialize ISlasher.InitParams if slasherIndex is 0, otherwise initialize IVetoSlasher.InitParams
         if (slasherIndex == 0) {
