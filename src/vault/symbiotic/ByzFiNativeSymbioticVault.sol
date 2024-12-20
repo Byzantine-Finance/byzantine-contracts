@@ -74,6 +74,9 @@ contract ByzFiNativeSymbioticVault is Initializable, OwnableUpgradeable, ERC7535
             initialOwner
         );
 
+        // Whitelist StakingMinivault to deposit into Symbiotic vault
+        vault.setDepositorWhitelistStatus(stakingMinivault, true);
+
         // Transfer ownership
         _transferOwnership(initialOwner);
     }
@@ -107,8 +110,8 @@ contract ByzFiNativeSymbioticVault is Initializable, OwnableUpgradeable, ERC7535
         // Send the ETH to the Staking Minivault to be staked on the beacon chain and mint the corresponding Staking vaultshares (SVS) 
         uint256 svShares = StakingMinivault(stakingMinivault).deposit{value: assets}(assets, receiver);
 
-        // Restake the SVS into the Symbiotic Vault
-        // TODO: implement
+        // Deposit SVS into Symbiotic vault
+        (uint256 depositedAmount, uint256 mintedShares) = vault.deposit(receiver, svShares);
         
         return nrvShares;
     }
@@ -126,8 +129,8 @@ contract ByzFiNativeSymbioticVault is Initializable, OwnableUpgradeable, ERC7535
         // Send the ETH to the Staking Minivault to be staked on the beacon chain and mint the corresponding Staking vaultshares (SVS) 
         uint256 stakingAssets = StakingMinivault(stakingMinivault).mint{value: assets}(shares, receiver);
 
-        // Restake the SVS into the Symbiotic Vault
-        // TODO: implement
+        // Deposit SVS into Symbiotic vault
+        (uint256 depositedAmount, uint256 mintedShares) = vault.deposit(receiver, stakingAssets);
 
         return assets;
     }
