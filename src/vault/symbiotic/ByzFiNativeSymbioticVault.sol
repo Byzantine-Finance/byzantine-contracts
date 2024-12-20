@@ -74,6 +74,9 @@ contract ByzFiNativeSymbioticVault is Initializable, OwnableUpgradeable, ERC7535
             initialOwner
         );
 
+        // Whitelist this contract to deposit into StakingMinivault
+        StakingMinivault(stakingMinivault).whitelistStaker(address(this));
+
         // Whitelist StakingMinivault to deposit into Symbiotic vault
         vault.setDepositorWhitelistStatus(stakingMinivault, true);
 
