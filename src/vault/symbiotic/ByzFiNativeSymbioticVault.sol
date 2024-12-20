@@ -21,27 +21,25 @@ contract ByzFiNativeSymbioticVault is Initializable, OwnableUpgradeable, ERC7535
     /* ============== CONSTRUCTOR & INITIALIZER ============== */
 
     /// @custom:oz-upgrades-unsafe-allow constructor
-    constructor() {
-        // Disable initializer in the context of the implementation contract
-        _disableInitializers();
-    }
+    // TODO: remove constructor, requires changing the initialization in SymbioticVaultFactory
+    // constructor() {
+    //     // Disable initializer in the context of the implementation contract
+    //     _disableInitializers();
+    // }
 
     function initialize(
         address initialOwner, 
-        address _vaultAddress,
-        bool _whitelistedDeposit
+        address _vaultAddress
     ) external initializer {
         __ByzFiNativeSymbioticVault_init(
             initialOwner,
-            _vaultAddress,
-            _whitelistedDeposit
+            _vaultAddress
         );
     }
 
     function __ByzFiNativeSymbioticVault_init(
         address initialOwner,
-        address _vaultAddress,
-        bool _whitelistedDeposit
+        address _vaultAddress
     ) internal onlyInitializing {
         // Initialize parent contracts
         __Ownable_init();
@@ -50,35 +48,19 @@ contract ByzFiNativeSymbioticVault is Initializable, OwnableUpgradeable, ERC7535
         // Initialize the contract
         __ByzFiNativeSymbioticVault_init_unchained(
             initialOwner,
-            _vaultAddress,
-            _whitelistedDeposit
+            _vaultAddress
         );
     }
 
     function __ByzFiNativeSymbioticVault_init_unchained(
         address initialOwner,
-        address _vaultAddress,
-        bool _whitelistedDeposit
+        address _vaultAddress
     ) internal onlyInitializing {
         // Set vault reference
         vault = IVault(_vaultAddress);
 
-        // Deploy and initialize StakingMinivault
-        stakingMinivault = payable(address(new StakingMinivault(
-            address(0),                 // _symPodFactory (mock)
-            address(0),                 // _auction (mock)
-            address(0)                  // _beaconChainAdmin (mock)
-        )));
-        StakingMinivault(stakingMinivault).initialize(
-            _whitelistedDeposit,
-            initialOwner
-        );
-
-        // Whitelist this contract to deposit into StakingMinivault
-        StakingMinivault(stakingMinivault).whitelistStaker(address(this));
-
-        // Whitelist StakingMinivault to deposit into Symbiotic vault
-        vault.setDepositorWhitelistStatus(stakingMinivault, true);
+        // Whitelist ByzFiNativeSymbioticVault to deposit into Symbiotic vault
+        vault.setDepositorWhitelistStatus(address(this), true);
 
         // Transfer ownership
         _transferOwnership(initialOwner);
@@ -94,13 +76,6 @@ contract ByzFiNativeSymbioticVault is Initializable, OwnableUpgradeable, ERC7535
     }
 
     /**
-     * @notice Whitelists the StakingMinivault contract to be able to deposit ETH into the Symbiotic Vault
-     */
-    function whitelistDepositors() external onlyOwner {
-        vault.setDepositorWhitelistStatus(stakingMinivault, true); 
-    }
-
-    /**
      * @notice Deposits ETH into the vault. Amount is determined by ETH depositing.
      * @param assets The amount of ETH being deposit.
      * @param receiver The address to receive the Native Restaking Vaultshares (NRVS).
@@ -113,8 +88,8 @@ contract ByzFiNativeSymbioticVault is Initializable, OwnableUpgradeable, ERC7535
         // Send the ETH to the Staking Minivault to be staked on the beacon chain and mint the corresponding Staking vaultshares (SVS) 
         uint256 svShares = StakingMinivault(stakingMinivault).deposit{value: assets}(assets, receiver);
 
-        // Deposit SVS into Symbiotic vault
-        (uint256 depositedAmount, uint256 mintedShares) = vault.deposit(receiver, svShares);
+        // // Deposit SVS into Symbiotic vault
+        // (uint256 depositedAmount, uint256 mintedShares) = vault.deposit(receiver, svShares);
         
         return nrvShares;
     }
