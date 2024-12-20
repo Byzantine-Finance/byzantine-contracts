@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "@openzeppelin-upgrades/contracts/token/ERC721/IERC721Upgradeable.sol";
+import {IERC721Upgradeable} from "@openzeppelin-upgrades/contracts/token/ERC721/IERC721Upgradeable.sol";
 
 interface IByzNft is IERC721Upgradeable {
 

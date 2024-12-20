@@ -8,7 +8,7 @@ import {IERC20Upgradeable} from "@openzeppelin-upgrades/contracts/token/ERC20/IE
 import {IERC20MetadataUpgradeable} from "@openzeppelin-upgrades/contracts/token/ERC20/extensions/IERC20MetadataUpgradeable.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgrades/contracts/security/ReentrancyGuardUpgradeable.sol";
 import {MathUpgradeable} from "@openzeppelin-upgrades/contracts/utils/math/MathUpgradeable.sol";
-import "../interfaces/IOracle.sol";
+import {IOracle} from "../interfaces/IOracle.sol";
 
 /**
  * @title ERC7535MultiRewardVault
