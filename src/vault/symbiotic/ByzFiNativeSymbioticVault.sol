@@ -6,7 +6,7 @@ import {OwnableUpgradeable} from "@openzeppelin-upgrades/contracts/access/Ownabl
 import "../ERC7535/ERC7535Upgradeable.sol";
 
 import {IVault} from "@symbioticfi/core/src/interfaces/vault/IVault.sol";
-import {StakingMinivaultMock} from "../../../test/mocks/StakingMinivaultMock.sol";
+import {StakingMinivault} from "./StakingMinivault.sol";
 
 contract ByzFiNativeSymbioticVault is Initializable, OwnableUpgradeable, ERC7535Upgradeable {
 
@@ -16,23 +16,53 @@ contract ByzFiNativeSymbioticVault is Initializable, OwnableUpgradeable, ERC7535
     IVault public vault;
 
     /// @notice The StakingMinivault contract address
-    address public stakingMinivault;
+    address payable public stakingMinivault;
 
     /* ============== CONSTRUCTOR & INITIALIZER ============== */
 
-    // /// @custom:oz-upgrades-unsafe-allow constructor
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    // TODO: remove constructor, requires changing the initialization in SymbioticVaultFactory
     // constructor() {
     //     // Disable initializer in the context of the implementation contract
     //     _disableInitializers();
     // }
 
-    /**
-     * @dev Initializes the address of the initial owner, the vault address, and the staking minivault address
-     */
-    function initialize(address initialOwner, address _vaultAddress, address _stakingMinivaultAddress) external initializer {
+    function initialize(
+        address initialOwner, 
+        address _vaultAddress
+    ) external initializer {
+        __ByzFiNativeSymbioticVault_init(
+            initialOwner,
+            _vaultAddress
+        );
+    }
+
+    function __ByzFiNativeSymbioticVault_init(
+        address initialOwner,
+        address _vaultAddress
+    ) internal onlyInitializing {
+        // Initialize parent contracts
+        __Ownable_init();
+        __ERC7535_init();
+
+        // Initialize the contract
+        __ByzFiNativeSymbioticVault_init_unchained(
+            initialOwner,
+            _vaultAddress
+        );
+    }
+
+    function __ByzFiNativeSymbioticVault_init_unchained(
+        address initialOwner,
+        address _vaultAddress
+    ) internal onlyInitializing {
+        // Set vault reference
         vault = IVault(_vaultAddress);
-        stakingMinivault = _stakingMinivaultAddress;
-        vault.setDepositorWhitelistStatus(stakingMinivault, true); 
+
+        // Whitelist ByzFiNativeSymbioticVault to deposit into Symbiotic vault
+        vault.setDepositorWhitelistStatus(address(this), true);
+
+        // Transfer ownership
         _transferOwnership(initialOwner);
     }
 
@@ -45,30 +75,23 @@ contract ByzFiNativeSymbioticVault is Initializable, OwnableUpgradeable, ERC7535
         // TODO: emit an event to notify
     }
 
-    // /**
-    //  * @notice Whitelists the StakingMinivault contract to be able to deposit ETH into the Symbiotic Vault
-    //  */
-    // function whitelistDepositors() external onlyOwner {
-    //     vault.setDepositorWhitelistStatus(stakingMinivault, true); 
-    // }
-
     /**
      * @notice Deposits ETH into the vault. Amount is determined by ETH depositing.
      * @param assets The amount of ETH being deposit.
      * @param receiver The address to receive the Native Restaking Vaultshares (NRVS).
-     * @return The amount of shares minted.
+     * @return The amount of NRVS shares minted.
      */
     function deposit(uint256 assets, address receiver) public virtual override payable returns (uint256) {
         // Deposit ETH into the vault to receive NRVS
-        uint256 shares = super.deposit(assets, receiver);
+        uint256 nrvShares = super.deposit(assets, receiver);
 
         // Send the ETH to the Staking Minivault to be staked on the beacon chain and mint the corresponding Staking vaultshares (SVS) 
-        // TODO: implement
+        uint256 svShares = StakingMinivault(stakingMinivault).deposit{value: assets}(assets, receiver);
 
-        // Restake the SVS into the Symbiotic Vault
-        // TODO: implement
+        // // Deposit SVS into Symbiotic vault
+        // (uint256 depositedAmount, uint256 mintedShares) = vault.deposit(receiver, svShares);
         
-        return shares;
+        return nrvShares;
     }
 
     /**
@@ -82,10 +105,10 @@ contract ByzFiNativeSymbioticVault is Initializable, OwnableUpgradeable, ERC7535
         uint256 assets = super.mint(shares, receiver);
 
         // Send the ETH to the Staking Minivault to be staked on the beacon chain and mint the corresponding Staking vaultshares (SVS) 
-        // TODO: implement
+        uint256 stakingAssets = StakingMinivault(stakingMinivault).mint{value: assets}(shares, receiver);
 
-        // Restake the SVS into the Symbiotic Vault
-        // TODO: implement
+        // Deposit SVS into Symbiotic vault
+        (uint256 depositedAmount, uint256 mintedShares) = vault.deposit(receiver, stakingAssets);
 
         return assets;
     }

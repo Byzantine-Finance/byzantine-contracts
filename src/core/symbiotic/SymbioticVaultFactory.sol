@@ -19,7 +19,7 @@ import {ISymbioticVaultFactory} from "../../interfaces/ISymbioticVaultFactory.so
 import {IVault} from "@symbioticfi/core/src/interfaces/vault/IVault.sol";
 
 import {ByzFiNativeSymbioticVault} from "../../vault/symbiotic/ByzFiNativeSymbioticVault.sol";
-import {StakingMinivaultMock} from "../../../test/mocks/StakingMinivaultMock.sol";
+import {StakingMinivault} from "../../vault/symbiotic/StakingMinivault.sol";
 
 contract SymbioticVaultFactory is Initializable, OwnableUpgradeable {
 
@@ -91,7 +91,11 @@ contract SymbioticVaultFactory is Initializable, OwnableUpgradeable {
         byzFiNativeSymbioticVault = payable(address(new ByzFiNativeSymbioticVault()));
         
         // Deploy StakingMinivault
-        stakingMinivault = address(new StakingMinivaultMock());
+        stakingMinivault = address(new StakingMinivault(
+            address(0),                 // _symPodFactory (mock)
+            address(0),                 // _auction (mock)
+            address(0)                  // _beaconChainAdmin (mock)
+        ));
 
         // Deploy BurnerRouter
         address burnerRouter = _deployBurnerRouter(burnerRouterParams, byzFiNativeSymbioticVault, stakingMinivault);
@@ -117,7 +121,7 @@ contract SymbioticVaultFactory is Initializable, OwnableUpgradeable {
         defaultStakerRewards = _deployDefaultStakerRewards(stakerRewardsParams, vault, byzFiNativeSymbioticVault);
 
         // Initialize ByzFiNativeSymbioticVault and whitelist the stakingMinivault as a depositor
-        ByzFiNativeSymbioticVault(byzFiNativeSymbioticVault).initialize(byzFiNativeSymbioticVault, vault, stakingMinivault);
+        ByzFiNativeSymbioticVault(byzFiNativeSymbioticVault).initialize(byzFiNativeSymbioticVault, vault);
 
         return (vault, delegator, slasher, defaultStakerRewards, byzFiNativeSymbioticVault, stakingMinivault);
     }
