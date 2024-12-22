@@ -5,20 +5,20 @@ pragma solidity ^0.8.20;
 // solhint-disable var-name-mixedcase
 // solhint-disable func-name-mixedcase
 
-import "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
-import "eigenlayer-contracts/interfaces/IEigenPod.sol";
-import "eigenlayer-contracts/interfaces/IStrategy.sol";
-import "eigenlayer-contracts/libraries/BeaconChainProofs.sol";
-import { SplitV2Lib } from "splits-v2/libraries/SplitV2.sol";
-import "./utils/ProofParsing.sol";
-import "./ByzantineDeployer.t.sol";
+import {BeaconProxy} from "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
+import {IEigenPod} from "eigenlayer-contracts/interfaces/IEigenPod.sol";
+import {IStrategy} from "eigenlayer-contracts/interfaces/IStrategy.sol";
+import {BeaconChainProofs} from "eigenlayer-contracts/libraries/BeaconChainProofs.sol";
+import {SplitV2Lib} from "splits-v2/libraries/SplitV2.sol";
+import {ProofParsing} from "./utils/ProofParsing.sol";
+import {ByzantineDeployer} from "./ByzantineDeployer.t.sol";
 
-import "../src/interfaces/IStrategyVaultERC20.sol";
-import "../src/interfaces/IStrategyVaultETH.sol";
-import "../src/interfaces/IStrategyVaultManager.sol";
-import "../src/interfaces/IAuction.sol";
-import "../src/core/StrategyVaultETH.sol";
-import "../src/interfaces/IStakerRewards.sol";
+import {IStrategyVaultERC20} from "../src/interfaces/IStrategyVaultERC20.sol";
+import {IStrategyVaultETH} from "../src/interfaces/IStrategyVaultETH.sol";
+import {IStrategyVaultManager} from "../src/interfaces/IStrategyVaultManager.sol";
+import {IAuction} from "../src/interfaces/IAuction.sol";
+import {StrategyVaultETH} from "../src/core/StrategyVaultETH.sol";
+import {IStakerRewards} from "../src/interfaces/IStakerRewards.sol";
 
 import "./mocks/MockOracle.sol";
 

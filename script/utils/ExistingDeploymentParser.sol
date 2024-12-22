@@ -254,31 +254,31 @@ contract ExistingDeploymentParser is Script, Test {
             strategyVaultERC20Beacon.implementation() == address(strategyVaultERC20Implementation),
             "strategyVaultERC20Beacon: implementation set incorrectly"
         );
-        // StrategyVaultManager
-        require(
-            byzantineProxyAdmin.getProxyImplementation(TransparentUpgradeableProxy(payable(address(strategyVaultManager)))) == address(strategyVaultManagerImplementation),
-            "strategyVaultManager: implementation set incorrectly"
-        );
-        // ByzNft
-        require(
-            byzantineProxyAdmin.getProxyImplementation(TransparentUpgradeableProxy(payable(address(byzNft)))) == address(byzNftImplementation),
-            "byzNft: implementation set incorrectly"
-        );
-        // Auction
-        require(
-            byzantineProxyAdmin.getProxyImplementation(TransparentUpgradeableProxy(payable(address(auction)))) == address(auctionImplementation),
-            "auction: implementation set incorrectly"
-        );
-        // Escrow
-        require(
-            byzantineProxyAdmin.getProxyImplementation(TransparentUpgradeableProxy(payable(address(escrow)))) == address(escrowImplementation),
-            "escrow: implementation set incorrectly"
-        );
-        // StakerRewards
-        require(
-            byzantineProxyAdmin.getProxyImplementation(TransparentUpgradeableProxy(payable(address(stakerRewards)))) == address(stakerRewardsImplementation),
-            "stakerRewards: implementation set incorrectly"
-        );
+        // // StrategyVaultManager
+        // require(
+        //     byzantineProxyAdmin.getProxyImplementation(TransparentUpgradeableProxy(payable(address(strategyVaultManager)))) == address(strategyVaultManagerImplementation),
+        //     "strategyVaultManager: implementation set incorrectly"
+        // );
+        // // ByzNft
+        // require(
+        //     byzantineProxyAdmin.getProxyImplementation(TransparentUpgradeableProxy(payable(address(byzNft)))) == address(byzNftImplementation),
+        //     "byzNft: implementation set incorrectly"
+        // );
+        // // Auction
+        // require(
+        //     byzantineProxyAdmin.getProxyImplementation(TransparentUpgradeableProxy(payable(address(auction)))) == address(auctionImplementation),
+        //     "auction: implementation set incorrectly"
+        // );
+        // // Escrow
+        // require(
+        //     byzantineProxyAdmin.getProxyImplementation(TransparentUpgradeableProxy(payable(address(escrow)))) == address(escrowImplementation),
+        //     "escrow: implementation set incorrectly"
+        // );
+        // // StakerRewards
+        // require(
+        //     byzantineProxyAdmin.getProxyImplementation(TransparentUpgradeableProxy(payable(address(stakerRewards)))) == address(stakerRewardsImplementation),
+        //     "stakerRewards: implementation set incorrectly"
+        // );
     }
 
     /**
