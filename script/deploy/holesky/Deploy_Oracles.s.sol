@@ -39,7 +39,7 @@ contract Deploy_Oracles is Script{
                 vm.stopBroadcast();
             } else if (keccak256(abi.encodePacked(oraclesToDeploy[i])) == keccak256(abi.encodePacked("API3"))) {
                 vm.startBroadcast();
-                api3OracleImplementation = new API3OracleImplementation();
+                api3OracleImplementation = new API3OracleImplementation(msg.sender);
                 console.log("API3OracleImplementation deployed at address: ", address(api3OracleImplementation));
                 vm.stopBroadcast();
             } else {

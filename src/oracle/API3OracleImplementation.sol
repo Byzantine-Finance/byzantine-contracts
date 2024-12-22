@@ -23,6 +23,8 @@ contract API3OracleImplementation is IOracle, Ownable {
     uint256 public constant MAX_DELAY = 1 hours;  // Maximum acceptable delay
     address public constant ETH_USD_PROXY = 0xa47Fd122b11CdD7aad7c3e8B740FB91D83Ce43D1; // ETH/USD Proxy on Holesky
 
+    constructor(address initialOwner) Ownable(initialOwner) {}
+
     /// @notice Get the price of an asset from an API3 dAPI
     /// @param asset The asset to get the price of
     /// @return price The price of the asset with 18 decimal places
