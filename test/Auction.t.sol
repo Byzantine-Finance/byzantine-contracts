@@ -36,28 +36,94 @@ contract AuctionTest is ByzantineDeployer {
     }
 
     function test_Whitelist() external view {
+
+        // // Alice, a non-whitelisted node operator, bids three times
+        // _bidCluster4(alice, 10e2, 110);
+        // _bidCluster4(alice, 10e2, 120);
+        // _bidCluster4(alice, 10e2, 130);
+        // assertEq(auction.getNodeOpDetails(alice).numBonds, 3);
+        // // Alice new balance
+        // aliceBalanceAfter3Bids = alice.balance;
+
         // Verify if all node operators are whitelisted
         for (uint256 i = 0; i < nodeOps.length; i++) {
             assertTrue(auction.isWhitelisted(nodeOps[i]));
+            assertEq(auction.getNodeOpDetails(nodeOps[i]).numBonds, 0);
         }
 
         // Verify Alice and Bob are not whitelisted
         assertFalse(auction.isWhitelisted(alice));
         assertFalse(auction.isWhitelisted(bob));
+
+        // Whitelist Alice
+        // auction.whitelistNodeOps(alice);
+        // assertEq(alice.balance, aliceBalanceAfter3Bids + 3 * BOND);
+        // assertEq(auction.getNodeOpDetails(alice).numBonds, 0);
+
     }
 
-    // function test_RemoveFromWhitelist() external {
-    //     // Byzantine add nodeOps[0] to the whitelist
-    //     auction.addNodeOpToWhitelist(nodeOps[0]);
+    function test_RemoveFromWhitelist() external {
+        // nodeOps[0] bids
+        bytes32 bidId = _bidCluster4(nodeOps[0], 10e2, 110);
 
-    //     // Should revert if Byzantine remove a non-whitelisted address
-    //     vm.expectRevert(IAuction.NotWhitelisted.selector);
-    //     auction.removeNodeOpFromWhitelist(nodeOps[1]);
+        // Should revert if nodeOps[0] has pending bids
+        address[] memory nodeOpToUnwhitelist = new address[](1);
+        nodeOpToUnwhitelist[0] = nodeOps[0];
+        vm.expectRevert(IAuction.NodeOpHasPendingBids.selector);
+        auction.removeNodeOpFromWhitelist(nodeOpToUnwhitelist);
 
-    //     // Byzantine removes nodeOps[0] from the whitelist
-    //     auction.removeNodeOpFromWhitelist(nodeOps[0]);
-    //     assertFalse(auction.isWhitelisted(nodeOps[0]));
-    // }
+        // nodeOps[0] removes its bid
+        vm.prank(nodeOps[0]);
+        auction.withdrawBid(bidId);
+
+        // Byzantine removes nodeOps[0] from the whitelist
+        auction.removeNodeOpFromWhitelist(nodeOps);
+        for (uint256 i = 0; i < nodeOps.length; i++) {
+            assertFalse(auction.isWhitelisted(nodeOps[i]));
+        }
+    }
+
+    function test_getNumBids() external {
+        // 6 nodeOps bid, 11 bids in total
+        _createMultipleBids();
+
+        // Sould revert if invalid auction type
+        vm.expectRevert(IAuction.InvalidAuctionType.selector);
+        auction.getNumBids(IAuction.AuctionType.JOIN_CLUSTER_7);
+
+        assertEq(auction.getNumBids(IAuction.AuctionType.JOIN_CLUSTER_4), 11);
+    }
+
+    function test_getBidRanking() external {
+        // 6 nodeOps bid, 11 bids in total
+        bytes32[] memory bidIds = _createMultipleBids();
+
+        // Should revert if numBids is 0
+        vm.expectRevert(bytes("Number of bids must be greater than 0"));
+        auction.getBidRanking(0, IAuction.AuctionType.JOIN_CLUSTER_4);
+
+        // Should revert if numBids is too high
+        vm.expectRevert(bytes("Number of bids too high"));
+        auction.getBidRanking(30, IAuction.AuctionType.JOIN_CLUSTER_4);
+
+        // Should revert if invalid auction type
+        vm.expectRevert(IAuction.InvalidAuctionType.selector);
+        auction.getBidRanking(11, IAuction.AuctionType.JOIN_CLUSTER_7);
+
+        // Get the bids ranking
+        IAuction.BSTNode[] memory bstNodes = auction.getBidRanking(11, IAuction.AuctionType.JOIN_CLUSTER_4);
+        assertEq(bstNodes[0].bidId, bidIds[8]);
+        assertEq(bstNodes[1].bidId, bidIds[0]);
+        assertEq(bstNodes[2].bidId, bidIds[1]);
+        assertEq(bstNodes[3].bidId, bidIds[2]);
+        assertEq(bstNodes[4].bidId, bidIds[3]);
+        assertEq(bstNodes[5].bidId, bidIds[9]);
+        assertEq(bstNodes[6].bidId, bidIds[4]);
+        assertEq(bstNodes[7].bidId, bidIds[5]);
+        assertEq(bstNodes[8].bidId, bidIds[6]);
+        assertEq(bstNodes[9].bidId, bidIds[7]);
+        assertEq(bstNodes[10].bidId, bidIds[10]);
+    }
 
     function test_getPriceToPay() external {
         // Should revert if discountRate too high
@@ -394,6 +460,9 @@ contract AuctionTest is ByzantineDeployer {
         vm.prank(nodeOps[0]);
         auction.withdrawBid(bidIds[0]);
 
+        // Verify number of bids
+        assertEq(auction.getNumBids(IAuction.AuctionType.JOIN_CLUSTER_4), 10);
+
         IAuction.NodeOpGlobalDetails memory nodeOpDetails = auction.getNodeOpDetails(nodeOps[0]);
         // Verify number of bids of nodeOps[0]
         assertEq(nodeOpDetails.numBidsCluster4, 1);
@@ -410,6 +479,9 @@ contract AuctionTest is ByzantineDeployer {
 
         vm.prank(nodeOps[0]);
         auction.withdrawBid(bidIds[1]);
+
+        // Verify number of bids
+        assertEq(auction.getNumBids(IAuction.AuctionType.JOIN_CLUSTER_4), 9);
 
         nodeOpDetails = auction.getNodeOpDetails(nodeOps[0]);
         // Verify number of bids of nodeOps[0]
@@ -431,6 +503,40 @@ contract AuctionTest is ByzantineDeployer {
         assertEq(nodesAddr[1], nodeOps[1]);
         assertEq(nodesAddr[2], nodeOps[4]);
         assertEq(nodesAddr[3], nodeOps[2]);
+
+    }
+
+    function testRemoveBid() external {
+        // 6 nodeOps bid, 11 bids in total
+        _createMultipleBids();
+        assertEq(auction.getNumBids(IAuction.AuctionType.JOIN_CLUSTER_4), 11);
+
+        // nodeOps[3] bids again two times: 13.75%, 129 days
+        bytes32 bidId1 = _bidCluster4(nodeOps[3], 1375, 129);
+        bytes32 bidId2 = _bidCluster4(nodeOps[3], 1375, 129);
+
+        // Verify total number of bids
+        assertEq(auction.getNumBids(IAuction.AuctionType.JOIN_CLUSTER_4), 13);
+
+        // Should revert if not called by the Byzantine Admin
+        vm.prank(alice);
+        vm.expectRevert(bytes("Ownable: caller is not the owner"));
+        auction.removeBid(bidId1, auctionScore_1375_129, nodeOps[3], IAuction.AuctionType.JOIN_CLUSTER_4);
+
+        /* ============= Byzantine Admin removes nodeOps[3]'s last bid ============= */
+
+        vm.prank(byzantineAdmin);
+        auction.removeBid(bidId2, auctionScore_1375_129, nodeOps[3], IAuction.AuctionType.JOIN_CLUSTER_4);
+
+        // Verify total number of bids
+        assertEq(auction.getNumBids(IAuction.AuctionType.JOIN_CLUSTER_4), 12);
+
+        // Verify number of bids of nodeOps[3]
+        assertEq(auction.getNodeOpDetails(nodeOps[3]).numBidsCluster4, 2);
+
+        // Verify bidId has been deleted from mapping
+        IAuction.BidDetails memory bidDetails = auction.getBidDetails(bidId2);
+        assertEq(bidDetails.nodeOp, address(0));
 
     }
 

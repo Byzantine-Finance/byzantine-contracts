@@ -322,7 +322,7 @@ contract ExistingDeploymentParser is Script, Test {
     function logInitialDeploymentParams() public {
         emit log_string("==== Parsed Initilize Params for Initial Deployment ====");
 
-        emit log_named_address("byzantineAdmin", byzantineAdmin);
+        emit log_named_address("byzantineAdmin", msg.sender);
         emit log_named_address("beaconChainAdmin", beaconChainAdmin);
 
         emit log_named_uint("EXPECTED_POS_DAILY_RETURN_WEI", EXPECTED_POS_DAILY_RETURN_WEI);
