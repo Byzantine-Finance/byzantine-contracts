@@ -522,6 +522,9 @@ contract Auction is
      */
     function whitelistNodeOps(address[] calldata _nodeOpAddrs) external onlyOwner {
         for (uint256 i = 0; i < _nodeOpAddrs.length;) {
+            uint16 numBonds = _nodeOpsDetails[_nodeOpAddrs[i]].numBonds;
+            if (numBonds > 0) escrow.refund(_nodeOpAddrs[i], numBonds * _BOND);
+            _nodeOpsDetails[_nodeOpAddrs[i]].numBonds = 0;
             _nodeOpsDetails[_nodeOpAddrs[i]].isWhitelisted = true;
             unchecked {
                 ++i;
@@ -530,14 +533,28 @@ contract Auction is
     }
 
     /**
-     * @notice Remove a node operator to the the whitelist.
-     * @param _nodeOpAddr: the node operator to remove from whitelist.
-     * @dev Revert if the node operator is not whitelisted.
+     * @notice Remove node operators from the whitelist.
+     * @param _nodeOpAddrs: A dynamique array of the addresses to unwhitelist
+     * @dev /!\ Edge case: TO USE WITH CAUTION
+     *      - node op whitelisted make a dummy bid
+     *      - node op unwhitelisted with pending dummy bid
+     *      - node op bids again for sensitive clusters and pay bond
+     *      - node op removes dummy bid and get back the bond
+     *      - node op can cheat and be slashed on the sensitive clusters
+     * @dev Solution:
+     *      - node op can't be unwhitelisted if it has pending bids
      */
-    /*function removeNodeOpFromWhitelist(address _nodeOpAddr) external onlyOwner {
-        if (!isWhitelisted(_nodeOpAddr)) revert NotWhitelisted();
-        _nodeOpsWhitelist[_nodeOpAddr] = false;
-    }*/
+    function removeNodeOpFromWhitelist(address[] calldata _nodeOpAddrs) external onlyOwner {
+        for (uint256 i = 0; i < _nodeOpAddrs.length;) {
+            if (_nodeOpsDetails[_nodeOpAddrs[i]].numBidsCluster4 + _nodeOpsDetails[_nodeOpAddrs[i]].numBidsCluster7 > 0) {
+                revert NodeOpHasPendingBids();
+            }
+            _nodeOpsDetails[_nodeOpAddrs[i]].isWhitelisted = false;
+            unchecked {
+                ++i;
+            }
+        }
+    }
 
     /**
      * @notice Remove a bid from the auction storage

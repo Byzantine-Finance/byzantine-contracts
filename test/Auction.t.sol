@@ -36,28 +36,52 @@ contract AuctionTest is ByzantineDeployer {
     }
 
     function test_Whitelist() external view {
+
+        // // Alice, a non-whitelisted node operator, bids three times
+        // _bidCluster4(alice, 10e2, 110);
+        // _bidCluster4(alice, 10e2, 120);
+        // _bidCluster4(alice, 10e2, 130);
+        // assertEq(auction.getNodeOpDetails(alice).numBonds, 3);
+        // // Alice new balance
+        // aliceBalanceAfter3Bids = alice.balance;
+
         // Verify if all node operators are whitelisted
         for (uint256 i = 0; i < nodeOps.length; i++) {
             assertTrue(auction.isWhitelisted(nodeOps[i]));
+            assertEq(auction.getNodeOpDetails(nodeOps[i]).numBonds, 0);
         }
 
         // Verify Alice and Bob are not whitelisted
         assertFalse(auction.isWhitelisted(alice));
         assertFalse(auction.isWhitelisted(bob));
+
+        // Whitelist Alice
+        // auction.whitelistNodeOps(alice);
+        // assertEq(alice.balance, aliceBalanceAfter3Bids + 3 * BOND);
+        // assertEq(auction.getNodeOpDetails(alice).numBonds, 0);
+
     }
 
-    // function test_RemoveFromWhitelist() external {
-    //     // Byzantine add nodeOps[0] to the whitelist
-    //     auction.addNodeOpToWhitelist(nodeOps[0]);
+    function test_RemoveFromWhitelist() external {
+        // nodeOps[0] bids
+        bytes32 bidId = _bidCluster4(nodeOps[0], 10e2, 110);
 
-    //     // Should revert if Byzantine remove a non-whitelisted address
-    //     vm.expectRevert(IAuction.NotWhitelisted.selector);
-    //     auction.removeNodeOpFromWhitelist(nodeOps[1]);
+        // Should revert if nodeOps[0] has pending bids
+        address[] memory nodeOpToUnwhitelist = new address[](1);
+        nodeOpToUnwhitelist[0] = nodeOps[0];
+        vm.expectRevert(IAuction.NodeOpHasPendingBids.selector);
+        auction.removeNodeOpFromWhitelist(nodeOpToUnwhitelist);
 
-    //     // Byzantine removes nodeOps[0] from the whitelist
-    //     auction.removeNodeOpFromWhitelist(nodeOps[0]);
-    //     assertFalse(auction.isWhitelisted(nodeOps[0]));
-    // }
+        // nodeOps[0] removes its bid
+        vm.prank(nodeOps[0]);
+        auction.withdrawBid(bidId);
+
+        // Byzantine removes nodeOps[0] from the whitelist
+        auction.removeNodeOpFromWhitelist(nodeOps);
+        for (uint256 i = 0; i < nodeOps.length; i++) {
+            assertFalse(auction.isWhitelisted(nodeOps[i]));
+        }
+    }
 
     function test_getNumBids() external {
         // 6 nodeOps bid, 11 bids in total

@@ -312,6 +312,12 @@ interface IAuction {
     function whitelistNodeOps(address[] calldata _nodeOpAddrs) external;
 
     /**
+     * @notice Remove node operators from the whitelist.
+     * @param _nodeOpAddrs: A dynamique array of the addresses to unwhitelist
+     */
+    function removeNodeOpFromWhitelist(address[] calldata _nodeOpAddrs) external;
+
+    /**
      * @notice Remove a bid from the auction storage
      * @notice Backup function in case a node op cheats or loses its key access
      * @param _bidId: the id of the bid to remove
@@ -357,8 +363,8 @@ interface IAuction {
     /// @dev Error when unauthorized call to a function callable only by a StakerRewards.
     error OnlyStakerRewards();
 
-    /// @dev Error when address already whitelisted
-    error AlreadyWhitelisted();
+    /// @dev Error when unwhitelisted node op with pending bids
+    error NodeOpHasPendingBids();
 
     /// @dev Error when trying to remove from whitelist a non-whitelisted address
     error NotWhitelisted();
