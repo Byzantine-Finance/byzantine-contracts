@@ -23,7 +23,7 @@ contract SymbioticVaultFactoryTest is Test {
     address public DEFAULT_STAKER_REWARDS_FACTORY = 0x698C36DE44D73AEfa3F0Ce3c0255A8667bdE7cFD; // deployed on holesky
     address public STAKING_MINIVAULT = vm.addr(1); 
 
-    // Parameters to be used or the createVault function
+    // Parameters to be used for the createVault function
     address public hook = vm.addr(2);
     address public network1 = vm.addr(3);
     address public network2 = vm.addr(4);
@@ -40,8 +40,7 @@ contract SymbioticVaultFactoryTest is Test {
         holeskyFork = vm.createFork(HOLESKY_RPC_URL);
         vm.selectFork(holeskyFork);
 
-
-        // Deploy the SymbioticVaultManager contract with constructor parameters
+        // Deploy the SymbioticVaultFactory contract with constructor parameters
         symbioticVaultFactory = new SymbioticVaultFactory(
             BURNER_ROUTER_FACTORY,
             VAULT_CONFIGURATOR,
@@ -109,7 +108,7 @@ contract SymbioticVaultFactoryTest is Test {
         console.log("delegator", delegator);
         console.log("slasher", slasher);
         console.log("defaultStakerRewards", defaultStakerRewards);
-        console.log("byzFiNativeSymbioticVault", byzFiNativeSymbioticVault);    
+        console.log("byzFiNativeSymbioticVault", byzFiNativeSymbioticVault);
 
         // Verifiy if the ByzFiNativeSymbioticVault is initialized with the correct vault address
         address vaultAddr = address(ByzFiNativeSymbioticVault(byzFiNativeSymbioticVault).vault());
@@ -118,10 +117,9 @@ contract SymbioticVaultFactoryTest is Test {
         // Verify if the ByzFiNativeSymbioticVault is initialized with the correct staking minivault address
         address stakingMinivaultAddr = ByzFiNativeSymbioticVault(byzFiNativeSymbioticVault).stakingMinivault();
         assertEq(stakingMinivaultAddr, stakingMinivault);
-        console.log("stakingMinivaultAddr", stakingMinivaultAddr);
 
         // Verify if the stakingMinivault is whitelisted
-        assertEq(IVault(vault).isDepositorWhitelisted(stakingMinivault), true);
+        assertEq(IVault(vault).isDepositorWhitelisted(byzFiNativeSymbioticVault), true);
 
         // Verify if depositLimit is set to 1000 ether, meaning that an advanced vault is created
         uint256 limit = IVault(vault).depositLimit();
@@ -188,6 +186,10 @@ contract SymbioticVaultFactoryTest is Test {
         assertEq(duration, 2 days);
     }
 
+    function test_deposit() public {
+        
+    }
+
     /* ===================== HELPER FUNCTIONS ===================== */
 
     function _createBurnerRouterParams(
@@ -196,14 +198,12 @@ contract SymbioticVaultFactoryTest is Test {
         IBurnerRouter.NetworkReceiver[] memory _networkReceivers,
         IBurnerRouter.OperatorNetworkReceiver[] memory _operatorNetworkReceivers
     ) private pure returns (ISymbioticVaultFactory.BurnerRouterParams memory) {
-        ISymbioticVaultFactory.BurnerRouterParams memory params = ISymbioticVaultFactory.BurnerRouterParams({
+        return ISymbioticVaultFactory.BurnerRouterParams({
             delay: _delay,
             globalReceiver: _globalReceiver,
             networkReceivers: _networkReceivers, 
             operatorNetworkReceivers: _operatorNetworkReceivers 
         });
-
-        return params;
     }
 
     function _createConfiguratorParams(uint64 _delegatorIndex, uint64 _slasherIndex) private pure returns (ISymbioticVaultFactory.VaultConfiguratorParams memory) {

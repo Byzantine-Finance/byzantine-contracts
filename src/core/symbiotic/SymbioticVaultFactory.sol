@@ -101,7 +101,7 @@ contract SymbioticVaultFactory is Initializable, OwnableUpgradeable {
         address burnerRouter = _deployBurnerRouter(burnerRouterParams, byzFiNativeSymbioticVault, stakingMinivault);
 
         // If it is a standard vault, use the preset parameters for the vault configurator
-        if (isStandardVault) {
+        if (isStandardVault) { 
             // Use the preset parameters for the vault configurator
             configuratorParams.delegatorIndex = DELEGATOR_INDEX;
             configuratorParams.slasherIndex = SLASHER_INDEX;
@@ -121,7 +121,7 @@ contract SymbioticVaultFactory is Initializable, OwnableUpgradeable {
         defaultStakerRewards = _deployDefaultStakerRewards(stakerRewardsParams, vault, byzFiNativeSymbioticVault);
 
         // Initialize ByzFiNativeSymbioticVault and whitelist the stakingMinivault as a depositor
-        ByzFiNativeSymbioticVault(byzFiNativeSymbioticVault).initialize(byzFiNativeSymbioticVault, vault);
+        ByzFiNativeSymbioticVault(byzFiNativeSymbioticVault).initialize(byzFiNativeSymbioticVault, vault, stakingMinivault);
 
         return (vault, delegator, slasher, defaultStakerRewards, byzFiNativeSymbioticVault, stakingMinivault);
     }
