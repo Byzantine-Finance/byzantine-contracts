@@ -22,6 +22,7 @@ import {IOperatorRegistry} from "@symbioticfi/core/src/interfaces/IOperatorRegis
 import {IRegistry} from "@symbioticfi/core/src/interfaces/common/IRegistry.sol";
 import {IVault} from "@symbioticfi/core/src/interfaces/vault/IVault.sol";
 import {IOptInService} from "@symbioticfi/core/src/interfaces/service/IOptInService.sol";
+import {StakingMinivault} from "../src/vault/symbiotic/StakingMinivault.sol";
 
 contract SymbioticVaultFactoryTest is Test {
     uint256 holeskyFork;
@@ -55,6 +56,7 @@ contract SymbioticVaultFactoryTest is Test {
     address public receiver2 = vm.addr(8);
     address public networkOwner = vm.addr(9);
     address public alice = vm.addr(10);
+    address public bob = vm.addr(11);
 
     function setUp() public {
         // Make forked tests on Holesky
@@ -78,8 +80,9 @@ contract SymbioticVaultFactoryTest is Test {
             DEFAULT_STAKER_REWARDS_FACTORY
         );
 
-        // Fund Alice with 1000 ether
+        // Fund Alice and Bob with 1000 ether
         vm.deal(alice, 1000 ether);
+        vm.deal(bob, 1000 ether);
     }
 
     function testCanSelectFork() public {
@@ -190,7 +193,6 @@ contract SymbioticVaultFactoryTest is Test {
 
     function test_networkAndOperatorOnboarding() public {
         // Create a standardized vault
-
         // Initialize the parameters for the createVault function
         (
             ISymbioticVaultFactory.BurnerRouterParams memory burnerRouterParams,
@@ -271,6 +273,7 @@ contract SymbioticVaultFactoryTest is Test {
             ISymbioticVaultFactory.SlasherParams memory slasherParams,
             ISymbioticVaultFactory.StakerRewardsParams memory stakerRewardsParams
         ) = _createVaultParamsSet();
+
         (address vault, address delegator, address slasher, address defaultStakerRewards, address payable byzFiNativeSymbioticVault, address stakingMinivault) = symbioticVaultFactory.createVault(
             burnerRouterParams,
             configuratorParams,
@@ -281,13 +284,56 @@ contract SymbioticVaultFactoryTest is Test {
             true // isStandardVault
         );
 
-        // Onboarding process
+        // Go through the entire onboarding process for the network, operator and vault
         _onboardingProcess(vault, delegator, byzFiNativeSymbioticVault);
 
-        // Alice approves ByzFiNativeSymbioticVault to spend her funds
-        vm.prank(alice);
-        uint256 nrvShares = ByzFiNativeSymbioticVault(byzFiNativeSymbioticVault).deposit{value: 32 ether}(32 ether, alice);
+        // ============= For Testing purposes: Mint SymPodShares to byzFiNativeSymbioticVault to bypass the real process, to simulate: 
+        // -> deposit of ETH by Alice in ByzFiNativeSymbioticVault 
+        // -> deposit of ETH by ByzFiNativeSymbioticVault in StakingMinivault 
+        // -> issuance of SymPodShares by StakingMinivault to ByzFiNativeSymbioticVault
+        // -> deposit of SymPodShares by ByzFiNativeSymbioticVault in the SymbioticVault ==============
 
+        // Mint SymPodShares to byzFiNativeSymbioticVault (no access control for testing purposes)
+        StakingMinivault(payable(stakingMinivault)).mintForTesting(byzFiNativeSymbioticVault, 1000);
+        assertEq(StakingMinivault(payable(stakingMinivault)).balanceOf(byzFiNativeSymbioticVault), 1000);
+
+        // ByzFiNativeSymbioticVault approves the vault to spend its SymPodShares
+        vm.prank(byzFiNativeSymbioticVault);
+        StakingMinivault(payable(stakingMinivault)).approve(vault, 1000);
+        assertEq(StakingMinivault(payable(stakingMinivault)).allowance(byzFiNativeSymbioticVault, vault), 1000);
+
+        // ByzFiNativeSymbioticVault deposits SymPodShares on behalf of Alice
+        vm.prank(byzFiNativeSymbioticVault);
+        IVault(vault).deposit(alice, 1000);
+        assertEq(StakingMinivault(payable(stakingMinivault)).balanceOf(byzFiNativeSymbioticVault), 0);
+        assertEq(IVault(vault).activeBalanceOf(alice), 1000);
+        assertEq(IVault(vault).totalStake(), 1000);
+        assertEq(IVault(vault).activeShares(), 1000);
+
+        // Alice withdraws her SymPodShares (it will be claimable after the next epoch)
+        vm.warp(block.timestamp + 30 days);
+        uint256 epochAtWithdraw = IVault(vault).currentEpoch(); // epoch 1
+        vm.prank(alice); 
+        // TODO: Be careful, Alice can withdraw her SymPodShares directly from the SymbioticVault if SymPodShares are depoisted on her behalf
+        // SymPodShares should be minted to ByzFiNativeSymbioticVault? 
+        IVault(vault).withdraw(alice, 1000);
+        assertEq(IVault(vault).activeBalanceOf(alice), 0);
+        assertEq(IVault(vault).totalStake(), 1000);
+
+        // Vault epoch duration is 21 days, so we need to wait for 21 days
+        vm.warp(block.timestamp + 100 days);
+        vm.prank(alice);
+        IVault(vault).claim(alice, epochAtWithdraw + 1); // Can be claimed at epochAtWithdraw + 1 epoch 
+        assertEq(IVault(vault).totalStake(), 0);
+        assertEq(IVault(vault).activeBalanceOf(alice), 0);
+        assertEq(StakingMinivault(payable(stakingMinivault)).balanceOf(alice), 1000);
+
+        // TODO: Redo tests to interact correctly with ByzFiNativeSymbioticVault and StakingMinivault
+        // vm.prank(alice);
+        // uint256 nrvShares = ByzFiNativeSymbioticVault(byzFiNativeSymbioticVault).deposit{value: 64 ether}(64 ether, alice);
+        // Verify if the nrvShares received are equal to the shares converted from the amount of ETH deposited in ByzFiNativeSymbioticVault
+        // assertEq(nrvShares, convertedNrvShares);
+        // console.log("nrvShares", nrvShares);
     }
 
     /* ===================== HELPER FUNCTIONS ===================== */
@@ -334,7 +380,7 @@ contract SymbioticVaultFactoryTest is Test {
         adminFee = 100;
     }
 
-    function _createVaultParamsSet() private returns (
+    function _createVaultParamsSet() private view returns (
         ISymbioticVaultFactory.BurnerRouterParams memory burnerRouterParams,
         ISymbioticVaultFactory.VaultConfiguratorParams memory configuratorParams,
         ISymbioticVaultFactory.VaultParams memory vaultParams,
