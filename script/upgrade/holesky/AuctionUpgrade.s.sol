@@ -46,7 +46,8 @@ contract AuctionUpgrade is ExistingDeploymentParser {
             stakerRewards
         );
         // Upgrade Auction
-        byzantineProxyAdmin.upgradeAndCall(
+        proxyAdmin = _getProxyAdmin(address(auction));
+        proxyAdmin.upgradeAndCall(
             ITransparentUpgradeableProxy(payable(address(auction))),
             address(auctionImplementation),
             ""

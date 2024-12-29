@@ -2,6 +2,7 @@
 pragma solidity ^0.8.20;
 
 import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
+import {ERC1967Utils} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Utils.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {IBeacon} from "@openzeppelin/contracts/proxy/beacon/IBeacon.sol";
@@ -29,7 +30,7 @@ import {EmptyContract} from "./mocks/EmptyContract.sol";
 contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
 
     // Byzantine contracts
-    ProxyAdmin public byzantineProxyAdmin;
+    ProxyAdmin public proxyAdmin;
     StrategyVaultManager public strategyVaultManager;
     UpgradeableBeacon public strategyVaultETHBeacon;
     UpgradeableBeacon public strategyVaultERC20Beacon;
@@ -106,28 +107,24 @@ contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
         _registerAsELOperator(ELOperator1);
     }
 
-    function _deployByzantineContractsLocal() internal {
-        // deploy proxy admin for ability to upgrade proxy contracts
-        byzantineProxyAdmin = new ProxyAdmin(byzantineAdmin);
-
-        
+    function _deployByzantineContractsLocal() internal {       
         // First, deploy upgradeable proxy contracts that **will point** to the implementations. Since the implementation contracts are
         // not yet deployed, we give these proxies an empty contract as the initial implementation, to act as if they have no code.
         emptyContract = new EmptyContract();
         strategyVaultManager = StrategyVaultManager(
-            address(new TransparentUpgradeableProxy(address(emptyContract), address(byzantineProxyAdmin), ""))
+            address(new TransparentUpgradeableProxy(address(emptyContract), address(byzantineAdmin), ""))
         );
         byzNft = ByzNft(
-            address(new TransparentUpgradeableProxy(address(emptyContract), address(byzantineProxyAdmin), ""))
+            address(new TransparentUpgradeableProxy(address(emptyContract), address(byzantineAdmin), ""))
         );
         auction = Auction(
-            address(new TransparentUpgradeableProxy(address(emptyContract), address(byzantineProxyAdmin), ""))
+            address(new TransparentUpgradeableProxy(address(emptyContract), address(byzantineAdmin), ""))
         );
         escrow = Escrow(
-            payable(address(new TransparentUpgradeableProxy(address(emptyContract), address(byzantineProxyAdmin), "")))
+            payable(address(new TransparentUpgradeableProxy(address(emptyContract), address(byzantineAdmin), "")))
         );
         stakerRewards = StakerRewards(
-            payable(address(new TransparentUpgradeableProxy(address(emptyContract), address(byzantineProxyAdmin), "")))
+            payable(address(new TransparentUpgradeableProxy(address(emptyContract), address(byzantineAdmin), "")))
         );
 
         // StrategyVaultETH implementation contract
@@ -142,7 +139,7 @@ contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
         );
         // StrategyVaultETH beacon contract. The Beacon Proxy contract is deployed in the StrategyVaultManager
         // This contract points to the implementation contract.
-        strategyVaultETHBeacon = new UpgradeableBeacon(address(strategyVaultETHImplementation), address(byzantineProxyAdmin));
+        strategyVaultETHBeacon = new UpgradeableBeacon(address(strategyVaultETHImplementation), address(byzantineAdmin));
 
         // StrategyVaultERC20 implementation contract
         IStrategyVault strategyVaultERC20Implementation = new StrategyVaultERC20(
@@ -153,7 +150,7 @@ contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
         );
         // StrategyVaultERC20 beacon contract. The Beacon Proxy contract is deployed in the StrategyVaultManager
         // This contract points to the implementation contract.
-        strategyVaultERC20Beacon = new UpgradeableBeacon(address(strategyVaultERC20Implementation), address(byzantineProxyAdmin));
+        strategyVaultERC20Beacon = new UpgradeableBeacon(address(strategyVaultERC20Implementation), address(byzantineAdmin));
 
         // Second, deploy the *implementation* contracts, using the *proxy contracts* as inputs
         StrategyVaultManager strategyVaultManagerImplementation = new StrategyVaultManager(
@@ -184,7 +181,8 @@ contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
 
         // Third, upgrade the proxy contracts to use the correct implementation contracts and initialize them.
         // Upgrade StrategyVaultManager
-        byzantineProxyAdmin.upgradeAndCall(
+        proxyAdmin = _getProxyAdmin(address(strategyVaultManager));
+        proxyAdmin.upgradeAndCall(
             ITransparentUpgradeableProxy(payable(address(strategyVaultManager))),
             address(strategyVaultManagerImplementation),
             abi.encodeWithSelector(
@@ -193,7 +191,8 @@ contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
             )
         );
         // Upgrade ByzNft
-        byzantineProxyAdmin.upgradeAndCall(
+        proxyAdmin = _getProxyAdmin(address(byzNft));
+        proxyAdmin.upgradeAndCall(
             ITransparentUpgradeableProxy(payable(address(byzNft))),
             address(byzNftImplementation),
             abi.encodeWithSelector(
@@ -202,7 +201,8 @@ contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
             )
         );
         // Upgrade Auction
-        byzantineProxyAdmin.upgradeAndCall(
+        proxyAdmin = _getProxyAdmin(address(auction));
+        proxyAdmin.upgradeAndCall(
             ITransparentUpgradeableProxy(payable(address(auction))),
             address(auctionImplementation),
             abi.encodeWithSelector(
@@ -214,13 +214,15 @@ contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
             )
         );
         // Upgrade Escrow
-        byzantineProxyAdmin.upgradeAndCall(
+        proxyAdmin = _getProxyAdmin(address(escrow));
+        proxyAdmin.upgradeAndCall(
             ITransparentUpgradeableProxy(payable(address(escrow))),
             address(escrowImplementation),
             ""
         );
         // Upgrade StakerRewards
-        byzantineProxyAdmin.upgradeAndCall(
+        proxyAdmin = _getProxyAdmin(address(stakerRewards));
+        proxyAdmin.upgradeAndCall(
             ITransparentUpgradeableProxy(payable(address(stakerRewards))),
             address(stakerRewardsImplementation),
             abi.encodeWithSelector(
@@ -255,4 +257,8 @@ contract ByzantineDeployer is EigenLayerDeployer, SplitsV2Deployer {
         assertTrue(delegation.isDelegated(operator), "_registerAsELOperator: operator doesn't delegate itself");
     }
 
+    function _getProxyAdmin(address _proxy) internal view returns (ProxyAdmin) {
+        bytes32 adminSlot = vm.load(_proxy, ERC1967Utils.ADMIN_SLOT);
+        return ProxyAdmin(address(uint160(uint256(adminSlot))));
+    }
 }
