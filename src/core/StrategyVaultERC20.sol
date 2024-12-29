@@ -3,7 +3,7 @@ pragma solidity ^0.8.20;
 
 import {Initializable} from "@openzeppelin-upgrades/contracts/proxy/utils/Initializable.sol";
 import {ISignatureUtils} from "eigenlayer-contracts/interfaces/ISignatureUtils.sol";
-import {IERC20MetadataUpgradeable} from "@openzeppelin-upgrades/contracts/token/ERC20/extensions/IERC20MetadataUpgradeable.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 import {ERC4626MultiRewardVault} from "../vault/ERC4626MultiRewardVault.sol";
 import "./StrategyVaultERC20Storage.sol";
@@ -56,7 +56,7 @@ contract StrategyVaultERC20 is Initializable, StrategyVaultERC20Storage, ERC4626
         upgradeable = _upgradeable;
 
         // Initialize the ERC4626MultiRewardVault
-        ERC4626MultiRewardVault.initialize(IERC20MetadataUpgradeable(_token), _oracle);
+        ERC4626MultiRewardVault.initialize(IERC20Metadata(_token), _oracle);
 
         // If contract is not upgradeable, disable initialization (removing ability to upgrade contract)
         if (!_upgradeable) {

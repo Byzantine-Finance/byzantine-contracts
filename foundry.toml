@@ -7,6 +7,7 @@ gas_reports = ["*"]
 
 # Override the Solidity version (this overrides `auto_detect_solc`)
 solc_version = '0.8.23'
+auto_detect_remappings = false
 
 [fmt]
 bracket_spacing = false

@@ -1,14 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "./ERC7535/ERC7535Upgradeable.sol";
-import {SafeERC20Upgradeable} from "@openzeppelin-upgrades/contracts/token/ERC20/utils/SafeERC20Upgradeable.sol";
+import {ERC7535Upgradeable} from "./ERC7535/ERC7535Upgradeable.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {OwnableUpgradeable} from "@openzeppelin-upgrades/contracts/access/OwnableUpgradeable.sol";
-import {IERC20Upgradeable} from "@openzeppelin-upgrades/contracts/token/ERC20/IERC20Upgradeable.sol";
-import {IERC20MetadataUpgradeable} from "@openzeppelin-upgrades/contracts/token/ERC20/extensions/IERC20MetadataUpgradeable.sol";
-import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgrades/contracts/security/ReentrancyGuardUpgradeable.sol";
-import {MathUpgradeable} from "@openzeppelin-upgrades/contracts/utils/math/MathUpgradeable.sol";
-import "../interfaces/IOracle.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgrades/contracts/utils/ReentrancyGuardUpgradeable.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import {IOracle} from "../interfaces/IOracle.sol";
 
 /**
  * @title ERC7535MultiRewardVault
@@ -16,8 +15,8 @@ import "../interfaces/IOracle.sol";
  * @notice ERC-7535: Native Asset ERC-4626 Tokenized Vault with support for multiple reward tokens
  */
 contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
-    using SafeERC20Upgradeable for IERC20Upgradeable;
-    using MathUpgradeable for uint256;
+    using SafeERC20 for IERC20;
+    using Math for uint256;
 
     /* ============== STATE VARIABLES ============== */
 
@@ -57,7 +56,7 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
     function __ERC7535MultiRewardVault_init(address _oracle) internal onlyInitializing {
         __ERC7535_init();
         __ERC20_init("ETH Byzantine StrategyVault Token", "byzETH");
-        __Ownable_init();
+        __Ownable_init(msg.sender);
         __ReentrancyGuard_init();
         __ERC7535MultiRewardVault_init_unchained(_oracle);
     }
@@ -164,7 +163,7 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
         // Calculate value of reward tokens, add them to the total value
         for (uint i = 0; i < rewardTokens.length; i++) {
             address token = rewardTokens[i];
-            uint256 balance = IERC20Upgradeable(token).balanceOf(address(this));
+            uint256 balance = IERC20(token).balanceOf(address(this));
             uint256 price = oracle.getPrice(token);
             totalValue += (balance * price);
         }
@@ -181,7 +180,7 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
      * Will revert if assets > 0, totalSupply > 0 and totalAssets = 0. That corresponds to a case where any asset
      * would represent an infinite amout of shares.
      */
-    function _convertToShares(uint256 assets, MathUpgradeable.Rounding rounding) internal view override returns (uint256 shares) {
+    function _convertToShares(uint256 assets, Math.Rounding rounding) internal view override returns (uint256 shares) {
         uint256 supply = totalSupply() + 10 ** _decimalsOffset(); // Supply includes virtual reserves
         if (totalSupply() == 0) {
             return assets; // On first deposit, totalSupply is 0, so return assets (amount of ETH deposited) as shares
@@ -196,7 +195,7 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
      * @dev Internal conversion function (from shares to assets) with support for rounding direction.
      * @dev This function is overriden to calculate total value of assets including reward tokens.
      */
-    function _convertToAssets(uint256 shares, MathUpgradeable.Rounding rounding) internal view override returns (uint256 assets) {
+    function _convertToAssets(uint256 shares, Math.Rounding rounding) internal view override returns (uint256 assets) {
         uint256 supply = totalSupply() + 10 ** _decimalsOffset(); // Supply includes virtual reserves
         if (totalSupply() == 0) {
             return shares; // If there are no shares, return the number of shares as assets. TODO: Remove unnecessary code?
@@ -216,10 +215,10 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
         uint256 totalShares = totalSupply();
         for (uint i = 0; i < rewardTokens.length; i++) {
             address rewardToken = rewardTokens[i];
-            uint256 rewardBalance = IERC20Upgradeable(rewardToken).balanceOf(address(this));
+            uint256 rewardBalance = IERC20(rewardToken).balanceOf(address(this));
             uint256 rewardAmount = (rewardBalance * sharesBurned) / totalShares;
             if (rewardAmount > 0) {
-                IERC20Upgradeable(rewardToken).safeTransfer(receiver, rewardAmount);
+                IERC20(rewardToken).safeTransfer(receiver, rewardAmount);
                 emit RewardTokenWithdrawn(receiver, rewardToken, rewardAmount);
             }
         }

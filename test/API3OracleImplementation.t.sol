@@ -8,7 +8,7 @@ contract API3OracleImplementationTest is Test {
     API3OracleImplementation public oracle;
 
     function setUp() public {
-        oracle = new API3OracleImplementation();
+        oracle = new API3OracleImplementation(msg.sender);
     }
 
     /// @dev forge test --fork-url $HOLESKY_RPC_URL --match-path test/API3OracleImplementation.t.sol

@@ -2,9 +2,9 @@
 pragma solidity ^0.8.20;
 
 import {Initializable} from "@openzeppelin-upgrades/contracts/proxy/utils/Initializable.sol";
-import {IERC20MetadataUpgradeable} from "@openzeppelin-upgrades/contracts/token/ERC20/extensions/IERC20MetadataUpgradeable.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {ERC20Upgradeable} from "@openzeppelin-upgrades/contracts/token/ERC20/ERC20Upgradeable.sol";
-import {MathUpgradeable} from "@openzeppelin-upgrades/contracts/utils/math/MathUpgradeable.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {IERC7535Upgradeable} from "./IERC7535Upgradeable.sol";
 
 /**
@@ -14,7 +14,7 @@ import {IERC7535Upgradeable} from "./IERC7535Upgradeable.sol";
  * @notice OpenZeppelin Upgradeable version of ERC7535
  */
 abstract contract ERC7535Upgradeable is Initializable, ERC20Upgradeable, IERC7535Upgradeable {
-    using MathUpgradeable for uint256;
+    using Math for uint256;
 
     /**
      * @dev Attempted to deposit more assets than the max amount for `receiver`.
@@ -56,7 +56,7 @@ abstract contract ERC7535Upgradeable is Initializable, ERC20Upgradeable, IERC753
      *
      * See {IERC20Metadata-decimals}.
      */
-    function decimals() public view virtual override(IERC20MetadataUpgradeable, ERC20Upgradeable) returns (uint8) {
+    function decimals() public view virtual override(IERC20Metadata, ERC20Upgradeable) returns (uint8) {
         return 18 + _decimalsOffset();
     }
 
@@ -78,14 +78,14 @@ abstract contract ERC7535Upgradeable is Initializable, ERC20Upgradeable, IERC753
      * @dev See {IERC7535-convertToShares}.
      */
     function convertToShares(uint256 assets) public view virtual returns (uint256) {
-        return _convertToShares(assets, MathUpgradeable.Rounding.Down);
+        return _convertToShares(assets, Math.Rounding.Floor);
     }
 
     /**
      * @dev See {IERC7535-convertToAssets}.
      */
     function convertToAssets(uint256 shares) public view virtual returns (uint256) {
-        return _convertToAssets(shares, MathUpgradeable.Rounding.Down);
+        return _convertToAssets(shares, Math.Rounding.Floor);
     }
 
     /**
@@ -106,7 +106,7 @@ abstract contract ERC7535Upgradeable is Initializable, ERC20Upgradeable, IERC753
      * @dev See {IERC7535-maxWithdraw}.
      */
     function maxWithdraw(address owner) public view virtual returns (uint256) {
-        return _convertToAssets(balanceOf(owner), MathUpgradeable.Rounding.Down);
+        return _convertToAssets(balanceOf(owner), Math.Rounding.Floor);
     }
 
     /**
@@ -120,28 +120,28 @@ abstract contract ERC7535Upgradeable is Initializable, ERC20Upgradeable, IERC753
      * @dev See {IERC7535-previewDeposit}.
      */
     function previewDeposit(uint256 assets) public view virtual returns (uint256) {
-        return _convertToShares(assets, MathUpgradeable.Rounding.Down);
+        return _convertToShares(assets, Math.Rounding.Floor);
     }
 
     /**
      * @dev See {IERC7535-previewMint}.
      */
     function previewMint(uint256 shares) public view virtual returns (uint256) {
-        return _convertToAssets(shares, MathUpgradeable.Rounding.Up);
+        return _convertToAssets(shares, Math.Rounding.Ceil);
     }
 
     /**
      * @dev See {IERC7535-previewWithdraw}.
      */
     function previewWithdraw(uint256 assets) public view virtual returns (uint256) {
-        return _convertToShares(assets, MathUpgradeable.Rounding.Up);
+        return _convertToShares(assets, Math.Rounding.Ceil);
     }
 
     /**
      * @dev See {IERC7535-previewRedeem}.
      */
     function previewRedeem(uint256 shares) public view virtual returns (uint256) {
-        return _convertToAssets(shares, MathUpgradeable.Rounding.Down);
+        return _convertToAssets(shares, Math.Rounding.Floor);
     }
 
     /**
@@ -216,14 +216,14 @@ abstract contract ERC7535Upgradeable is Initializable, ERC20Upgradeable, IERC753
     /**
      * @dev Internal conversion function (from assets to shares) with support for rounding direction.
      */
-    function _convertToShares(uint256 assets, MathUpgradeable.Rounding rounding) internal view virtual returns (uint256) {
+    function _convertToShares(uint256 assets, Math.Rounding rounding) internal view virtual returns (uint256) {
         return assets.mulDiv(totalSupply() + 10 ** _decimalsOffset(), totalAssets() + 1, rounding);
     }
 
     /**
      * @dev Internal conversion function (from shares to assets) with support for rounding direction.
      */
-    function _convertToAssets(uint256 shares, MathUpgradeable.Rounding rounding) internal view virtual returns (uint256) {
+    function _convertToAssets(uint256 shares, Math.Rounding rounding) internal view virtual returns (uint256) {
         return shares.mulDiv(totalAssets() + 1, totalSupply() + 10 ** _decimalsOffset(), rounding);
     }
 

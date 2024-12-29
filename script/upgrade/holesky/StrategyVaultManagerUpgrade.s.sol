@@ -2,6 +2,7 @@
 pragma solidity ^0.8.20;
 
 import "../../utils/ExistingDeploymentParser.sol";
+import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 /**
  * @notice Script used to upgrade Auction contract on Holesky
@@ -48,9 +49,11 @@ contract StrategyVaultManagerUpgrade is ExistingDeploymentParser {
             strategyManager
         );
         // Upgrade StrategyVaultManager
-        byzantineProxyAdmin.upgrade(
-            TransparentUpgradeableProxy(payable(address(strategyVaultManager))),
-            address(strategyVaultManagerImplementation)
+        proxyAdmin = _getProxyAdmin(address(strategyVaultManager));
+        proxyAdmin.upgradeAndCall(
+            ITransparentUpgradeableProxy(payable(address(strategyVaultManager))),
+            address(strategyVaultManagerImplementation),
+            ""
         );
     }
 }

@@ -5,24 +5,26 @@ pragma solidity ^0.8.12;
 // solhint-disable var-name-mixedcase
 // solhint-disable func-name-mixedcase
 
-import "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
-import "eigenlayer-contracts/interfaces/IEigenPod.sol";
-import "eigenlayer-contracts/interfaces/IStrategy.sol";
-import "eigenlayer-contracts/libraries/BeaconChainProofs.sol";
-import { SplitV2Lib } from "splits-v2/libraries/SplitV2.sol";
-import "./utils/ProofParsing.sol";
+import {BeaconProxy} from "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
+import {IEigenPod} from "eigenlayer-contracts/interfaces/IEigenPod.sol";
+import {IStrategy} from "eigenlayer-contracts/interfaces/IStrategy.sol";
+import {BeaconChainProofs} from "eigenlayer-contracts/libraries/BeaconChainProofs.sol";
+import {SplitV2Lib} from "splits-v2/libraries/SplitV2.sol";
+import {ProofParsing} from "./utils/ProofParsing.sol";
+import {CredentialProofs} from "./mocks/BeaconChainMock.t.sol";
 
-import "./ByzantineDeployer.t.sol";
+import {ByzantineDeployer} from "./ByzantineDeployer.t.sol";
 
-import "../src/tokens/ByzNft.sol";
-import "../src/core/Auction.sol";
+import {ByzNft} from "../src/tokens/ByzNft.sol";
+import {Auction} from "../src/core/Auction.sol";
 
-import "../src/interfaces/IStrategyVaultERC20.sol";
-import "../src/interfaces/IStrategyVaultETH.sol";
-import "../src/interfaces/IStrategyVaultManager.sol";
-import "../src/interfaces/IAuction.sol";
+import {IStrategyVaultERC20} from "../src/interfaces/IStrategyVaultERC20.sol";
+import {IStrategyVaultETH} from "../src/interfaces/IStrategyVaultETH.sol";
+import {IStrategyVault} from "../src/interfaces/IStrategyVault.sol";
+import {IStrategyVaultManager} from "../src/interfaces/IStrategyVaultManager.sol";
+import {IAuction} from "../src/interfaces/IAuction.sol";
 
-import "./mocks/MockOracle.sol";
+import {MockOracle} from "./mocks/MockOracle.sol";
 
 contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
     // using BeaconChainProofs for *;
@@ -48,6 +50,7 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
     bytes32[] internal bidId;
 
     function setUp() public override {
+
         // deploy locally EigenLayer and Byzantine contracts
         ByzantineDeployer.setUp();
 

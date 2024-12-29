@@ -3,7 +3,7 @@ pragma solidity ^0.8.20;
 
 import { Initializable } from "@openzeppelin-upgrades/contracts/proxy/utils/Initializable.sol";
 import { OwnableUpgradeable } from "@openzeppelin-upgrades/contracts/access/OwnableUpgradeable.sol";
-import { ReentrancyGuardUpgradeable } from "@openzeppelin-upgrades/contracts/security/ReentrancyGuardUpgradeable.sol";
+import { ReentrancyGuardUpgradeable } from "@openzeppelin-upgrades/contracts/utils/ReentrancyGuardUpgradeable.sol";
 import { SplitV2Lib } from "splits-v2/libraries/SplitV2.sol";
 
 import { ByzantineAuctionMath } from "../libraries/ByzantineAuctionMath.sol";
