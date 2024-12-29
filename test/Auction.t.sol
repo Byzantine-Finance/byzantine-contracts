@@ -6,8 +6,9 @@ pragma solidity ^0.8.20;
 // solhint-disable func-name-mixedcase
 
 import "./ByzantineDeployer.t.sol";
-import "../src/interfaces/IAuction.sol";
-import "../src/interfaces/IStrategyVaultETH.sol";
+import {IAuction} from "../src/interfaces/IAuction.sol";
+import {IStrategyVaultETH} from "../src/interfaces/IStrategyVaultETH.sol";
+import {OwnableUpgradeable} from "@openzeppelin-upgrades/contracts/access/OwnableUpgradeable.sol";
 
 contract AuctionTest is ByzantineDeployer {
 
@@ -520,7 +521,7 @@ contract AuctionTest is ByzantineDeployer {
 
         // Should revert if not called by the Byzantine Admin
         vm.prank(alice);
-        vm.expectRevert(bytes("Ownable: caller is not the owner"));
+        vm.expectRevert(abi.encodeWithSelector(OwnableUpgradeable.OwnableUnauthorizedAccount.selector, alice));
         auction.removeBid(bidId1, auctionScore_1375_129, nodeOps[3], IAuction.AuctionType.JOIN_CLUSTER_4);
 
         /* ============= Byzantine Admin removes nodeOps[3]'s last bid ============= */
