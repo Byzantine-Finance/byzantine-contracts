@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "@openzeppelin-upgrades/contracts/token/ERC721/IERC721Upgradeable.sol";
+import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 
-interface IByzNft is IERC721Upgradeable {
+interface IByzNft is IERC721 {
 
     /**
      * @notice Gets called when a Strategy Vault is created
