@@ -2,7 +2,7 @@
 pragma solidity ^0.8.20;
 
 import "@openzeppelin-upgrades/contracts/proxy/utils/Initializable.sol";
-import "@openzeppelin-upgrades/contracts/security/ReentrancyGuardUpgradeable.sol";
+import "@openzeppelin-upgrades/contracts/utils/ReentrancyGuardUpgradeable.sol";
 
 import {AutomationCompatibleInterface} from "chainlink/v0.8/interfaces/AutomationCompatibleInterface.sol";
 import {OwnerIsCreator} from "chainlink/v0.8/shared/access/OwnerIsCreator.sol";

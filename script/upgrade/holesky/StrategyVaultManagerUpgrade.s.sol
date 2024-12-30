@@ -49,7 +49,8 @@ contract StrategyVaultManagerUpgrade is ExistingDeploymentParser {
             strategyManager
         );
         // Upgrade StrategyVaultManager
-        byzantineProxyAdmin.upgradeAndCall(
+        proxyAdmin = _getProxyAdmin(address(strategyVaultManager));
+        proxyAdmin.upgradeAndCall(
             ITransparentUpgradeableProxy(payable(address(strategyVaultManager))),
             address(strategyVaultManagerImplementation),
             ""

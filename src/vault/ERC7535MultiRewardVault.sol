@@ -16,8 +16,8 @@ import {IOracle} from "../interfaces/IOracle.sol";
  * @notice ERC-7535: Native Asset ERC-4626 Tokenized Vault with support for multiple reward tokens
  */
 contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
-    using SafeERC20Upgradeable for IERC20Upgradeable;
-    using MathUpgradeable for uint256;
+    using SafeERC20 for IERC20;
+    using Math for uint256;
 
     /* ============== STATE VARIABLES ============== */
 
@@ -59,7 +59,7 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
     function __ERC7535MultiRewardVault_init(address _oracle) internal onlyInitializing {
         __ERC7535_init();
         __ERC20_init("ETH Byzantine StrategyVault Token", "byzETH");
-        __Ownable_init();
+        __Ownable_init(msg.sender);
         __ReentrancyGuard_init();
         __ERC7535MultiRewardVault_init_unchained(_oracle);
     }

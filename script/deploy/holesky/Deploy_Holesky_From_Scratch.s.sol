@@ -40,28 +40,25 @@ contract Deploy_Holesky_From_Scratch is ExistingDeploymentParser {
         // Byzantine Admin is the deployer
         byzantineAdmin = msg.sender;
 
-        // Deploy ProxyAdmin, later set admins for all proxies to be byzantineMultisig TODO
-        byzantineProxyAdmin = new ProxyAdmin(byzantineAdmin);
-
         /**
          * First, deploy upgradeable proxy contracts that **will point** to the implementations. Since the implementation contracts are
          * not yet deployed, we give these proxies an empty contract as the initial implementation, to act as if they have no code.
          */
         emptyContract = new EmptyContract();
         strategyVaultManager = StrategyVaultManager(
-            address(new TransparentUpgradeableProxy(address(emptyContract), address(byzantineProxyAdmin), ""))
+            address(new TransparentUpgradeableProxy(address(emptyContract), address(byzantineAdmin), ""))
         );
         byzNft = ByzNft(
-            address(new TransparentUpgradeableProxy(address(emptyContract), address(byzantineProxyAdmin), ""))
+            address(new TransparentUpgradeableProxy(address(emptyContract), address(byzantineAdmin), ""))
         );
         auction = Auction(
-            address(new TransparentUpgradeableProxy(address(emptyContract), address(byzantineProxyAdmin), ""))
+            address(new TransparentUpgradeableProxy(address(emptyContract), address(byzantineAdmin), ""))
         );
         escrow = Escrow(
-            payable(address(new TransparentUpgradeableProxy(address(emptyContract), address(byzantineProxyAdmin), "")))
+            payable(address(new TransparentUpgradeableProxy(address(emptyContract), address(byzantineAdmin), "")))
         );
         stakerRewards = StakerRewards(
-            payable(address(new TransparentUpgradeableProxy(address(emptyContract), address(byzantineProxyAdmin), "")))
+            payable(address(new TransparentUpgradeableProxy(address(emptyContract), address(byzantineAdmin), "")))
         );
 
         // StrategyVaultETH implementation contract
@@ -118,7 +115,8 @@ contract Deploy_Holesky_From_Scratch is ExistingDeploymentParser {
 
         // Third, upgrade the proxy contracts to use the correct implementation contracts and initialize them.
         // Upgrade StrategyVaultManager
-        byzantineProxyAdmin.upgradeAndCall(
+        proxyAdmin = _getProxyAdmin(address(strategyVaultManager));
+        proxyAdmin.upgradeAndCall(
             ITransparentUpgradeableProxy(payable(address(strategyVaultManager))),
             address(strategyVaultManagerImplementation),
             abi.encodeWithSelector(
@@ -127,7 +125,8 @@ contract Deploy_Holesky_From_Scratch is ExistingDeploymentParser {
             )
         );
         // Upgrade ByzNft
-        byzantineProxyAdmin.upgradeAndCall(
+        proxyAdmin = _getProxyAdmin(address(byzNft));
+        proxyAdmin.upgradeAndCall(
             ITransparentUpgradeableProxy(payable(address(byzNft))),
             address(byzNftImplementation),
             abi.encodeWithSelector(
@@ -136,7 +135,8 @@ contract Deploy_Holesky_From_Scratch is ExistingDeploymentParser {
             )
         );
         // Upgrade Auction
-        byzantineProxyAdmin.upgradeAndCall(
+        proxyAdmin = _getProxyAdmin(address(auction));
+        proxyAdmin.upgradeAndCall(
             ITransparentUpgradeableProxy(payable(address(auction))),
             address(auctionImplementation),
             abi.encodeWithSelector(
@@ -148,13 +148,15 @@ contract Deploy_Holesky_From_Scratch is ExistingDeploymentParser {
             )
         );
         // Upgrade Escrow
-        byzantineProxyAdmin.upgradeAndCall(
+        proxyAdmin = _getProxyAdmin(address(escrow));
+        proxyAdmin.upgradeAndCall(
             ITransparentUpgradeableProxy(payable(address(escrow))),
             address(escrowImplementation),
             ""
         );
         // Upgrade StakerRewards
-        byzantineProxyAdmin.upgradeAndCall(
+        proxyAdmin = _getProxyAdmin(address(stakerRewards));
+        proxyAdmin.upgradeAndCall(
             ITransparentUpgradeableProxy(payable(address(stakerRewards))),
             address(stakerRewardsImplementation),
             abi.encodeWithSelector(

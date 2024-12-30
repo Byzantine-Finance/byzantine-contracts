@@ -42,16 +42,16 @@ contract ByzNft is
     }
 
     /**
-     * @dev Overrides `_beforeTokenTransfer` to restrict token transfers.
+     * @dev Overrides `_update` to restrict token transfers.
      */
-    function _beforeTokenTransfer(
-        address from,
-        address /*to*/,
-        uint256 /*tokenId*/,
-        uint256 /*batchSize*/
-    ) internal override view {
+    function _update(
+        address to,
+        uint256 tokenId,
+        address auth
+    ) internal override returns (address) {
         // Allow transfers only during minting
-        if (from != address(0)) revert("ByzNft is non-transferable");
+        if (auth != address(0)) revert("ByzNft is non-transferable");
+        return super._update(to, tokenId, auth);
     }
 
 }

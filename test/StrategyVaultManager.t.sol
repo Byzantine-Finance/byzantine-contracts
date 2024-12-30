@@ -51,8 +51,6 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
 
     function setUp() public override {
 
-        vm.startPrank(byzantineAdmin);
-
         // deploy locally EigenLayer and Byzantine contracts
         ByzantineDeployer.setUp();
 

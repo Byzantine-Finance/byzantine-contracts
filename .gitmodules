@@ -16,12 +16,9 @@
 [submodule "lib/foundry-chainlink-toolkit"]
 	path = lib/foundry-chainlink-toolkit
 	url = https://github.com/smartcontractkit/foundry-chainlink-toolkit
-[submodule "lib/openzeppelin-contracts-v5.1.0"]
-	path = lib/openzeppelin-contracts-v5.1.0
-	url = https://github.com/OpenZeppelin/openzeppelin-contracts
-[submodule "lib/openzeppelin-contracts-upgradeable-v5.1.0"]
-	path = lib/openzeppelin-contracts-upgradeable-v5.1.0
-	url = https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable
 [submodule "lib/splits-contracts-v2"]
 	path = lib/splits-contracts-v2
-	url = https://github.com/asanson1404/splits-contracts-monorepo
+	url = https://github.com/0xSplits/splits-contracts-monorepo
+[submodule "lib/solady"]
+	path = lib/solady
+	url = https://github.com/Vectorized/solady

@@ -1,11 +1,10 @@
-@openzeppelin-upgrades-v5.1.0/=lib/openzeppelin-contracts-upgradeable-v5.1.0/
-@openzeppelin-upgrades/=lib/openzeppelin-contracts-upgradeable/
-@openzeppelin-v5.1.0/=lib/openzeppelin-contracts-v5.1.0/
-@openzeppelin/=lib/openzeppelin-contracts-v5.1.0/
+lib/eigenlayer-contracts:@openzeppelin-upgrades/=lib/eigenlayer-contracts/lib/openzeppelin-contracts-upgradeable/
 lib/eigenlayer-contracts:@openzeppelin/=lib/eigenlayer-contracts/lib/openzeppelin-contracts/
+@openzeppelin-upgrades/=lib/openzeppelin-contracts-upgradeable/
+@openzeppelin/=lib/openzeppelin-contracts/
 eigenlayer-contracts/=lib/eigenlayer-contracts/src/contracts/
 splits-v2/=lib/splits-contracts-v2/packages/splits-v2/src/
-solady/=lib/splits-contracts-v2/packages/splits-v2/lib/solady/src/
+solady/=lib/solady/src/
 ds-test/=lib/ds-test/src/
 forge-std/=lib/forge-std/src/
 chainlink/=lib/foundry-chainlink-toolkit/lib/chainlink-brownie-contracts/contracts/src/

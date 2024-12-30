@@ -2,6 +2,14 @@
 pragma solidity ^0.8.20;
 
 import {ERC4626Upgradeable} from "@openzeppelin-upgrades/contracts/token/ERC20/extensions/ERC4626Upgradeable.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {OwnableUpgradeable} from "@openzeppelin-upgrades/contracts/access/OwnableUpgradeable.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgrades/contracts/utils/ReentrancyGuardUpgradeable.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import {IOracle} from "../interfaces/IOracle.sol";
+import {ERC4626Upgradeable} from "@openzeppelin-upgrades/contracts/token/ERC20/extensions/ERC4626Upgradeable.sol";
 import {SafeERC20Upgradeable} from "@openzeppelin-upgrades/contracts/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin-upgrades/contracts/access/OwnableUpgradeable.sol";
 import {IERC20Upgradeable} from "@openzeppelin-upgrades/contracts/token/ERC20/IERC20Upgradeable.sol";
@@ -11,6 +19,9 @@ import {MathUpgradeable} from "@openzeppelin-upgrades/contracts/utils/math/MathU
 import {IOracle} from "../interfaces/IOracle.sol";
 import {Initializable} from "@openzeppelin-upgrades/contracts/proxy/utils/Initializable.sol";
 
+contract ERC4626MultiRewardVault is ERC4626Upgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
+    using SafeERC20 for IERC20;
+    using Math for uint256;
 /**
  * @title ERC4626MultiRewardVault
  * @author Byzantine-Finance
@@ -22,7 +33,22 @@ contract ERC4626MultiRewardVault is Initializable, ERC4626Upgradeable, OwnableUp
 
     /* ============== STATE VARIABLES ============== */
 
+    struct TokenInfo {
+        address priceFeed;
+        uint8 decimals;
+    }
+
+    /// @notice Mapping of asset token address to its information
+    mapping(IERC20 => TokenInfo) public assetInfo;
+
+    /// @notice Mapping of reward token address to its information
+    mapping(IERC20 => TokenInfo) public rewardInfo;
+
+    /// @notice List of asset tokens
+    IERC20[] public assetTokens;
+
     /// @notice List of reward tokens
+    IERC20[] public rewardTokens;
     address[] public rewardTokens;
 
     /// @notice Oracle implementation
@@ -44,6 +70,9 @@ contract ERC4626MultiRewardVault is Initializable, ERC4626Upgradeable, OwnableUp
 
     /* ============== EVENTS ============== */
 
+    event AssetTokenAdded(IERC20 indexed token, address priceFeed, uint8 decimals);
+    event RewardTokenAdded(IERC20 indexed token, address priceFeed, uint8 decimals);
+    event PriceFeedUpdated(IERC20 indexed token, address newPriceFeed);
     event RewardTokenAdded(address indexed token);
     event OracleUpdated(address newOracle);
     event RewardTokenWithdrawn(address indexed receiver, address indexed rewardToken, uint256 amount);
@@ -55,6 +84,8 @@ contract ERC4626MultiRewardVault is Initializable, ERC4626Upgradeable, OwnableUp
      * @param _oracle The oracle implementation address to use for the vault.
      * @param _asset The asset to be staked.
      */
+    function initialize(IERC20 _asset, address _oracle) public initializer {
+        string memory assetSymbol = IERC20Metadata(address(_asset)).symbol();
     function initialize(address _oracle, address _asset) public initializer {
         __ERC4626MultiRewardVault_init(_oracle, _asset);
     }
@@ -66,9 +97,9 @@ contract ERC4626MultiRewardVault is Initializable, ERC4626Upgradeable, OwnableUp
         string memory vaultName = string(abi.encodePacked(assetSymbol, " Byzantine StrategyVault Token"));
         string memory vaultSymbol = string(abi.encodePacked("bvz", assetSymbol));
 
-        __ERC4626_init(IERC20MetadataUpgradeable(address(_asset)));
+        __ERC4626_init(IERC20Metadata(address(_asset)));
         __ERC20_init(vaultName, vaultSymbol);
-        __Ownable_init();
+        __Ownable_init(msg.sender);
         __ReentrancyGuard_init();
         __ERC4626MultiRewardVault_init_unchained(_oracle);
     }
@@ -86,6 +117,15 @@ contract ERC4626MultiRewardVault is Initializable, ERC4626Upgradeable, OwnableUp
 
     /* ============== EXTERNAL FUNCTIONS ============== */
 
+    // /**
+    //  * @notice Adds a reward token to the vault.
+    //  * @param _rewardToken The reward token to add.
+    //  */
+    // function addRewardToken(IERC20 _rewardToken) external onlyOwner {
+    //     rewardTokens.push(_rewardToken);
+    //     uint8 decimals = IERC20Metadata(address(_rewardToken)).decimals();
+    //     rewardTokenDecimals[_rewardToken] = decimals;
+    // }
     /**
      * @notice Deposits assets into the vault in return for vault shares.
      * @param assets The amount of assets being deposited.
@@ -322,6 +362,11 @@ contract ERC4626MultiRewardVault is Initializable, ERC4626Upgradeable, OwnableUp
         uint256[] memory tokenAmounts
     ) internal returns (uint256 totalRewardTokenValueWithdrawn) {
         for (uint i = 0; i < rewardTokens.length; i++) {
+            IERC20 rewardToken = rewardTokens[i];
+            uint256 rewardBalance = rewardToken.balanceOf(address(this));
+            uint256 rewardAmount = (rewardBalance * sharesBurned) / totalShares;
+            if (rewardAmount > 0) {
+                rewardToken.safeTransfer(receiver, rewardAmount);
             address token = rewardTokens[i];
             uint8 tokenDecimals;
             
