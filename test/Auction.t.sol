@@ -6,8 +6,9 @@ pragma solidity ^0.8.20;
 // solhint-disable func-name-mixedcase
 
 import "./ByzantineDeployer.t.sol";
-import "../src/interfaces/IAuction.sol";
-import "../src/interfaces/IStrategyVaultETH.sol";
+import {IAuction} from "../src/interfaces/IAuction.sol";
+import {IStrategyVaultETH} from "../src/interfaces/IStrategyVaultETH.sol";
+import {OwnableUpgradeable} from "@openzeppelin-upgrades/contracts/access/OwnableUpgradeable.sol";
 
 contract AuctionTest is ByzantineDeployer {
 
@@ -431,6 +432,40 @@ contract AuctionTest is ByzantineDeployer {
         assertEq(nodesAddr[1], nodeOps[1]);
         assertEq(nodesAddr[2], nodeOps[4]);
         assertEq(nodesAddr[3], nodeOps[2]);
+
+    }
+
+    function testRemoveBid() external {
+        // 6 nodeOps bid, 11 bids in total
+        _createMultipleBids();
+        assertEq(auction.getNumBids(IAuction.AuctionType.JOIN_CLUSTER_4), 11);
+
+        // nodeOps[3] bids again two times: 13.75%, 129 days
+        bytes32 bidId1 = _bidCluster4(nodeOps[3], 1375, 129);
+        bytes32 bidId2 = _bidCluster4(nodeOps[3], 1375, 129);
+
+        // Verify total number of bids
+        assertEq(auction.getNumBids(IAuction.AuctionType.JOIN_CLUSTER_4), 13);
+
+        // Should revert if not called by the Byzantine Admin
+        vm.prank(alice);
+        vm.expectRevert(abi.encodeWithSelector(OwnableUpgradeable.OwnableUnauthorizedAccount.selector, alice));
+        auction.removeBid(bidId1, auctionScore_1375_129, nodeOps[3], IAuction.AuctionType.JOIN_CLUSTER_4);
+
+        /* ============= Byzantine Admin removes nodeOps[3]'s last bid ============= */
+
+        vm.prank(byzantineAdmin);
+        auction.removeBid(bidId2, auctionScore_1375_129, nodeOps[3], IAuction.AuctionType.JOIN_CLUSTER_4);
+
+        // Verify total number of bids
+        assertEq(auction.getNumBids(IAuction.AuctionType.JOIN_CLUSTER_4), 12);
+
+        // Verify number of bids of nodeOps[3]
+        assertEq(auction.getNodeOpDetails(nodeOps[3]).numBidsCluster4, 2);
+
+        // Verify bidId has been deleted from mapping
+        IAuction.BidDetails memory bidDetails = auction.getBidDetails(bidId2);
+        assertEq(bidDetails.nodeOp, address(0));
 
     }
 
