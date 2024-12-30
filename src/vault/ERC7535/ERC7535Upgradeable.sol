@@ -24,7 +24,7 @@ abstract contract ERC7535Upgradeable is Initializable, ERC20Upgradeable, IERC753
     }
 
     // keccak256(abi.encode(uint256(keccak256("openzeppelin.storage.ERC7535")) - 1)) & ~bytes32(uint256(0xff))
-    bytes32 private constant ERC7535StorageLocation = 0x481ed8d1d0a7c4b28dd95359e21366e33334d19bcd02564e1c21a5e7e0145d00;;
+    bytes32 private constant ERC7535StorageLocation = 0x481ed8d1d0a7c4b28dd95359e21366e33334d19bcd02564e1c21a5e7e0145d00;
 
     function _getERC7535Storage() private pure returns (ERC7535Storage storage $) {
         assembly {
