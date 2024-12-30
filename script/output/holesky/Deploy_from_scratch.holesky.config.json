@@ -1,7 +1,7 @@
 {
   "addresses": {
     "auction": "0xC050C50e18CB8787dDF1E1227c0FE7A8a5404815",
-    "auctionImplementation": "0x46f5399403Ecc2784C66089E0A8772E2061F5ffF",
+    "auctionImplementation": "0xE7a94A95cd08a8422b0258518F6edb0E90AbCC5F",
     "byzNft": "0x55b9159B9E03fa6CFDe0c72B7AaB91487E390EAA",
     "byzNftImplementation": "0xC568911d9F92d719d3150540eD0dbe336C98701C",
     "byzantineProxyAdmin": "0x37AEd944Af167086B16b168A4ddf3CE9375f25db",
@@ -13,7 +13,7 @@
     "strategyVaultERC20Beacon": "0xf9CB2b4f8945b931C0C4b2BF54fCB4f7557AecdA",
     "strategyVaultERC20Implementation": "0x5AaA3f895cF1cA36057B63283e5FfC2C9bCea956",
     "strategyVaultETHBeacon": "0x471E14fe98a34450aAA1198756D23dA241445d12",
-    "strategyVaultETHImplementation": "0xb22175A3Ac131DbeB13274369C504d95fB73e374",
+    "strategyVaultETHImplementation": "0xAac46a6231Be81DA998804EeAE6A7F6DeA31259b",
     "strategyVaultManager": "0x7027CfbB4E295288c7346c04C577f03aA9a1e5a4",
     "strategyVaultManagerImplementation": "0x16E1e7DE1d5B8453358A072AEb5Bc441891fd83D"
   },

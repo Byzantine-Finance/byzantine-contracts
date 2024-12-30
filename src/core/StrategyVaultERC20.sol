@@ -57,7 +57,6 @@ contract StrategyVaultERC20 is Initializable, StrategyVaultERC20Storage, ERC4626
 
         // Initialize the ERC4626MultiRewardVault
         ERC4626MultiRewardVault.initialize(_token, _oracle);
-
         // If contract is not upgradeable, disable initialization (removing ability to upgrade contract)
         if (!_upgradeable) {
             _disableInitializers();

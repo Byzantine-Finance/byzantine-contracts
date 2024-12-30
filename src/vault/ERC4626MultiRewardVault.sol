@@ -43,7 +43,7 @@ contract ERC4626MultiRewardVault is Initializable, ERC4626Upgradeable, OwnableUp
     error TokenHasMoreThan18Decimals(address token);
 
     /* ============== EVENTS ============== */
-
+    
     event RewardTokenAdded(address indexed token);
     event OracleUpdated(address newOracle);
     event RewardTokenWithdrawn(address indexed receiver, address indexed rewardToken, uint256 amount);
