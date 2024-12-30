@@ -503,7 +503,7 @@ contract ERC4626MultiRewardVaultTest is Test {
         /* ===================== BOB DEPOSITS 2 AST ===================== */
         uint256 bobDepositAmount = 2 ether;
         vm.prank(bob);
-        uint256 bobSharesAfterDeposit = vault.deposit(bobDepositAmount, bob);
+        vault.deposit(bobDepositAmount, bob);
 
         console.log("~~~After Bob's deposit~~~");
         console.log("totalAssets", etherToString(vault.totalAssets()));
@@ -539,7 +539,7 @@ contract ERC4626MultiRewardVaultTest is Test {
         console.log("vaultASTBalanceBefore2", decimalToString(vaultASTBalanceBefore2));
 
         vm.prank(bob);
-        uint256 bobAssetsRedeemed = vault.redeem(bobSharesToRedeem, bob, bob);
+        vault.redeem(bobSharesToRedeem, bob, bob);
         uint256 bobSharesAfterRedeem = vault.balanceOf(bob);
 
         console.log("~~~After Bob's redeem~~~");
@@ -585,7 +585,6 @@ contract ERC4626MultiRewardVaultTest is Test {
 
     function testTotalAssets() public {
         uint256 oneEth = 1 ether;
-        uint256 expectedValuePerEth = 1000 * 1e18; // $1000 in 18 decimal precision
 
         // Deposit 1 AST
         vm.prank(alice);

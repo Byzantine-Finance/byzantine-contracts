@@ -266,7 +266,7 @@ contract ERC7535MultiRewardVaultTest is Test {
 
         // Alice deposits 1 ETH
         vm.prank(alice);
-        uint256 aliceShares = vault.deposit{value: oneEth}(oneEth, alice);
+        vault.deposit{value: oneEth}(oneEth, alice);
 
         console.log("~~~After Alice's deposit~~~");
         console.log("totalAssets", etherToString(vault.totalAssets()));
@@ -463,7 +463,7 @@ contract ERC7535MultiRewardVaultTest is Test {
         /* ===================== BOB DEPOSITS 2 ETH ===================== */
         uint256 bobDepositAmount = 2 ether;
         vm.prank(bob);
-        uint256 bobSharesAfterDeposit = vault.deposit{value: bobDepositAmount}(bobDepositAmount, bob);
+        vault.deposit{value: bobDepositAmount}(bobDepositAmount, bob);
 
         console.log("~~~After Bob's deposit~~~");
         console.log("totalAssets", etherToString(vault.totalAssets()));
@@ -499,7 +499,7 @@ contract ERC7535MultiRewardVaultTest is Test {
         console.log("vaultETHBalanceBefore2", etherToString(vaultETHBalanceBefore2));
 
         vm.prank(bob);
-        uint256 bobAssetsRedeemed = vault.redeem(bobSharesToRedeem, bob, bob);
+        vault.redeem(bobSharesToRedeem, bob, bob);
         uint256 bobSharesAfterRedeem = vault.balanceOf(bob);
 
         console.log("~~~After Bob's redeem~~~");
@@ -545,7 +545,6 @@ contract ERC7535MultiRewardVaultTest is Test {
 
     function testTotalAssets() public {
         uint256 oneEth = 1 ether;
-        uint256 expectedValuePerEth = 1000 * 1e18; // $1000 in 18 decimal precision
 
         // Deposit 1 ETH
         vm.prank(alice);
