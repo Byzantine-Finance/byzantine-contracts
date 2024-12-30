@@ -9,46 +9,20 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgrades/contracts/utils/ReentrancyGuardUpgradeable.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {IOracle} from "../interfaces/IOracle.sol";
-import {ERC4626Upgradeable} from "@openzeppelin-upgrades/contracts/token/ERC20/extensions/ERC4626Upgradeable.sol";
-import {SafeERC20Upgradeable} from "@openzeppelin-upgrades/contracts/token/ERC20/utils/SafeERC20Upgradeable.sol";
-import {OwnableUpgradeable} from "@openzeppelin-upgrades/contracts/access/OwnableUpgradeable.sol";
-import {IERC20Upgradeable} from "@openzeppelin-upgrades/contracts/token/ERC20/IERC20Upgradeable.sol";
-import {IERC20MetadataUpgradeable} from "@openzeppelin-upgrades/contracts/token/ERC20/extensions/IERC20MetadataUpgradeable.sol";
-import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgrades/contracts/security/ReentrancyGuardUpgradeable.sol";
-import {MathUpgradeable} from "@openzeppelin-upgrades/contracts/utils/math/MathUpgradeable.sol";
-import {IOracle} from "../interfaces/IOracle.sol";
 import {Initializable} from "@openzeppelin-upgrades/contracts/proxy/utils/Initializable.sol";
 
-contract ERC4626MultiRewardVault is ERC4626Upgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
-    using SafeERC20 for IERC20;
-    using Math for uint256;
 /**
  * @title ERC4626MultiRewardVault
  * @author Byzantine-Finance
  * @notice ERC-4626: Tokenized Vault with support for multiple reward tokens
  */
 contract ERC4626MultiRewardVault is Initializable, ERC4626Upgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
-    using SafeERC20Upgradeable for IERC20Upgradeable;
-    using MathUpgradeable for uint256;
+    using SafeERC20 for IERC20;
+    using Math for uint256;
 
     /* ============== STATE VARIABLES ============== */
 
-    struct TokenInfo {
-        address priceFeed;
-        uint8 decimals;
-    }
-
-    /// @notice Mapping of asset token address to its information
-    mapping(IERC20 => TokenInfo) public assetInfo;
-
-    /// @notice Mapping of reward token address to its information
-    mapping(IERC20 => TokenInfo) public rewardInfo;
-
-    /// @notice List of asset tokens
-    IERC20[] public assetTokens;
-
     /// @notice List of reward tokens
-    IERC20[] public rewardTokens;
     address[] public rewardTokens;
 
     /// @notice Oracle implementation
@@ -70,9 +44,6 @@ contract ERC4626MultiRewardVault is Initializable, ERC4626Upgradeable, OwnableUp
 
     /* ============== EVENTS ============== */
 
-    event AssetTokenAdded(IERC20 indexed token, address priceFeed, uint8 decimals);
-    event RewardTokenAdded(IERC20 indexed token, address priceFeed, uint8 decimals);
-    event PriceFeedUpdated(IERC20 indexed token, address newPriceFeed);
     event RewardTokenAdded(address indexed token);
     event OracleUpdated(address newOracle);
     event RewardTokenWithdrawn(address indexed receiver, address indexed rewardToken, uint256 amount);
@@ -84,8 +55,6 @@ contract ERC4626MultiRewardVault is Initializable, ERC4626Upgradeable, OwnableUp
      * @param _oracle The oracle implementation address to use for the vault.
      * @param _asset The asset to be staked.
      */
-    function initialize(IERC20 _asset, address _oracle) public initializer {
-        string memory assetSymbol = IERC20Metadata(address(_asset)).symbol();
     function initialize(address _oracle, address _asset) public initializer {
         __ERC4626MultiRewardVault_init(_oracle, _asset);
     }
@@ -93,7 +62,7 @@ contract ERC4626MultiRewardVault is Initializable, ERC4626Upgradeable, OwnableUp
     function __ERC4626MultiRewardVault_init(address _oracle, address _asset) internal onlyInitializing {
         _validateTokenDecimals(_asset);
         
-        string memory assetSymbol = IERC20MetadataUpgradeable(_asset).symbol();
+        string memory assetSymbol = IERC20Metadata(_asset).symbol();
         string memory vaultName = string(abi.encodePacked(assetSymbol, " Byzantine StrategyVault Token"));
         string memory vaultSymbol = string(abi.encodePacked("bvz", assetSymbol));
 
@@ -117,15 +86,6 @@ contract ERC4626MultiRewardVault is Initializable, ERC4626Upgradeable, OwnableUp
 
     /* ============== EXTERNAL FUNCTIONS ============== */
 
-    // /**
-    //  * @notice Adds a reward token to the vault.
-    //  * @param _rewardToken The reward token to add.
-    //  */
-    // function addRewardToken(IERC20 _rewardToken) external onlyOwner {
-    //     rewardTokens.push(_rewardToken);
-    //     uint8 decimals = IERC20Metadata(address(_rewardToken)).decimals();
-    //     rewardTokenDecimals[_rewardToken] = decimals;
-    // }
     /**
      * @notice Deposits assets into the vault in return for vault shares.
      * @param assets The amount of assets being deposited.
@@ -262,7 +222,7 @@ contract ERC4626MultiRewardVault is Initializable, ERC4626Upgradeable, OwnableUp
     function totalAssets() public view override returns (uint256) {
         // Calculate USD value of reward tokens
         uint256 rewardTokenUSDValue;
-        uint8 assetDecimals = IERC20MetadataUpgradeable(address(asset())).decimals();
+        uint8 assetDecimals = IERC20Metadata(address(asset())).decimals();
 
         for (uint i = 0; i < rewardTokens.length; i++) {
             address token = rewardTokens[i];
@@ -273,8 +233,8 @@ contract ERC4626MultiRewardVault is Initializable, ERC4626Upgradeable, OwnableUp
                 balance = address(this).balance;
                 tokenDecimals = 18;
             } else {
-                balance = IERC20Upgradeable(token).balanceOf(address(this));
-                tokenDecimals = IERC20MetadataUpgradeable(token).decimals();
+                balance = IERC20(token).balanceOf(address(this));
+                tokenDecimals = IERC20Metadata(token).decimals();
             }
 
             // Normalize balance to 18 decimals
@@ -288,7 +248,7 @@ contract ERC4626MultiRewardVault is Initializable, ERC4626Upgradeable, OwnableUp
         uint256 rewardTokenAssetAmount = (rewardTokenUSDValue * 10**assetDecimals) / assetPrice;
 
         // Add the asset value of the reward tokens to the asset balance to get total asset amount
-        uint256 assetBalance = IERC20Upgradeable(asset()).balanceOf(address(this));
+        uint256 assetBalance = IERC20(asset()).balanceOf(address(this));
         uint256 totalAssetAmount = assetBalance + rewardTokenAssetAmount;
         return totalAssetAmount;
     }
@@ -318,7 +278,7 @@ contract ERC4626MultiRewardVault is Initializable, ERC4626Upgradeable, OwnableUp
 
         // Get the amount of assets owned by the user
         address asset = super.asset();
-        uint256 userAssetAmount = (userSharesProportion * IERC20Upgradeable(asset).balanceOf(address(this))) / 1e18;
+        uint256 userAssetAmount = (userSharesProportion * IERC20(asset).balanceOf(address(this))) / 1e18;
 
         // Setup arrays for tokens owned by the user
         address[] memory tokenAddresses = new address[](rewardTokens.length + 1);
@@ -336,7 +296,7 @@ contract ERC4626MultiRewardVault is Initializable, ERC4626Upgradeable, OwnableUp
             if (token == 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE) {
                 vaultBalance = address(this).balance;
             } else {
-                vaultBalance = IERC20Upgradeable(token).balanceOf(address(this));
+                vaultBalance = IERC20(token).balanceOf(address(this));
             }
 
             uint256 userTokenAmount = (vaultBalance * userSharesProportion) / 1e18;
@@ -362,18 +322,13 @@ contract ERC4626MultiRewardVault is Initializable, ERC4626Upgradeable, OwnableUp
         uint256[] memory tokenAmounts
     ) internal returns (uint256 totalRewardTokenValueWithdrawn) {
         for (uint i = 0; i < rewardTokens.length; i++) {
-            IERC20 rewardToken = rewardTokens[i];
-            uint256 rewardBalance = rewardToken.balanceOf(address(this));
-            uint256 rewardAmount = (rewardBalance * sharesBurned) / totalShares;
-            if (rewardAmount > 0) {
-                rewardToken.safeTransfer(receiver, rewardAmount);
             address token = rewardTokens[i];
             uint8 tokenDecimals;
             
             if (token == address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE)) {
                 tokenDecimals = 18;
             } else {
-                tokenDecimals = IERC20MetadataUpgradeable(token).decimals();
+                tokenDecimals = IERC20Metadata(token).decimals();
             }
 
             // Calculate amount to withdraw based on user's balance and withdraw proportion
@@ -384,7 +339,7 @@ contract ERC4626MultiRewardVault is Initializable, ERC4626Upgradeable, OwnableUp
                     (bool success,) = payable(receiver).call{value: tokenToWithdraw}("");
                     require(success, "ETH transfer failed");
                 } else {
-                    IERC20Upgradeable(token).safeTransfer(receiver, tokenToWithdraw);
+                    IERC20(token).safeTransfer(receiver, tokenToWithdraw);
                 }
                 emit RewardTokenWithdrawn(receiver, token, tokenToWithdraw);
                 
@@ -393,7 +348,7 @@ contract ERC4626MultiRewardVault is Initializable, ERC4626Upgradeable, OwnableUp
                 uint256 assetPrice = oracle.getPrice(address(asset()));
                 uint256 normalizedTokenAmount = tokenToWithdraw * 10**(18 - tokenDecimals);
                 uint256 tokenValueInUSD = (normalizedTokenAmount * tokenPrice) / 1e18;
-                uint256 tokenValueInAsset = (tokenValueInUSD * 10**IERC20MetadataUpgradeable(address(asset())).decimals()) / assetPrice;
+                uint256 tokenValueInAsset = (tokenValueInUSD * 10**IERC20Metadata(address(asset())).decimals()) / assetPrice;
                 
                 totalRewardTokenValueWithdrawn += tokenValueInAsset;
             }
@@ -432,7 +387,7 @@ contract ERC4626MultiRewardVault is Initializable, ERC4626Upgradeable, OwnableUp
     */
     function _tryGetTokenDecimals(address token) internal view returns (bool, uint8) {
         (bool success, bytes memory encodedDecimals) = token.staticcall(
-            abi.encodeCall(IERC20MetadataUpgradeable.decimals, ())
+            abi.encodeCall(IERC20Metadata.decimals, ())
         );
         if (success && encodedDecimals.length >= 32) {
             uint256 returnedDecimals = abi.decode(encodedDecimals, (uint256));
@@ -448,9 +403,9 @@ contract ERC4626MultiRewardVault is Initializable, ERC4626Upgradeable, OwnableUp
      * OZ changed empty vault conversions to use 1-to-1 rate ignoring decimal differences.
      * We scale to 18 decimals to ensure all vaults use same decimal precision regardless of asset.
      */
-    function _convertToShares(uint256 assets, MathUpgradeable.Rounding rounding) internal view virtual override returns (uint256) {
+    function _convertToShares(uint256 assets, Math.Rounding rounding) internal view virtual override returns (uint256) {
         uint256 supply = totalSupply();
-        uint8 assetDecimals = IERC20MetadataUpgradeable(asset()).decimals();
+        uint8 assetDecimals = IERC20Metadata(asset()).decimals();
         
         if (supply == 0) {
             return assets * 10**(18 - assetDecimals);
@@ -470,9 +425,9 @@ contract ERC4626MultiRewardVault is Initializable, ERC4626Upgradeable, OwnableUp
      * @dev Overrides _convertToAssets to maintain consistency with _convertToShares.
      * Scales calculations to 18 decimals before converting back to asset decimals.
      */
-    function _convertToAssets(uint256 shares, MathUpgradeable.Rounding rounding) internal view virtual override returns (uint256) {
+    function _convertToAssets(uint256 shares, Math.Rounding rounding) internal view virtual override returns (uint256) {
         uint256 supply = totalSupply();
-        uint8 assetDecimals = IERC20MetadataUpgradeable(asset()).decimals();
+        uint8 assetDecimals = IERC20Metadata(asset()).decimals();
         
         if (supply == 0) {
             return shares / 10**(18 - assetDecimals);

@@ -2,12 +2,12 @@
 pragma solidity ^0.8.20;
 
 import {ERC7535Upgradeable} from "./ERC7535/ERC7535Upgradeable.sol";
-import {SafeERC20Upgradeable} from "@openzeppelin-upgrades/contracts/token/ERC20/utils/SafeERC20Upgradeable.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {OwnableUpgradeable} from "@openzeppelin-upgrades/contracts/access/OwnableUpgradeable.sol";
-import {IERC20Upgradeable} from "@openzeppelin-upgrades/contracts/token/ERC20/IERC20Upgradeable.sol";
-import {IERC20MetadataUpgradeable} from "@openzeppelin-upgrades/contracts/token/ERC20/extensions/IERC20MetadataUpgradeable.sol";
-import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgrades/contracts/security/ReentrancyGuardUpgradeable.sol";
-import {MathUpgradeable} from "@openzeppelin-upgrades/contracts/utils/math/MathUpgradeable.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgrades/contracts/utils/ReentrancyGuardUpgradeable.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {IOracle} from "../interfaces/IOracle.sol";
 
 /**
@@ -209,8 +209,8 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
 
         for (uint i = 0; i < rewardTokens.length; i++) {
             address token = rewardTokens[i];
-            uint256 balance = IERC20Upgradeable(token).balanceOf(address(this));
-            uint8 tokenDecimals = IERC20MetadataUpgradeable(token).decimals();
+            uint256 balance = IERC20(token).balanceOf(address(this));
+            uint8 tokenDecimals = IERC20Metadata(token).decimals();
 
             // Normalize balance to 18 decimals before multiplying by price
             uint256 normalizedBalance = balance * 10**(18 - tokenDecimals);
@@ -265,7 +265,7 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
         for (uint i = 0; i < rewardTokens.length; i++) {
             address token = rewardTokens[i];
 
-            uint256 vaultBalance = IERC20Upgradeable(token).balanceOf(address(this));
+            uint256 vaultBalance = IERC20(token).balanceOf(address(this));
             uint256 userTokenAmount = (vaultBalance * userSharesProportion) / 1e18;
 
             tokenAddresses[i + 1] = token;
@@ -290,13 +290,13 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
     ) internal returns (uint256 totalRewardTokenValueWithdrawn) {
         for (uint i = 0; i < rewardTokens.length; i++) {
             address token = rewardTokens[i];
-            uint8 tokenDecimals = IERC20MetadataUpgradeable(token).decimals();
+            uint8 tokenDecimals = IERC20Metadata(token).decimals();
 
             // Calculate amount to withdraw based on user's balance and withdraw proportion
             uint256 tokenToWithdraw = (tokenAmounts[i + 1] * withdrawProportion) / 1e18;
 
             if (tokenToWithdraw > 0) {
-                IERC20Upgradeable(token).safeTransfer(receiver, tokenToWithdraw);
+                IERC20(token).safeTransfer(receiver, tokenToWithdraw);
                 emit RewardTokenWithdrawn(receiver, token, tokenToWithdraw);
                 
                 // Convert reward token value to ETH terms
@@ -338,7 +338,7 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
     */
     function _tryGetTokenDecimals(address token) internal view returns (bool, uint8) {
         (bool success, bytes memory encodedDecimals) = token.staticcall(
-            abi.encodeCall(IERC20MetadataUpgradeable.decimals, ())
+            abi.encodeCall(IERC20Metadata.decimals, ())
         );
         if (success && encodedDecimals.length >= 32) {
             uint256 returnedDecimals = abi.decode(encodedDecimals, (uint256));
