@@ -40,6 +40,7 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
     error InvalidAddress();
     error TokenDoesNotHaveDecimalsFunction(address token);
     error TokenHasMoreThan18Decimals(address token);
+    
     /* ============== EVENTS ============== */
 
     event RewardTokenAdded(address indexed token);
@@ -227,6 +228,7 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
         uint256 totalETHAmount = ethBalance + rewardTokenETHAmount;
         return totalETHAmount;
     }
+
     /**
      * @notice Returns the total ETH value of assets and reward tokens in the vault for a user.
      * @param user The address of the user.
