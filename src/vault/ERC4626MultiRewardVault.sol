@@ -4,19 +4,18 @@ pragma solidity ^0.8.20;
 import {ERC4626Upgradeable} from "@openzeppelin-upgrades/contracts/token/ERC20/extensions/ERC4626Upgradeable.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {OwnableUpgradeable} from "@openzeppelin-upgrades/contracts/access/OwnableUpgradeable.sol";
-import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgrades/contracts/utils/ReentrancyGuardUpgradeable.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {IOracle} from "../interfaces/IOracle.sol";
-import {Initializable} from "@openzeppelin-upgrades/contracts/proxy/utils/Initializable.sol";
 
 /**
  * @title ERC4626MultiRewardVault
  * @author Byzantine-Finance
  * @notice ERC-4626: Tokenized Vault with support for multiple reward tokens
  */
-contract ERC4626MultiRewardVault is Initializable, ERC4626Upgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
+contract ERC4626MultiRewardVault is ERC4626Upgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
     using SafeERC20 for IERC20;
     using Math for uint256;
 
@@ -229,6 +228,7 @@ contract ERC4626MultiRewardVault is Initializable, ERC4626Upgradeable, OwnableUp
             uint256 balance;
             uint8 tokenDecimals;
 
+            // Check if the reward token is ETH
             if (token == address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE)) {
                 balance = address(this).balance;
                 tokenDecimals = 18;
@@ -237,7 +237,7 @@ contract ERC4626MultiRewardVault is Initializable, ERC4626Upgradeable, OwnableUp
                 tokenDecimals = IERC20Metadata(token).decimals();
             }
 
-            // Normalize balance to 18 decimals
+            // Normalize balance to 18 decimals and multiply by price for the USD value of the reward token
             uint256 normalizedBalance = balance * 10**(18 - tokenDecimals);
             uint256 price = oracle.getPrice(token);
             rewardTokenUSDValue += (normalizedBalance * price) / 1e18;
@@ -314,7 +314,7 @@ contract ERC4626MultiRewardVault is Initializable, ERC4626Upgradeable, OwnableUp
     * @dev Distributes rewards to the receiver based on withdrawal proportion
     * @param receiver The address to receive the rewards
     * @param withdrawProportion The users proportion being withdrawn (in 1e18)
-    * @return totalRewardTokenValueWithdrawn The total value of reward tokens withdrawn in asset terms
+    * @return totalRewardTokenValueWithdrawn The total value of reward tokens withdrawn in asset amount
     */
     function _distributeRewards(
         address receiver,
@@ -324,26 +324,23 @@ contract ERC4626MultiRewardVault is Initializable, ERC4626Upgradeable, OwnableUp
         for (uint i = 0; i < rewardTokens.length; i++) {
             address token = rewardTokens[i];
             uint8 tokenDecimals;
-            
-            if (token == address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE)) {
-                tokenDecimals = 18;
-            } else {
-                tokenDecimals = IERC20Metadata(token).decimals();
-            }
 
             // Calculate amount to withdraw based on user's balance and withdraw proportion
             uint256 tokenToWithdraw = (tokenAmounts[i + 1] * withdrawProportion) / 1e18;
 
+            // Transfer the reward token to the receiver
             if (tokenToWithdraw > 0) {
                 if (token == address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE)) {
                     (bool success,) = payable(receiver).call{value: tokenToWithdraw}("");
                     require(success, "ETH transfer failed");
+                    tokenDecimals = 18;
                 } else {
                     IERC20(token).safeTransfer(receiver, tokenToWithdraw);
+                    tokenDecimals = IERC20Metadata(token).decimals();
                 }
                 emit RewardTokenWithdrawn(receiver, token, tokenToWithdraw);
                 
-                // Convert reward token value to asset terms
+                // Convert reward token value to asset amount
                 uint256 tokenPrice = oracle.getPrice(token);
                 uint256 assetPrice = oracle.getPrice(address(asset()));
                 uint256 normalizedTokenAmount = tokenToWithdraw * 10**(18 - tokenDecimals);
@@ -357,13 +354,10 @@ contract ERC4626MultiRewardVault is Initializable, ERC4626Upgradeable, OwnableUp
     }
 
     /**
-     * @dev Returns the ETH balance of the vault.
-     * @return The ETH balance of the vault.
+     * @dev Validates the decimals of a token. Token must have decimals() function and have 18 or less decimals.
+     * @param rewardToken The token to validate.
+     * @return The decimals of the token.
      */
-    function _getETHBalance() internal view virtual returns (uint256) {
-        return address(this).balance;
-    }
-
     function _validateTokenDecimals(address rewardToken) internal view returns (uint8) {
         // Skip validation for ETH
         if (rewardToken == address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE)) {

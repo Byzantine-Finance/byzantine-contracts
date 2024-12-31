@@ -213,7 +213,7 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
             uint256 balance = IERC20(token).balanceOf(address(this));
             uint8 tokenDecimals = IERC20Metadata(token).decimals();
 
-            // Normalize balance to 18 decimals before multiplying by price
+            // Normalize balance to 18 decimals and multiply by price for the USD value of the reward token
             uint256 normalizedBalance = balance * 10**(18 - tokenDecimals);
             uint256 price = oracle.getPrice(token);
             rewardTokenUSDValue += (normalizedBalance * price) / 1e18;
@@ -283,7 +283,7 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
     * @dev Distributes rewards to the receiver based on withdrawal proportion
     * @param receiver The address to receive the rewards
     * @param withdrawProportion The users proportion being withdrawn (in 1e18)
-    * @return totalRewardTokenValueWithdrawn The total value of reward tokens withdrawn in asset terms
+    * @return totalRewardTokenValueWithdrawn The total value of reward tokens withdrawn in ETH amount
     */
     function _distributeRewards(
         address receiver,
@@ -297,11 +297,12 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
             // Calculate amount to withdraw based on user's balance and withdraw proportion
             uint256 tokenToWithdraw = (tokenAmounts[i + 1] * withdrawProportion) / 1e18;
 
+            // Transfer the reward token to the receiver
             if (tokenToWithdraw > 0) {
                 IERC20(token).safeTransfer(receiver, tokenToWithdraw);
                 emit RewardTokenWithdrawn(receiver, token, tokenToWithdraw);
                 
-                // Convert reward token value to ETH terms
+                // Convert reward token value to ETH amount
                 uint256 tokenPrice = oracle.getPrice(token);
                 uint256 ethPrice = oracle.getPrice(address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE));
                 uint256 normalizedTokenAmount = tokenToWithdraw * 10**(18 - tokenDecimals);
@@ -315,13 +316,10 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
     }
 
     /**
-     * @dev Returns the ETH balance of the vault.
-     * @return The ETH balance of the vault.
+     * @dev Validates the decimals of a token. Token must have decimals() function and have 18 or less decimals.
+     * @param rewardToken The token to validate.
+     * @return The decimals of the token.
      */
-    function _getETHBalance() internal view virtual returns (uint256) {
-        return address(this).balance;
-    }
-
     function _validateTokenDecimals(address rewardToken) internal view returns (uint8) {
         (bool success, uint8 tokenDecimals) = _tryGetTokenDecimals(rewardToken);
         if (!success) {
@@ -349,5 +347,13 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
             }
         }
         return (false, 0);
+    }
+
+    /**
+     * @dev Returns the ETH balance of the vault.
+     * @return The ETH balance of the vault.
+     */
+    function _getETHBalance() internal view virtual returns (uint256) {
+        return address(this).balance;
     }
 }
