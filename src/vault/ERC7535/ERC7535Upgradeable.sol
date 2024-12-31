@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {ERC20Upgradeable} from "@openzeppelin-upgrades/contracts/token/ERC20/ERC20Upgradeable.sol";
-import {IERC7535Upgradeable} from "./IERC7535Upgradeable.sol";
+import {IERC7535} from "./IERC7535.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {Initializable} from "@openzeppelin-upgrades/contracts/proxy/utils/Initializable.sol";
 
@@ -14,7 +14,7 @@ import {Initializable} from "@openzeppelin-upgrades/contracts/proxy/utils/Initia
  * @notice ERC-4626 Tokenized Vaults with Ether (Native Asset) as the underlying asset
  * @notice OpenZeppelin Upgradeable version of ERC7535
  */
-abstract contract ERC7535Upgradeable is Initializable, ERC20Upgradeable, IERC7535Upgradeable {
+abstract contract ERC7535Upgradeable is Initializable, ERC20Upgradeable, IERC7535 {
     using Math for uint256;
 
     /// @custom:storage-location erc7201:openzeppelin.storage.ERC7535

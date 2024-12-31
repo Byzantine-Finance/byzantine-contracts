@@ -2,11 +2,11 @@
 pragma solidity ^0.8.20;
 
 import {BeaconChainProofs} from "eigenlayer-contracts/libraries/BeaconChainProofs.sol";
-import {IERC7535Upgradeable} from "../vault/ERC7535/IERC7535Upgradeable.sol";
+import {IERC7535} from "../vault/ERC7535/IERC7535.sol";
 
 import "./IStrategyVault.sol";
 
-interface IStrategyVaultETH is IStrategyVault, IERC7535Upgradeable {
+interface IStrategyVaultETH is IStrategyVault, IERC7535 {
 
   /* ============== EVENTS ============== */
 
