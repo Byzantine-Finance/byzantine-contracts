@@ -315,5 +315,4 @@ abstract contract ERC7535Upgradeable is Initializable, ERC20Upgradeable, IERC753
      */
     receive() external payable virtual {}
 
-    uint256[50] private __gap;
 }
