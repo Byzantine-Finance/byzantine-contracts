@@ -2,7 +2,7 @@
 pragma solidity ^0.8.20;
 
 import {BeaconChainProofs} from "eigenlayer-contracts/libraries/BeaconChainProofs.sol";
-import {IERC7535} from "../vault/ERC7535/IERC7535.sol";
+import {IERC7535} from "./IERC7535.sol";
 
 import "./IStrategyVault.sol";
 
