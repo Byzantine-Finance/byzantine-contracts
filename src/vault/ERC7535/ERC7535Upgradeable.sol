@@ -310,9 +310,6 @@ abstract contract ERC7535Upgradeable is Initializable, ERC20Upgradeable, IERC753
         return 0;
     }
 
-    /**
-     * @dev Receive ether from the caller, allowing vault to earn yield in the native asset.
-     */
     receive() external payable virtual {}
 
 }
