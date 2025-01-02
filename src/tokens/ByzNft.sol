@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "@openzeppelin-upgrades/contracts/proxy/utils/Initializable.sol";
-import "@openzeppelin-upgrades/contracts/token/ERC721/ERC721Upgradeable.sol";
-import "@openzeppelin-upgrades/contracts/access/OwnableUpgradeable.sol";
+import {Initializable} from "@openzeppelin-upgrades/contracts/proxy/utils/Initializable.sol";
+import {ERC721Upgradeable} from "@openzeppelin-upgrades/contracts/token/ERC721/ERC721Upgradeable.sol";
+import {OwnableUpgradeable} from "@openzeppelin-upgrades/contracts/access/OwnableUpgradeable.sol";
 
-import "../interfaces/IByzNft.sol";
-import "../interfaces/IStrategyVaultManager.sol";    
+import {IByzNft} from "../interfaces/IByzNft.sol";
+import {IStrategyVaultManager} from "../interfaces/IStrategyVaultManager.sol";    
 
 contract ByzNft is
     Initializable,

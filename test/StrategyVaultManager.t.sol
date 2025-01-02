@@ -73,6 +73,8 @@ contract StrategyVaultManagerTest is ProofParsing, ByzantineDeployer {
 
         // Get deposit data of a random validator
         // _getDepositData(abi.encodePacked("./test/test-data/deposit-data-DV0-noPod.json"));
+
+        vm.stopPrank();
     }
 
     function test_byzantineContractsOwnership() public view {
