@@ -44,7 +44,7 @@ contract SymPod is ERC7535MultiRewardVault {
         _;
     }
 
-    // TODO: Move file imports, errors, events, constants, state variables to a StakingMinivaultStorage.sol
+    // TODO: Move file imports, errors, events, constants, state variables to a SymPodStorage.sol
 
     /* =================== ERRORS =================== */
     error InvalidDeposit();
@@ -103,26 +103,26 @@ contract SymPod is ERC7535MultiRewardVault {
         address _creator,
         address _oracle
     ) external initializer {
-        __StakingMinivault_init(
+        __SymPod_init(
             _whitelistedDeposit,
             _creator,
             _oracle
         );
     }
 
-    function __StakingMinivault_init(
+    function __SymPod_init(
         bool _whitelistedDeposit,
         address _creator,
         address _oracle
     ) internal onlyInitializing {
         __ERC7535MultiRewardVault_init(_oracle);
-        __StakingMinivault_init_unchained(
+        __SymPod_init_unchained(
             _whitelistedDeposit,
             _creator
         );
     }
 
-    function __StakingMinivault_init_unchained(
+    function __SymPod_init_unchained(
         bool _whitelistedDeposit,
         address _creator
     ) internal onlyInitializing {
@@ -216,11 +216,11 @@ contract SymPod is ERC7535MultiRewardVault {
     ) external onlyBeaconChainAdmin {
         if (!clusterIdsFIFO.exists(clusterId)) revert ClusterNotInVault();
 
-        symPod.stake{value: VALIDATOR_DEPOSIT}(
-            pubkey,
-            signature,
-            depositDataRoot
-        );
+        // stake{value: VALIDATOR_DEPOSIT}(
+        //     pubkey,
+        //     signature,
+        //     depositDataRoot
+        // );
 
         auction.updateClusterStatus(clusterId, IAuction.ClusterStatus.DEPOSITED);
         auction.setClusterPubKey(clusterId, pubkey);

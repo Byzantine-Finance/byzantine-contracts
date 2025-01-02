@@ -133,8 +133,8 @@ contract SymbioticVaultFactoryTest is Test {
         assertEq(vaultAddr, vault);
 
         // Verify if the ByzFiNativeSymbioticVault is initialized with the correct staking minivault address
-        address stakingMinivaultAddr = ByzFiNativeSymbioticVault(byzFiNativeSymbioticVault).symPod();
-        assertEq(stakingMinivaultAddr, symPod);
+        address symPodAddr = ByzFiNativeSymbioticVault(byzFiNativeSymbioticVault).symPod();
+        assertEq(symPodAddr, symPod);
 
         // Verify if the symPod is whitelisted
         assertEq(IVault(vault).isDepositorWhitelisted(byzFiNativeSymbioticVault), true);
