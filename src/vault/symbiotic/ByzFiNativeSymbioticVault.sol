@@ -29,17 +29,20 @@ contract ByzFiNativeSymbioticVault is Initializable, OwnableUpgradeable, ERC7535
 
     function initialize(
         address initialOwner, 
-        address _vaultAddress
+        address _vaultAddress,
+        address _stakingMinivault
     ) external initializer {
         __ByzFiNativeSymbioticVault_init(
             initialOwner,
-            _vaultAddress
+            _vaultAddress,
+            _stakingMinivault
         );
     }
 
     function __ByzFiNativeSymbioticVault_init(
         address initialOwner,
-        address _vaultAddress
+        address _vaultAddress,
+        address _stakingMinivault
     ) internal onlyInitializing {
         // Initialize parent contracts
         __Ownable_init();
@@ -48,16 +51,21 @@ contract ByzFiNativeSymbioticVault is Initializable, OwnableUpgradeable, ERC7535
         // Initialize the contract
         __ByzFiNativeSymbioticVault_init_unchained(
             initialOwner,
-            _vaultAddress
+            _vaultAddress,
+            _stakingMinivault
         );
     }
 
     function __ByzFiNativeSymbioticVault_init_unchained(
         address initialOwner,
-        address _vaultAddress
+        address _vaultAddress,
+        address _stakingMinivault
     ) internal onlyInitializing {
         // Set vault reference
         vault = IVault(_vaultAddress);
+
+        // Set stakingMinivault reference
+        stakingMinivault = payable(_stakingMinivault);
 
         // Whitelist ByzFiNativeSymbioticVault to deposit into Symbiotic vault
         vault.setDepositorWhitelistStatus(address(this), true);

@@ -147,6 +147,16 @@ contract StakingMinivault is ERC7535Upgradeable {
 
     /* =================== EXTERNAL FUNCTIONS =================== */
 
+
+    /**
+     * @notice Mints tokens to a specific address for testing purposes.
+     * @param to The address to receive the minted tokens.
+     * @param amount The amount of tokens to mint.
+     */
+    function mintForTesting(address to, uint256 amount) external {
+        _mint(to, amount);
+    }
+
     /**
      * @notice Deposit ETH into the vault
      * @param assets Amount of ETH to deposit
