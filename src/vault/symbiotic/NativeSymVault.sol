@@ -8,11 +8,11 @@ import "../ERC7535/ERC7535Upgradeable.sol";
 import {IVault} from "@symbioticfi/core/src/interfaces/vault/IVault.sol";
 import {SymPod} from "./SymPod.sol";
 
-contract ByzFiNativeSymbioticVault is Initializable, OwnableUpgradeable, ERC7535Upgradeable {
+contract NativeSymVault is Initializable, OwnableUpgradeable, ERC7535Upgradeable {
 
     /* ============== CONSTANTS + IMMUTABLES ============== */
 
-    /// @notice The vault that this ByzFiNativeSymbioticVault is associated with
+    /// @notice The vault that this NativeSymVault is associated with
     IVault public vault;
 
     /// @notice The SymPod contract address
@@ -32,14 +32,14 @@ contract ByzFiNativeSymbioticVault is Initializable, OwnableUpgradeable, ERC7535
         address _vaultAddress,
         address _stakingMinivault
     ) external initializer {
-        __ByzFiNativeSymbioticVault_init(
+        __NativeSymVault_init(
             initialOwner,
             _vaultAddress,
             _stakingMinivault
         );
     }
 
-    function __ByzFiNativeSymbioticVault_init(
+    function __NativeSymVault_init(
         address initialOwner,
         address _vaultAddress,
         address _stakingMinivault
@@ -49,14 +49,14 @@ contract ByzFiNativeSymbioticVault is Initializable, OwnableUpgradeable, ERC7535
         __ERC7535_init();
 
         // Initialize the contract
-        __ByzFiNativeSymbioticVault_init_unchained(
+        __NativeSymVault_init_unchained(
             initialOwner,
             _vaultAddress,
             _stakingMinivault
         );
     }
 
-    function __ByzFiNativeSymbioticVault_init_unchained(
+    function __NativeSymVault_init_unchained(
         address initialOwner,
         address _vaultAddress,
         address _stakingMinivault
@@ -67,7 +67,7 @@ contract ByzFiNativeSymbioticVault is Initializable, OwnableUpgradeable, ERC7535
         // Set symPod reference
         symPod = payable(_stakingMinivault);
 
-        // Whitelist ByzFiNativeSymbioticVault to deposit into Symbiotic vault
+        // Whitelist NativeSymVault to deposit into Symbiotic vault
         vault.setDepositorWhitelistStatus(address(this), true);
 
         // Transfer ownership
@@ -77,7 +77,7 @@ contract ByzFiNativeSymbioticVault is Initializable, OwnableUpgradeable, ERC7535
     /* ============== EXTERNAL FUNCTIONS ============== */
 
     /**
-     * @notice Payable fallback function that receives ether deposited to the ByzFiNativeSymbioticVault contract
+     * @notice Payable fallback function that receives ether deposited to the NativeSymVault contract
      */
     receive() external override payable {
         // TODO: emit an event to notify
