@@ -2,6 +2,7 @@
 pragma solidity ^0.8.20;
 
 import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
+import {ERC1967Utils} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Utils.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 
@@ -26,7 +27,7 @@ import "forge-std/Test.sol";
 
 contract ExistingDeploymentParser is Script, Test {
     // Byzantine contracts
-    ProxyAdmin public byzantineProxyAdmin;
+    ProxyAdmin public proxyAdmin;
     StrategyVaultManager public strategyVaultManager;
     StrategyVaultManager public strategyVaultManagerImplementation;
     UpgradeableBeacon public strategyVaultETHBeacon;
@@ -42,9 +43,6 @@ contract ExistingDeploymentParser is Script, Test {
     StakerRewards public stakerRewards;
     StakerRewards public stakerRewardsImplementation;
 
-    // Beacon Chain Admin address
-    address public beaconChainAdmin;
-
     // EigenLayer contracts
     DelegationManager public delegation;
     EigenPodManager public eigenPodManager;
@@ -56,7 +54,9 @@ contract ExistingDeploymentParser is Script, Test {
     EmptyContract public emptyContract;
 
     // Byzantine Admin
-    address byzantineAdmin;
+    address public byzantineAdmin;
+    // Beacon Chain Admin address
+    address public beaconChainAdmin;
     // Initial Auction parameters
     uint256 EXPECTED_POS_DAILY_RETURN_WEI;
     uint16 MAX_DISCOUNT_RATE;
@@ -108,7 +108,6 @@ contract ExistingDeploymentParser is Script, Test {
         auctionImplementation = Auction(stdJson.readAddress(contractsAddressesData, ".addresses.auctionImplementation"));
         byzNft = ByzNft(stdJson.readAddress(contractsAddressesData, ".addresses.byzNft"));
         byzNftImplementation = ByzNft(stdJson.readAddress(contractsAddressesData, ".addresses.byzNftImplementation"));
-        byzantineProxyAdmin = ProxyAdmin(stdJson.readAddress(contractsAddressesData, ".addresses.byzantineProxyAdmin"));
         emptyContract = EmptyContract(stdJson.readAddress(contractsAddressesData, ".addresses.emptyContract"));
         stakerRewards = StakerRewards(payable(stdJson.readAddress(contractsAddressesData, ".addresses.stakerRewards")));
         stakerRewardsImplementation = StakerRewards(payable(stdJson.readAddress(contractsAddressesData, ".addresses.stakerRewardsImplementation")));
@@ -121,8 +120,9 @@ contract ExistingDeploymentParser is Script, Test {
         strategyVaultManager = StrategyVaultManager(stdJson.readAddress(contractsAddressesData, ".addresses.strategyVaultManager"));
         strategyVaultManagerImplementation = StrategyVaultManager(stdJson.readAddress(contractsAddressesData, ".addresses.strategyVaultManagerImplementation"));
 
-        // read byzantineAdmin address
+        // read admin addresses
         byzantineAdmin = stdJson.readAddress(contractsAddressesData, ".parameters.byzantineAdmin");
+        beaconChainAdmin = stdJson.readAddress(contractsAddressesData, ".parameters.beaconChainAdmin");
     }
 
     /// @notice Ensure contracts point at each other correctly via constructors
@@ -256,29 +256,41 @@ contract ExistingDeploymentParser is Script, Test {
         );
         // StrategyVaultManager
         require(
-            byzantineProxyAdmin.getProxyImplementation(TransparentUpgradeableProxy(payable(address(strategyVaultManager)))) == address(strategyVaultManagerImplementation),
+            _getImplementation(address(strategyVaultManager)) == address(strategyVaultManagerImplementation),
             "strategyVaultManager: implementation set incorrectly"
         );
         // ByzNft
         require(
-            byzantineProxyAdmin.getProxyImplementation(TransparentUpgradeableProxy(payable(address(byzNft)))) == address(byzNftImplementation),
+            _getImplementation(address(byzNft)) == address(byzNftImplementation),
             "byzNft: implementation set incorrectly"
         );
         // Auction
         require(
-            byzantineProxyAdmin.getProxyImplementation(TransparentUpgradeableProxy(payable(address(auction)))) == address(auctionImplementation),
+            _getImplementation(address(auction)) == address(auctionImplementation),
             "auction: implementation set incorrectly"
         );
         // Escrow
         require(
-            byzantineProxyAdmin.getProxyImplementation(TransparentUpgradeableProxy(payable(address(escrow)))) == address(escrowImplementation),
+            _getImplementation(address(escrow)) == address(escrowImplementation),
             "escrow: implementation set incorrectly"
         );
         // StakerRewards
         require(
-            byzantineProxyAdmin.getProxyImplementation(TransparentUpgradeableProxy(payable(address(stakerRewards)))) == address(stakerRewardsImplementation),
+            _getImplementation(address(stakerRewards)) == address(stakerRewardsImplementation),
             "stakerRewards: implementation set incorrectly"
         );
+    }
+
+    /// @notice Get the implementation address of a proxy contract
+    function _getImplementation(address _proxy) internal view returns (address) {
+        bytes32 implementationSlot = vm.load(_proxy, ERC1967Utils.IMPLEMENTATION_SLOT);
+        return address(uint160(uint256(implementationSlot)));
+    }
+
+    /// @notice Get the ProxyAdmin of a specific `_proxy` contract
+    function _getProxyAdmin(address _proxy) internal view returns (ProxyAdmin) {
+        bytes32 adminSlot = vm.load(_proxy, ERC1967Utils.ADMIN_SLOT);
+        return ProxyAdmin(address(uint160(uint256(adminSlot))));
     }
 
     /**
@@ -322,7 +334,7 @@ contract ExistingDeploymentParser is Script, Test {
     function logInitialDeploymentParams() public {
         emit log_string("==== Parsed Initilize Params for Initial Deployment ====");
 
-        emit log_named_address("byzantineAdmin", byzantineAdmin);
+        emit log_named_address("byzantineAdmin", msg.sender);
         emit log_named_address("beaconChainAdmin", beaconChainAdmin);
 
         emit log_named_uint("EXPECTED_POS_DAILY_RETURN_WEI", EXPECTED_POS_DAILY_RETURN_WEI);
@@ -347,7 +359,6 @@ contract ExistingDeploymentParser is Script, Test {
         string memory parent_object = "parent object";
 
         string memory deployed_addresses = "addresses";
-        vm.serializeAddress(deployed_addresses, "byzantineProxyAdmin", address(byzantineProxyAdmin));
         vm.serializeAddress(deployed_addresses, "strategyVaultManager", address(strategyVaultManager));
         vm.serializeAddress(deployed_addresses, "strategyVaultManagerImplementation", address(strategyVaultManagerImplementation));
         vm.serializeAddress(deployed_addresses, "strategyVaultETHBeacon", address(strategyVaultETHBeacon));
@@ -386,7 +397,6 @@ contract ExistingDeploymentParser is Script, Test {
     function logAndUpdateContractAddresses(string memory outputPath) public {
         // WRITE JSON DATA ADDRESSES
         string memory deployed_addresses = "addresses";
-        vm.serializeAddress(deployed_addresses, "byzantineProxyAdmin", address(byzantineProxyAdmin));
         vm.serializeAddress(deployed_addresses, "strategyVaultManager", address(strategyVaultManager));
         vm.serializeAddress(deployed_addresses, "strategyVaultManagerImplementation", address(strategyVaultManagerImplementation));
         vm.serializeAddress(deployed_addresses, "strategyVaultETHBeacon", address(strategyVaultETHBeacon));

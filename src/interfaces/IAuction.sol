@@ -85,6 +85,14 @@ interface IAuction {
         uint32 currentVCNumber;
     }
 
+    /// @notice Struct representing a node in the auction's Binary Search Tree (BST)
+    struct BSTNode {
+        // Auction score
+        uint256 auctionScore;
+        // Associated bidId
+        bytes32 bidId;
+    }
+
     /* ===================== EVENTS ===================== */
 
     /// @notice Emitted when a bid is placed. Track all the bids done on Byzantine.
@@ -110,6 +118,12 @@ interface IAuction {
 
     /// @notice Emitted when a bid is withdrawn
     event BidWithdrawn(
+        address indexed nodeOpAddr,
+        bytes32 indexed bidId
+    );
+
+    /// @notice Emitted when a bid is removed by the Byzantine Admin
+    event BidRemoved(
         address indexed nodeOpAddr,
         bytes32 indexed bidId
     );
@@ -153,6 +167,9 @@ interface IAuction {
     /// @notice Returns the number of DVs in the main auction
     function getNumDVInAuction() external view returns (uint256);
 
+    /// @notice Returns the number of bids in the auction's BST
+    function getNumBids(AuctionType _auctionType) external view returns (uint256);
+
     /**
      * @notice Returns the details of a specific bid
      * @param _bidId The unique identifier of the bid
@@ -172,6 +189,13 @@ interface IAuction {
      * @dev Returns 0 if main tree is empty
      */
     function getWinningCluster() external view returns (bytes32, uint256);
+
+    /**
+     * @notice Returns the ranking of the bids in the auction's BST
+     * @param _numBids: the number of bids to display (should be greater than 0 and less than the total number of bids)
+     * @param _auctionType: the sub-auction type to get the ranking from
+     */
+    function getBidRanking(uint256 _numBids, AuctionType _auctionType) external view returns (BSTNode[] memory);
 
     /* ===================== EXTERNAL FUNCTIONS ===================== */
 
@@ -288,6 +312,23 @@ interface IAuction {
     function whitelistNodeOps(address[] calldata _nodeOpAddrs) external;
 
     /**
+     * @notice Remove node operators from the whitelist.
+     * @param _nodeOpAddrs: A dynamique array of the addresses to unwhitelist
+     */
+    function removeNodeOpFromWhitelist(address[] calldata _nodeOpAddrs) external;
+
+    /**
+     * @notice Remove a bid from the auction storage
+     * @notice Backup function in case a node op cheats or loses its key access
+     * @param _bidId: the id of the bid to remove
+     * @param _auctionScore: the auction score of the bid to remove
+     * @param _nodeOp: the node operator addressof the bid to remove
+     * @param _auctionType: the type of the sub-auction
+     * @dev Revert if not called by the Byzantine Admin
+     */
+    function removeBid(bytes32 _bidId, uint256 _auctionScore, address _nodeOp, AuctionType _auctionType) external;
+
+    /**
      * @notice Update the expected daily PoS rewards variable (in Wei)
      * @dev This function is callable only by the Auction contract's owner
      * @param _newExpectedDailyReturnWei: the new expected daily return of Ethereum staking (in wei)
@@ -322,8 +363,8 @@ interface IAuction {
     /// @dev Error when unauthorized call to a function callable only by a StakerRewards.
     error OnlyStakerRewards();
 
-    /// @dev Error when address already whitelisted
-    error AlreadyWhitelisted();
+    /// @dev Error when unwhitelisted node op with pending bids
+    error NodeOpHasPendingBids();
 
     /// @dev Error when trying to remove from whitelist a non-whitelisted address
     error NotWhitelisted();

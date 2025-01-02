@@ -284,6 +284,8 @@ library HitchensOrderStatisticsTreeLib {
             }
             fixCountRecurse(self, cursorParent);
             delete self.nodes[cursor];
+        } else {
+            fixCountRecurse(self, value);
         }
     }
     function fixCountRecurse(Tree storage self, uint value) private {

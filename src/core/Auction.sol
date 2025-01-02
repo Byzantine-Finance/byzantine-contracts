@@ -3,7 +3,7 @@ pragma solidity ^0.8.20;
 
 import { Initializable } from "@openzeppelin-upgrades/contracts/proxy/utils/Initializable.sol";
 import { OwnableUpgradeable } from "@openzeppelin-upgrades/contracts/access/OwnableUpgradeable.sol";
-import { ReentrancyGuardUpgradeable } from "@openzeppelin-upgrades/contracts/security/ReentrancyGuardUpgradeable.sol";
+import { ReentrancyGuardUpgradeable } from "@openzeppelin-upgrades/contracts/utils/ReentrancyGuardUpgradeable.sol";
 import { SplitV2Lib } from "splits-v2/libraries/SplitV2.sol";
 
 import { ByzantineAuctionMath } from "../libraries/ByzantineAuctionMath.sol";
@@ -350,38 +350,8 @@ contract Auction is
         // Get the bid to withdraw details
         BidDetails memory bidToWithdraw = _bidDetails[_bidId];
 
-        // Find the bid's sub-auction tree
-        if (bidToWithdraw.auctionType == AuctionType.JOIN_CLUSTER_4) {
-            // Decrement the bid number of the node op
-            _nodeOpsDetails[msg.sender].numBidsCluster4 -= 1;
-            // Update `dv4AuctionNumNodeOps` if necessary
-            if (_nodeOpsDetails[msg.sender].numBidsCluster4 == 0) --dv4AuctionNumNodeOps;
-
-            // Remove the bid from the sub-auction tree
-            _dv4AuctionTree.remove(_bidId, bidToWithdraw.auctionScore);
-
-            // delete the bid from the bids mapping
-            delete _bidDetails[_bidId];
-
-            // Update main auction if necessary
-            if (bidToWithdraw.auctionScore >= _dv4LatestWinningInfo.lastestWinningScore && dv4AuctionNumNodeOps >= _CLUSTER_SIZE_4) {
-                _dv4UpdateMainAuction();
-            }
-
-        } else {
-
-            revert InvalidAuctionType();
-        }
-
-        // Ask the Escrow contract to refund the node op
-        if (isWhitelisted(msg.sender)) {
-            escrow.refund(msg.sender, bidToWithdraw.bidPrice);
-        } else if (_nodeOpsDetails[msg.sender].numBonds > 0) {
-            _nodeOpsDetails[msg.sender].numBonds -= 1;
-            escrow.refund(msg.sender, bidToWithdraw.bidPrice + _BOND);
-        } else {
-            escrow.refund(msg.sender, bidToWithdraw.bidPrice);
-        }
+        // Remove bid from auction and refund the bidder
+        _removeBid(_bidId, bidToWithdraw.auctionScore, bidToWithdraw.bidPrice, msg.sender, bidToWithdraw.auctionType);
 
         emit BidWithdrawn(msg.sender, _bidId);
     }
@@ -447,6 +417,15 @@ contract Auction is
         return _mainAuctionTree.count();
     }
 
+    /// @notice Returns the number of bids in the auction's BST
+    function getNumBids(AuctionType _auctionType) public view returns (uint256) {
+        if (_auctionType == AuctionType.JOIN_CLUSTER_4) {
+            return _dv4AuctionTree.count();
+        } else {
+            revert InvalidAuctionType();
+        }
+    }
+
     /**
      * @notice Returns the details of a specific bid
      * @param _bidId The unique identifier of the bid
@@ -478,6 +457,63 @@ contract Auction is
         }
     }
 
+    /**
+     * @notice Returns the ranking of the bids in the auction's BST
+     * @param _numBids: the number of bids to display (should be greater than 0 and less than the total number of bids)
+     * @param _auctionType: the sub-auction type to get the ranking from
+     */
+    function getBidRanking(uint256 _numBids, AuctionType _auctionType) public view returns (BSTNode[] memory) {
+
+        require(_numBids > 0, "Number of bids must be greater than 0");
+        require(_numBids <= getNumBids(_auctionType), "Number of bids too high");
+
+        HitchensOrderStatisticsTreeLib.Tree storage auctionTree;
+        if (_auctionType == AuctionType.JOIN_CLUSTER_4) {
+            auctionTree = _dv4AuctionTree;
+        } else {
+            revert InvalidAuctionType();
+        }
+
+        uint256 numSameBids;
+        uint256 count;
+        BSTNode[] memory bstNodes = new BSTNode[](_numBids);
+
+        /* ----- First BST node ----- */
+
+        bstNodes[0].auctionScore = auctionTree.last();
+        (,,,,numSameBids,) = auctionTree.getNode(bstNodes[0].auctionScore);
+        for (uint256 i = 0; i < numSameBids;) {
+            bstNodes[count].auctionScore = bstNodes[0].auctionScore;
+            bstNodes[count].bidId = auctionTree.valueKeyAtIndex(bstNodes[0].auctionScore, i);
+            ++count;
+            if (count == _numBids) return bstNodes;
+            unchecked {
+                ++i;
+            }
+        }
+
+        /* ----- Other BST nodes ----- */
+
+        for (uint256 i = count; i < _numBids;) {
+            bstNodes[i].auctionScore = auctionTree.prev(bstNodes[i - 1].auctionScore);
+            (,,,,numSameBids,) = auctionTree.getNode(bstNodes[i].auctionScore);
+            for (uint256 j = 0; j < numSameBids;) {
+                bstNodes[count].auctionScore = bstNodes[i].auctionScore;
+                bstNodes[count].bidId = auctionTree.valueKeyAtIndex(bstNodes[i].auctionScore, j);
+                ++count;
+                if (count == _numBids) return bstNodes;
+                unchecked {
+                    ++j;
+                }
+            }
+            unchecked {
+                ++i;
+            }
+        }
+
+        return bstNodes;
+    }
+
     /* ======================= OWNER FUNCTIONS ======================= */
 
     /**
@@ -486,6 +522,9 @@ contract Auction is
      */
     function whitelistNodeOps(address[] calldata _nodeOpAddrs) external onlyOwner {
         for (uint256 i = 0; i < _nodeOpAddrs.length;) {
+            uint16 numBonds = _nodeOpsDetails[_nodeOpAddrs[i]].numBonds;
+            if (numBonds > 0) escrow.refund(_nodeOpAddrs[i], numBonds * _BOND);
+            _nodeOpsDetails[_nodeOpAddrs[i]].numBonds = 0;
             _nodeOpsDetails[_nodeOpAddrs[i]].isWhitelisted = true;
             unchecked {
                 ++i;
@@ -494,14 +533,44 @@ contract Auction is
     }
 
     /**
-     * @notice Remove a node operator to the the whitelist.
-     * @param _nodeOpAddr: the node operator to remove from whitelist.
-     * @dev Revert if the node operator is not whitelisted.
+     * @notice Remove node operators from the whitelist.
+     * @param _nodeOpAddrs: A dynamique array of the addresses to unwhitelist
+     * @dev /!\ Edge case: TO USE WITH CAUTION
+     *      - node op whitelisted make a dummy bid
+     *      - node op unwhitelisted with pending dummy bid
+     *      - node op bids again for sensitive clusters and pay bond
+     *      - node op removes dummy bid and get back the bond
+     *      - node op can cheat and be slashed on the sensitive clusters
+     * @dev Solution:
+     *      - node op can't be unwhitelisted if it has pending bids
      */
-    /*function removeNodeOpFromWhitelist(address _nodeOpAddr) external onlyOwner {
-        if (!isWhitelisted(_nodeOpAddr)) revert NotWhitelisted();
-        _nodeOpsWhitelist[_nodeOpAddr] = false;
-    }*/
+    function removeNodeOpFromWhitelist(address[] calldata _nodeOpAddrs) external onlyOwner {
+        for (uint256 i = 0; i < _nodeOpAddrs.length;) {
+            if (_nodeOpsDetails[_nodeOpAddrs[i]].numBidsCluster4 + _nodeOpsDetails[_nodeOpAddrs[i]].numBidsCluster7 > 0) {
+                revert NodeOpHasPendingBids();
+            }
+            _nodeOpsDetails[_nodeOpAddrs[i]].isWhitelisted = false;
+            unchecked {
+                ++i;
+            }
+        }
+    }
+
+    /**
+     * @notice Remove a bid from the auction storage
+     * @notice Backup function in case a node op cheats or loses its key access
+     * @param _bidId: the id of the bid to remove
+     * @param _auctionScore: the auction score of the bid to remove
+     * @param _nodeOp: the node operator addressof the bid to remove
+     * @param _auctionType: the type of the sub-auction
+     * @dev Revert if not called by the Byzantine Admin
+     */
+    function removeBid(bytes32 _bidId, uint256 _auctionScore, address _nodeOp, AuctionType _auctionType) external onlyOwner {
+        // Remove bid from auction and refund the bidder
+        _removeBid(_bidId, _auctionScore, _bidDetails[_bidId].bidPrice, _nodeOp, _auctionType);
+
+        emit BidRemoved(_nodeOp, _bidId);
+    }
 
     /**
      * @notice Update the expected daily PoS rewards variable (in Wei)
@@ -650,6 +719,42 @@ contract Auction is
             delete _clusterDetails[_dv4LatestWinningInfo.latestWinningClusterId];
         }
         _mainAuctionTree.insert(_newClusterId, _newAvgAuctionScore);
+    }
+
+    /// @notice Remove a bid from the auction storage
+    function _removeBid(bytes32 _bidId, uint256 _auctionScore, uint256 _bidPrice, address _nodeOp, AuctionType _auctionType) private {
+        // Work on the correct sub-auction tree
+        if (_auctionType == AuctionType.JOIN_CLUSTER_4) {
+            // Decrement the bid number of the node op
+            _nodeOpsDetails[_nodeOp].numBidsCluster4 -= 1;
+            // Update `dv4AuctionNumNodeOps` if necessary
+            if (_nodeOpsDetails[_nodeOp].numBidsCluster4 == 0) --dv4AuctionNumNodeOps;
+
+            // Remove the bid from the sub-auction tree
+            _dv4AuctionTree.remove(_bidId, _auctionScore);
+
+            // delete the bid from the bids mapping
+            delete _bidDetails[_bidId];
+
+            // Update main auction if necessary
+            if (_auctionScore >= _dv4LatestWinningInfo.lastestWinningScore && dv4AuctionNumNodeOps >= _CLUSTER_SIZE_4) {
+                _dv4UpdateMainAuction();
+            }
+
+        } else {
+
+            revert InvalidAuctionType();
+        }
+
+        // Ask the Escrow contract to refund the node op
+        if (isWhitelisted(_nodeOp)) {
+            escrow.refund(_nodeOp, _bidPrice);
+        } else if (_nodeOpsDetails[_nodeOp].numBonds > 0) {
+            _nodeOpsDetails[_nodeOp].numBonds -= 1;
+            escrow.refund(_nodeOp, _bidPrice + _BOND);
+        } else {
+            escrow.refund(_nodeOp, _bidPrice);
+        }
     }
 
     /// @notice Create a new entry in the `_clusterDetails` mapping

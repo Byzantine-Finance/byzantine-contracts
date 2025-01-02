@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "@openzeppelin-upgrades/contracts/proxy/utils/Initializable.sol";
-import "@openzeppelin-upgrades/contracts/token/ERC721/ERC721Upgradeable.sol";
-import "@openzeppelin-upgrades/contracts/access/OwnableUpgradeable.sol";
+import {Initializable} from "@openzeppelin-upgrades/contracts/proxy/utils/Initializable.sol";
+import {ERC721Upgradeable} from "@openzeppelin-upgrades/contracts/token/ERC721/ERC721Upgradeable.sol";
+import {OwnableUpgradeable} from "@openzeppelin-upgrades/contracts/access/OwnableUpgradeable.sol";
 
-import "../interfaces/IByzNft.sol";
-import "../interfaces/IStrategyVaultManager.sol";    
+import {IByzNft} from "../interfaces/IByzNft.sol";
+import {IStrategyVaultManager} from "../interfaces/IStrategyVaultManager.sol";    
 
 contract ByzNft is
     Initializable,
@@ -42,15 +42,16 @@ contract ByzNft is
     }
 
     /**
-     * @dev Overrides `_beforeTokenTransfer` to restrict token transfers.
+     * @dev Overrides `_update` to restrict token transfers.
      */
-    function _beforeTokenTransfer(
-        address from,
-        address /*to*/,
-        uint256 /*tokenId*/
-    ) internal override view {
+    function _update(
+        address to,
+        uint256 tokenId,
+        address auth
+    ) internal override returns (address) {
         // Allow transfers only during minting
-        if (from != address(0)) revert("ByzNft is non-transferable");
+        if (auth != address(0)) revert("ByzNft is non-transferable");
+        return super._update(to, tokenId, auth);
     }
 
 }

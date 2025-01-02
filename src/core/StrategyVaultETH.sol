@@ -124,7 +124,7 @@ contract StrategyVaultETH is StrategyVaultETHStorage, ERC7535MultiRewardVault {
      * @dev Revert if the amount deposited is not a multiple of 32 ETH.
      * @dev Trigger auction(s) for each bundle of 32 ETH deposited to get Distributed Validator(s)
      */
-    function deposit(uint256 assets, address receiver) public override(ERC7535MultiRewardVault, IERC7535Upgradeable) payable checkWhitelist returns (uint256) {
+    function deposit(uint256 assets, address receiver) public override(ERC7535MultiRewardVault, IERC7535) payable checkWhitelist returns (uint256) {
         _triggerAuction();
         uint256 shares = super.deposit(assets, receiver);
         amountOfETH += assets;
@@ -141,7 +141,7 @@ contract StrategyVaultETH is StrategyVaultETHStorage, ERC7535MultiRewardVault {
      * @dev Revert if the amount deposited is not a multiple of 32 ETH.
      * @dev Trigger auction(s) for each bundle of 32 ETH deposited to get Distributed Validator(s)
      */
-    function mint(uint256 shares, address receiver) public override(ERC7535MultiRewardVault, IERC7535Upgradeable) payable checkWhitelist returns (uint256) {
+    function mint(uint256 shares, address receiver) public override(ERC7535MultiRewardVault, IERC7535) payable checkWhitelist returns (uint256) {
         _triggerAuction();
         uint256 assets = super.mint(shares, receiver);
         amountOfETH += assets;

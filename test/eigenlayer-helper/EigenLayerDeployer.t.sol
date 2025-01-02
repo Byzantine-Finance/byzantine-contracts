@@ -1,28 +1,31 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.12;
 
-import "@openzeppelin/contracts/token/ERC20/presets/ERC20PresetFixedSupply.sol";
-import "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
-import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-import "@openzeppelin/contracts/proxy/beacon/IBeacon.sol";
-import "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
+import {ERC20} from "../../lib/eigenlayer-contracts/lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
+import {IERC20} from "../../lib/eigenlayer-contracts/lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
+import {ProxyAdmin} from "../../lib/eigenlayer-contracts/lib/openzeppelin-contracts/contracts/proxy/transparent/ProxyAdmin.sol";
+import {TransparentUpgradeableProxy} from "../../lib/eigenlayer-contracts/lib/openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {IBeacon} from "../../lib/eigenlayer-contracts/lib/openzeppelin-contracts/contracts/proxy/beacon/IBeacon.sol";
+import {UpgradeableBeacon} from "../../lib/eigenlayer-contracts/lib/openzeppelin-contracts/contracts/proxy/beacon/UpgradeableBeacon.sol";
 
-import "eigenlayer-contracts/interfaces/IDelegationManager.sol";
-import "eigenlayer-contracts/core/DelegationManager.sol";
+import {IDelegationManager} from "eigenlayer-contracts/interfaces/IDelegationManager.sol";
+import {DelegationManager} from "eigenlayer-contracts/core/DelegationManager.sol";
 
-import "eigenlayer-contracts/interfaces/IETHPOSDeposit.sol";
+import {IETHPOSDeposit} from "eigenlayer-contracts/interfaces/IETHPOSDeposit.sol";
 
-import "eigenlayer-contracts/core/StrategyManager.sol";
-import "eigenlayer-contracts/strategies/StrategyBase.sol";
-import "eigenlayer-contracts/core/Slasher.sol";
+import {StrategyManager} from "eigenlayer-contracts/core/StrategyManager.sol";
+import {StrategyBase} from "eigenlayer-contracts/strategies/StrategyBase.sol";
+import {IStrategy} from "eigenlayer-contracts/interfaces/IStrategy.sol";
+import {Slasher} from "eigenlayer-contracts/core/Slasher.sol";
 
-import "eigenlayer-contracts/pods/EigenPod.sol";
-import "eigenlayer-contracts/pods/EigenPodManager.sol";
+import {EigenPod} from "eigenlayer-contracts/pods/EigenPod.sol";
+import {IEigenPod} from "eigenlayer-contracts/interfaces/IEigenPod.sol";
+import {EigenPodManager} from "eigenlayer-contracts/pods/EigenPodManager.sol";
 
-import "eigenlayer-contracts/permissions/PauserRegistry.sol";
+import {PauserRegistry} from "eigenlayer-contracts/permissions/PauserRegistry.sol";
 
-import "../mocks/EmptyContract.sol";
-import "../mocks/ETHDepositMock.sol";
+import {EmptyContract} from "../mocks/EmptyContract.sol";
+import {ETHPOSDepositMock} from "../mocks/ETHDepositMock.sol";
 
 import "forge-std/Test.sol";
 
@@ -224,7 +227,7 @@ contract EigenLayerDeployer is Test {
         );
 
         //simple ERC20 (**NOT** WETH-like!), used in a test strategy
-        weth = new ERC20PresetFixedSupply("weth", "WETH", wethInitialSupply, address(this));
+        weth = new ERC20("weth", "WETH");
 
         // deploy StrategyBase contract implementation, then create upgradeable proxy that points to implementation and initialize it
         baseStrategyImplementation = new StrategyBase(strategyManager);
@@ -238,7 +241,7 @@ contract EigenLayerDeployer is Test {
             )
         );
 
-        eigenToken = new ERC20PresetFixedSupply("eigen", "EIGEN", wethInitialSupply, address(this));
+        eigenToken = new ERC20("eigen", "EIGEN");
 
         // deploy upgradeable proxy that points to StrategyBase implementation and initialize it
         eigenStrat = StrategyBase(

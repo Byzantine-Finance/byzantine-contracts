@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "../interfaces/IOracle.sol";
+import {IOracle} from "../interfaces/IOracle.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 // API3 Proxy Interface from https://github.com/api3dao/contracts/blob/main/contracts/api3-server-v1/proxies/interfaces/IProxy.sol
@@ -22,6 +22,8 @@ contract API3OracleImplementation is IOracle, Ownable {
 
     uint256 public constant MAX_DELAY = 1 hours;  // Maximum acceptable delay
     address public constant ETH_USD_PROXY = 0xa47Fd122b11CdD7aad7c3e8B740FB91D83Ce43D1; // ETH/USD Proxy on Holesky
+
+    constructor(address initialOwner) Ownable(initialOwner) {}
 
     /// @notice Get the price of an asset from an API3 dAPI
     /// @param asset The asset to get the price of

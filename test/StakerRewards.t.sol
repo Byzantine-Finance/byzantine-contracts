@@ -5,20 +5,22 @@ pragma solidity ^0.8.20;
 // solhint-disable var-name-mixedcase
 // solhint-disable func-name-mixedcase
 
-import "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
-import "eigenlayer-contracts/interfaces/IEigenPod.sol";
-import "eigenlayer-contracts/interfaces/IStrategy.sol";
-import "eigenlayer-contracts/libraries/BeaconChainProofs.sol";
-import { SplitV2Lib } from "splits-v2/libraries/SplitV2.sol";
-import "./utils/ProofParsing.sol";
-import "./ByzantineDeployer.t.sol";
+import {BeaconProxy} from "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
+import {IEigenPod} from "eigenlayer-contracts/interfaces/IEigenPod.sol";
+import {IStrategy} from "eigenlayer-contracts/interfaces/IStrategy.sol";
+import {BeaconChainProofs} from "eigenlayer-contracts/libraries/BeaconChainProofs.sol";
+import {SplitV2Lib} from "splits-v2/libraries/SplitV2.sol";
+import {ProofParsing} from "./utils/ProofParsing.sol";
+import {ByzantineDeployer} from "./ByzantineDeployer.t.sol";
 
-import "../src/interfaces/IStrategyVaultERC20.sol";
-import "../src/interfaces/IStrategyVaultETH.sol";
-import "../src/interfaces/IStrategyVaultManager.sol";
-import "../src/interfaces/IAuction.sol";
-import "../src/core/StrategyVaultETH.sol";
-import "../src/interfaces/IStakerRewards.sol";
+import {IStrategyVaultERC20} from "../src/interfaces/IStrategyVaultERC20.sol";
+import {IStrategyVaultETH} from "../src/interfaces/IStrategyVaultETH.sol";
+import {IStrategyVaultManager} from "../src/interfaces/IStrategyVaultManager.sol";
+import {IAuction} from "../src/interfaces/IAuction.sol";
+import {StrategyVaultETH} from "../src/core/StrategyVaultETH.sol";
+import {IStakerRewards} from "../src/interfaces/IStakerRewards.sol";
+
+import "./mocks/MockOracle.sol";
 
 import {console} from "forge-std/console.sol";
 
@@ -28,6 +30,9 @@ contract StakerRewardsTest is ProofParsing, ByzantineDeployer {
 
     /// @notice Array of all the bid ids
     bytes32[] internal bidId;
+
+    /// @notice Mock oracle to simulate the price of ETH
+    MockOracle public oracle;
 
     /// @notice Random validator deposit data (simulates a Byzantine DV)
     bytes private pubkey;
@@ -40,6 +45,9 @@ contract StakerRewardsTest is ProofParsing, ByzantineDeployer {
     function setUp() public override {
         // deploy locally EigenLayer and Byzantine contracts
         ByzantineDeployer.setUp();
+
+        // Deploy the mock oracle
+        oracle = new MockOracle();
 
         // Set forwarder address
         vm.prank(address(strategyVaultManager));
@@ -732,7 +740,7 @@ contract StakerRewardsTest is ProofParsing, ByzantineDeployer {
 
     function _createStratVaultETHAndStake(address _staker, uint256 _amount) internal returns (IStrategyVaultETH) {
         vm.prank(_staker);
-        IStrategyVaultETH stratVaultETH = IStrategyVaultETH(strategyVaultManager.createStratVaultAndStakeNativeETH{value: _amount}(true, true, ELOperator1, address(0), _staker));
+        IStrategyVaultETH stratVaultETH = IStrategyVaultETH(strategyVaultManager.createStratVaultAndStakeNativeETH{value: _amount}(true, true, ELOperator1, address(oracle), _staker));
         return stratVaultETH;
     }
 
