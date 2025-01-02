@@ -22,7 +22,7 @@ import {IOperatorRegistry} from "@symbioticfi/core/src/interfaces/IOperatorRegis
 import {IRegistry} from "@symbioticfi/core/src/interfaces/common/IRegistry.sol";
 import {IVault} from "@symbioticfi/core/src/interfaces/vault/IVault.sol";
 import {IOptInService} from "@symbioticfi/core/src/interfaces/service/IOptInService.sol";
-import {StakingMinivault} from "../src/vault/symbiotic/StakingMinivault.sol";
+import {SymPod} from "../src/vault/symbiotic/SymPod.sol";
 
 contract SymbioticVaultFactoryTest is Test {
     uint256 holeskyFork;
@@ -106,7 +106,7 @@ contract SymbioticVaultFactoryTest is Test {
         ) = _createVaultParamsSet();
 
         // Call the createVault function to create an advanced vault
-        (address vault, address delegator, address slasher, address defaultStakerRewards, address payable byzFiNativeSymbioticVault, address stakingMinivault) = symbioticVaultFactory.createVault(
+        (address vault, address delegator, address slasher, address defaultStakerRewards, address payable byzFiNativeSymbioticVault, address symPod) = symbioticVaultFactory.createVault(
             burnerRouterParams,
             configuratorParams,
             vaultParams,
@@ -133,10 +133,10 @@ contract SymbioticVaultFactoryTest is Test {
         assertEq(vaultAddr, vault);
 
         // Verify if the ByzFiNativeSymbioticVault is initialized with the correct staking minivault address
-        address stakingMinivaultAddr = ByzFiNativeSymbioticVault(byzFiNativeSymbioticVault).stakingMinivault();
-        assertEq(stakingMinivaultAddr, stakingMinivault);
+        address stakingMinivaultAddr = ByzFiNativeSymbioticVault(byzFiNativeSymbioticVault).symPod();
+        assertEq(stakingMinivaultAddr, symPod);
 
-        // Verify if the stakingMinivault is whitelisted
+        // Verify if the symPod is whitelisted
         assertEq(IVault(vault).isDepositorWhitelisted(byzFiNativeSymbioticVault), true);
 
         // Verify if depositLimit is set to 1000 ether, meaning that an advanced vault is created
@@ -166,7 +166,7 @@ contract SymbioticVaultFactoryTest is Test {
         ) = _createVaultParamsSet();
 
         // Call the createVault function to create a standardized vault
-        (address vault, address delegator, address slasher, address defaultStakerRewards, address payable byzFiNativeSymbioticVault, address stakingMinivault) = symbioticVaultFactory.createVault(
+        (address vault, address delegator, address slasher, address defaultStakerRewards, address payable byzFiNativeSymbioticVault, address symPod) = symbioticVaultFactory.createVault(
             burnerRouterParams,
             configuratorParams,
             vaultParams,
@@ -204,7 +204,7 @@ contract SymbioticVaultFactoryTest is Test {
         ) = _createVaultParamsSet();
 
         // Call the createVault function to create a standardized vault
-        (address vault, address delegator, address slasher, address defaultStakerRewards, address payable byzFiNativeSymbioticVault, address stakingMinivault) = symbioticVaultFactory.createVault(
+        (address vault, address delegator, address slasher, address defaultStakerRewards, address payable byzFiNativeSymbioticVault, address symPod) = symbioticVaultFactory.createVault(
             burnerRouterParams,
             configuratorParams,
             vaultParams,
@@ -274,7 +274,7 @@ contract SymbioticVaultFactoryTest is Test {
             ISymbioticVaultFactory.StakerRewardsParams memory stakerRewardsParams
         ) = _createVaultParamsSet();
 
-        (address vault, address delegator, address slasher, address defaultStakerRewards, address payable byzFiNativeSymbioticVault, address stakingMinivault) = symbioticVaultFactory.createVault(
+        (address vault, address delegator, address slasher, address defaultStakerRewards, address payable byzFiNativeSymbioticVault, address symPod) = symbioticVaultFactory.createVault(
             burnerRouterParams,
             configuratorParams,
             vaultParams,
@@ -289,23 +289,23 @@ contract SymbioticVaultFactoryTest is Test {
 
         // ============= For Testing purposes: Mint SymPodShares to byzFiNativeSymbioticVault to bypass the real process, to simulate: 
         // -> deposit of ETH by Alice in ByzFiNativeSymbioticVault 
-        // -> deposit of ETH by ByzFiNativeSymbioticVault in StakingMinivault 
-        // -> issuance of SymPodShares by StakingMinivault to ByzFiNativeSymbioticVault
+        // -> deposit of ETH by ByzFiNativeSymbioticVault in SymPod 
+        // -> issuance of SymPodShares by SymPod to ByzFiNativeSymbioticVault
         // -> deposit of SymPodShares by ByzFiNativeSymbioticVault in the SymbioticVault ==============
 
         // Mint SymPodShares to byzFiNativeSymbioticVault (no access control for testing purposes)
-        StakingMinivault(payable(stakingMinivault)).mintForTesting(byzFiNativeSymbioticVault, 1000);
-        assertEq(StakingMinivault(payable(stakingMinivault)).balanceOf(byzFiNativeSymbioticVault), 1000);
+        SymPod(payable(symPod)).mintForTesting(byzFiNativeSymbioticVault, 1000);
+        assertEq(SymPod(payable(symPod)).balanceOf(byzFiNativeSymbioticVault), 1000);
 
         // ByzFiNativeSymbioticVault approves the vault to spend its SymPodShares
         vm.prank(byzFiNativeSymbioticVault);
-        StakingMinivault(payable(stakingMinivault)).approve(vault, 1000);
-        assertEq(StakingMinivault(payable(stakingMinivault)).allowance(byzFiNativeSymbioticVault, vault), 1000);
+        SymPod(payable(symPod)).approve(vault, 1000);
+        assertEq(SymPod(payable(symPod)).allowance(byzFiNativeSymbioticVault, vault), 1000);
 
         // ByzFiNativeSymbioticVault deposits SymPodShares on behalf of Alice
         vm.prank(byzFiNativeSymbioticVault);
         IVault(vault).deposit(alice, 1000);
-        assertEq(StakingMinivault(payable(stakingMinivault)).balanceOf(byzFiNativeSymbioticVault), 0);
+        assertEq(SymPod(payable(symPod)).balanceOf(byzFiNativeSymbioticVault), 0);
         assertEq(IVault(vault).activeBalanceOf(alice), 1000);
         assertEq(IVault(vault).totalStake(), 1000);
         assertEq(IVault(vault).activeShares(), 1000);
@@ -326,9 +326,9 @@ contract SymbioticVaultFactoryTest is Test {
         IVault(vault).claim(alice, epochAtWithdraw + 1); // Can be claimed at epochAtWithdraw + 1 epoch 
         assertEq(IVault(vault).totalStake(), 0);
         assertEq(IVault(vault).activeBalanceOf(alice), 0);
-        assertEq(StakingMinivault(payable(stakingMinivault)).balanceOf(alice), 1000);
+        assertEq(SymPod(payable(symPod)).balanceOf(alice), 1000);
 
-        // TODO: Redo tests to interact correctly with ByzFiNativeSymbioticVault and StakingMinivault
+        // TODO: Redo tests to interact correctly with ByzFiNativeSymbioticVault and SymPod
         // vm.prank(alice);
         // uint256 nrvShares = ByzFiNativeSymbioticVault(byzFiNativeSymbioticVault).deposit{value: 64 ether}(64 ether, alice);
         // Verify if the nrvShares received are equal to the shares converted from the amount of ETH deposited in ByzFiNativeSymbioticVault

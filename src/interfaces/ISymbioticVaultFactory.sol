@@ -61,5 +61,5 @@ interface ISymbioticVaultFactory {
         ISymbioticVaultFactory.SlasherParams memory slasherParams,
         ISymbioticVaultFactory.StakerRewardsParams memory stakerRewardsParams,
         bool isStandardVault
-    ) external returns (address vault, address delegator, address slasher, address defaultStakerRewards, address payable byzFiNativeSymbioticVault, address stakingMinivault);
+    ) external returns (address vault, address delegator, address slasher, address defaultStakerRewards, address payable byzFiNativeSymbioticVault, address symPod);
 }

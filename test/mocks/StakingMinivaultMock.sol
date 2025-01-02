@@ -8,7 +8,7 @@ contract StakingMinivaultMock is ERC7535Upgradeable {
     /* ============== EXTERNAL FUNCTIONS ============== */
 
     /**
-     * @notice Payable fallback function that receives ether deposited to the StakingMinivault contract
+     * @notice Payable fallback function that receives ether deposited to the SymPod contract
      */
     receive() external override payable {}
 }

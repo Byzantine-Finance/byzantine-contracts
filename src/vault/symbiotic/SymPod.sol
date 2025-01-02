@@ -23,11 +23,11 @@ interface ISymPodFactory {
 }
 
 /**
- * @title StakingMinivault
+ * @title SymPod
  * @author Byzantine Finance
  * @notice ERC7535 vault for staking ETH through SymPod
  */
-contract StakingMinivault is ERC7535MultiRewardVault {
+contract SymPod is ERC7535MultiRewardVault {
     using FIFOLib for FIFOLib.FIFO;
 
     /* =================== MODIFIERS =================== */

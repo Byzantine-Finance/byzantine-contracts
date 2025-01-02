@@ -6,7 +6,7 @@ import {OwnableUpgradeable} from "@openzeppelin-upgrades/contracts/access/Ownabl
 import "../ERC7535/ERC7535Upgradeable.sol";
 
 import {IVault} from "@symbioticfi/core/src/interfaces/vault/IVault.sol";
-import {StakingMinivault} from "./StakingMinivault.sol";
+import {SymPod} from "./SymPod.sol";
 
 contract ByzFiNativeSymbioticVault is Initializable, OwnableUpgradeable, ERC7535Upgradeable {
 
@@ -15,8 +15,8 @@ contract ByzFiNativeSymbioticVault is Initializable, OwnableUpgradeable, ERC7535
     /// @notice The vault that this ByzFiNativeSymbioticVault is associated with
     IVault public vault;
 
-    /// @notice The StakingMinivault contract address
-    address payable public stakingMinivault;
+    /// @notice The SymPod contract address
+    address payable public symPod;
 
     /* ============== CONSTRUCTOR & INITIALIZER ============== */
 
@@ -64,8 +64,8 @@ contract ByzFiNativeSymbioticVault is Initializable, OwnableUpgradeable, ERC7535
         // Set vault reference
         vault = IVault(_vaultAddress);
 
-        // Set stakingMinivault reference
-        stakingMinivault = payable(_stakingMinivault);
+        // Set symPod reference
+        symPod = payable(_stakingMinivault);
 
         // Whitelist ByzFiNativeSymbioticVault to deposit into Symbiotic vault
         vault.setDepositorWhitelistStatus(address(this), true);
@@ -94,7 +94,7 @@ contract ByzFiNativeSymbioticVault is Initializable, OwnableUpgradeable, ERC7535
         uint256 nrvShares = super.deposit(assets, receiver);
 
         // Send the ETH to the Staking Minivault to be staked on the beacon chain and mint the corresponding Staking vaultshares (SVS) 
-        uint256 svShares = StakingMinivault(stakingMinivault).deposit{value: assets}(assets, receiver);
+        uint256 svShares = SymPod(symPod).deposit{value: assets}(assets, receiver);
 
         // // Deposit SVS into Symbiotic vault
         // (uint256 depositedAmount, uint256 mintedShares) = vault.deposit(receiver, svShares);
@@ -113,7 +113,7 @@ contract ByzFiNativeSymbioticVault is Initializable, OwnableUpgradeable, ERC7535
         uint256 assets = super.mint(shares, receiver);
 
         // Send the ETH to the Staking Minivault to be staked on the beacon chain and mint the corresponding Staking vaultshares (SVS) 
-        uint256 stakingAssets = StakingMinivault(stakingMinivault).mint{value: assets}(shares, receiver);
+        uint256 stakingAssets = SymPod(symPod).mint{value: assets}(shares, receiver);
 
         // Deposit SVS into Symbiotic vault
         (uint256 depositedAmount, uint256 mintedShares) = vault.deposit(receiver, stakingAssets);

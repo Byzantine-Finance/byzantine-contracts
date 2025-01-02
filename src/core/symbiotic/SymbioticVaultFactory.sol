@@ -19,7 +19,7 @@ import {ISymbioticVaultFactory} from "../../interfaces/ISymbioticVaultFactory.so
 import {IVault} from "@symbioticfi/core/src/interfaces/vault/IVault.sol";
 
 import {ByzFiNativeSymbioticVault} from "../../vault/symbiotic/ByzFiNativeSymbioticVault.sol";
-import {StakingMinivault} from "../../vault/symbiotic/StakingMinivault.sol";
+import {SymPod} from "../../vault/symbiotic/SymPod.sol";
 
 contract SymbioticVaultFactory is Initializable, OwnableUpgradeable {
 
@@ -85,13 +85,13 @@ contract SymbioticVaultFactory is Initializable, OwnableUpgradeable {
         ISymbioticVaultFactory.SlasherParams memory slasherParams,
         ISymbioticVaultFactory.StakerRewardsParams memory stakerRewardsParams,
         bool isStandardVault
-    ) external returns (address vault, address delegator, address slasher, address defaultStakerRewards, address payable byzFiNativeSymbioticVault, address stakingMinivault) {
+    ) external returns (address vault, address delegator, address slasher, address defaultStakerRewards, address payable byzFiNativeSymbioticVault, address symPod) {
         
         // Deploy ByzFiNativeSymbioticVault
         byzFiNativeSymbioticVault = payable(address(new ByzFiNativeSymbioticVault()));
         
-        // Deploy StakingMinivault
-        stakingMinivault = address(new StakingMinivault(
+        // Deploy SymPod
+        symPod = address(new SymPod(
             address(0),                 // _symPodFactory (mock)
             address(0),                 // _auction (mock)
             address(0),                 // _beaconChainAdmin (mock)
@@ -99,7 +99,7 @@ contract SymbioticVaultFactory is Initializable, OwnableUpgradeable {
         ));
 
         // Deploy BurnerRouter
-        address burnerRouter = _deployBurnerRouter(burnerRouterParams, byzFiNativeSymbioticVault, stakingMinivault);
+        address burnerRouter = _deployBurnerRouter(burnerRouterParams, byzFiNativeSymbioticVault, symPod);
 
         // If it is a standard vault, use the preset parameters for the vault configurator
         if (isStandardVault) { 
@@ -116,15 +116,15 @@ contract SymbioticVaultFactory is Initializable, OwnableUpgradeable {
         }
 
         // Deploy Vault
-        (vault, delegator, slasher) = _deployVault(configuratorParams, vaultParams, delegatorParams, slasherParams, burnerRouter, byzFiNativeSymbioticVault, stakingMinivault);
+        (vault, delegator, slasher) = _deployVault(configuratorParams, vaultParams, delegatorParams, slasherParams, burnerRouter, byzFiNativeSymbioticVault, symPod);
 
         // Deploy DefaultStakerRewards
         defaultStakerRewards = _deployDefaultStakerRewards(stakerRewardsParams, vault, byzFiNativeSymbioticVault);
 
-        // Initialize ByzFiNativeSymbioticVault and whitelist the stakingMinivault as a depositor
-        ByzFiNativeSymbioticVault(byzFiNativeSymbioticVault).initialize(byzFiNativeSymbioticVault, vault, stakingMinivault);
+        // Initialize ByzFiNativeSymbioticVault and whitelist the symPod as a depositor
+        ByzFiNativeSymbioticVault(byzFiNativeSymbioticVault).initialize(byzFiNativeSymbioticVault, vault, symPod);
 
-        return (vault, delegator, slasher, defaultStakerRewards, byzFiNativeSymbioticVault, stakingMinivault);
+        return (vault, delegator, slasher, defaultStakerRewards, byzFiNativeSymbioticVault, symPod);
     }
 
     /* ===================== PRIVATE FUNCTIONS ===================== */
@@ -133,17 +133,17 @@ contract SymbioticVaultFactory is Initializable, OwnableUpgradeable {
      * @notice Deploys a BurnerRouter with the given parameters
      * @param params The parameters for the BurnerRouter
      * @param byzFiNativeSymbioticVault The address of the ByzFiNativeSymbioticVault
-     * @param stakingMinivault The address of the StakingMinivault
+     * @param symPod The address of the SymPod
      */
     function _deployBurnerRouter(
         ISymbioticVaultFactory.BurnerRouterParams memory params,
         address byzFiNativeSymbioticVault,
-        address stakingMinivault
+        address symPod
     ) private returns (address) {
         return IBurnerRouterFactory(BURNER_ROUTER_FACTORY).create(
             IBurnerRouter.InitParams({
                 owner: byzFiNativeSymbioticVault,
-                collateral: stakingMinivault, // the minivault is also an ERC20 token
+                collateral: symPod, // the minivault is also an ERC20 token
                 delay: params.delay,
                 globalReceiver: params.globalReceiver,
                 networkReceivers: params.networkReceivers,
@@ -160,7 +160,7 @@ contract SymbioticVaultFactory is Initializable, OwnableUpgradeable {
      * @param slasherParams The parameters for the Slasher
      * @param burnerRouter The address of the BurnerRouter
      * @param byzFiNativeSymbioticVault The address of the ByzFiNativeSymbioticVault
-     * @param stakingMinivault The address of the StakingMinivault
+     * @param symPod The address of the SymPod
      */
     function _deployVault(
         ISymbioticVaultFactory.VaultConfiguratorParams memory configuratorParams,
@@ -169,14 +169,14 @@ contract SymbioticVaultFactory is Initializable, OwnableUpgradeable {
         ISymbioticVaultFactory.SlasherParams memory slasherParams,
         address burnerRouter,
         address byzFiNativeSymbioticVault,
-        address stakingMinivault
+        address symPod
     ) private returns (address, address, address) {
         // Initialize vaultInitParams
         bytes memory vaultInitParams = _initializeVaultInitParams(
             vaultParams,
             burnerRouter,
             byzFiNativeSymbioticVault,
-            stakingMinivault
+            symPod
         );
 
         // Initialize delegatorInitParams
@@ -237,16 +237,16 @@ contract SymbioticVaultFactory is Initializable, OwnableUpgradeable {
      * @param vaultParams The parameters for the Vault
      * @param burnerRouter The address of the BurnerRouter
      * @param byzFiNativeSymbioticVault The address of the ByzFiNativeSymbioticVault
-     * @param stakingMinivault The address of the StakingMinivault
+     * @param symPod The address of the SymPod
      */
     function _initializeVaultInitParams(
         ISymbioticVaultFactory.VaultParams memory vaultParams,
         address burnerRouter,
         address byzFiNativeSymbioticVault,
-        address stakingMinivault
+        address symPod
     ) private pure returns (bytes memory) {
         return abi.encode(IVault.InitParams({
-            collateral: stakingMinivault,
+            collateral: symPod,
             burner: burnerRouter,
             epochDuration: vaultParams.epochDuration,
             depositWhitelist: true,
