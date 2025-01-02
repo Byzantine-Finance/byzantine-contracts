@@ -9,13 +9,14 @@ import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IER
 import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgrades/contracts/utils/ReentrancyGuardUpgradeable.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {IOracle} from "../interfaces/IOracle.sol";
+import {IERC7535MultiRewardVault} from "../interfaces/IERC7535MultiRewardVault.sol";
 
 /**
  * @title ERC7535MultiRewardVault
  * @author Byzantine-Finance
  * @notice ERC-7535: Native Asset ERC-4626 Tokenized Vault with support for multiple reward tokens
  */
-contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
+contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable, IERC7535MultiRewardVault {
     using SafeERC20 for IERC20;
     using Math for uint256;
 
@@ -34,19 +35,6 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
      */
     uint256[44] private __gap;
 
-    /* ============== CUSTOM ERRORS ============== */
-
-    error TokenAlreadyAdded();
-    error InvalidAddress();
-    error TokenDoesNotHaveDecimalsFunction(address token);
-    error TokenHasMoreThan18Decimals(address token);
-    
-    /* ============== EVENTS ============== */
-
-    event RewardTokenAdded(address indexed token);
-    event OracleUpdated(address newOracle);
-    event RewardTokenWithdrawn(address indexed receiver, address indexed rewardToken, uint256 amount);
-    
     /* ============== CONSTRUCTOR & INITIALIZER ============== */
 
     /**
@@ -77,7 +65,7 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
      * @param receiver The address to receive the Byzantine vault shares.
      * @return The amount of shares minted.
      */
-    function deposit(uint256 assets, address receiver) public virtual override payable returns (uint256) {
+    function deposit(uint256 assets, address receiver) public virtual override(ERC7535Upgradeable, IERC7535MultiRewardVault) payable returns (uint256) {
         return super.deposit(assets, receiver);
     }
 
@@ -87,7 +75,7 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
      * @param receiver The address to receive the Byzantine vault shares.
      * @return The amount of ETH deposited.
      */
-    function mint(uint256 shares, address receiver) public virtual override payable returns (uint256) {
+    function mint(uint256 shares, address receiver) public virtual override(ERC7535Upgradeable, IERC7535MultiRewardVault) payable returns (uint256) {
         return super.mint(shares, receiver);
     }
 
@@ -99,7 +87,7 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
      * @param owner The address that is withdrawing ETH.
      * @return The amount of shares burned.
      */
-    function withdraw(uint256 assets, address receiver, address owner) public override nonReentrant returns (uint256) {   
+    function withdraw(uint256 assets, address receiver, address owner) public override(ERC7535Upgradeable, IERC7535MultiRewardVault) nonReentrant returns (uint256) {   
         // Calculate the amount of shares that will be burned
         uint256 sharesToBurn = previewWithdraw(assets);
 
@@ -139,7 +127,7 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
      * @param owner The address that is withdrawing ETH.
      * return The amount of ETH withdrawn (includes ETH + ETH value of all reward tokens).
      */
-    function redeem(uint256 shares, address receiver, address owner) public override nonReentrant returns (uint256) {
+    function redeem(uint256 shares, address receiver, address owner) public override(ERC7535Upgradeable, IERC7535MultiRewardVault) nonReentrant returns (uint256) {
         // Calculate the proportion of shares the user is redeeming
         uint256 userWithdrawProportion = (shares * 1e18) / balanceOf(owner);
 
@@ -204,7 +192,7 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
      * @dev This ensures that when depositing or withdrawing, a user receives a proportional amount of assets or shares.
      * @dev Assumes that the oracle returns the price in 18 decimals.
      */
-    function totalAssets() public view override returns (uint256) {        
+    function totalAssets() public view override(ERC7535Upgradeable, IERC7535MultiRewardVault) returns (uint256) {        
         // Calculate USD value of reward tokens
         uint256 rewardTokenUSDValue;
 
