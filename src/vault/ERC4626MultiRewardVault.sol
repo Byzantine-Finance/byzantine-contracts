@@ -206,7 +206,7 @@ contract ERC4626MultiRewardVault is ERC4626Upgradeable, OwnableUpgradeable, Reen
      * @dev This ensures that when depositing or withdrawing, a user receives a proportional amount of assets or shares.
      * @dev Assumes that the oracle returns the price in 18 decimals.
      */
-    function totalAssets() public view override(ERC4626Upgradeable, IERC4626MultiRewardVault) returns (uint256) {
+    function totalAssets() public view virtual override(ERC4626Upgradeable, IERC4626MultiRewardVault) returns (uint256) {
         // Calculate USD value of reward tokens
         uint256 rewardTokenUSDValue;
         uint8 assetDecimals = IERC20Metadata(address(asset())).decimals();

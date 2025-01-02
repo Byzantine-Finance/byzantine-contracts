@@ -192,7 +192,7 @@ contract ERC7535MultiRewardVault is ERC7535Upgradeable, OwnableUpgradeable, Reen
      * @dev This ensures that when depositing or withdrawing, a user receives a proportional amount of assets or shares.
      * @dev Assumes that the oracle returns the price in 18 decimals.
      */
-    function totalAssets() public view override(ERC7535Upgradeable, IERC7535MultiRewardVault) returns (uint256) {        
+    function totalAssets() public view virtual override(ERC7535Upgradeable, IERC7535MultiRewardVault) returns (uint256) {        
         // Calculate USD value of reward tokens
         uint256 rewardTokenUSDValue;
 

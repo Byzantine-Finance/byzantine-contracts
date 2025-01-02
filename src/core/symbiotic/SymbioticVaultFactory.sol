@@ -94,7 +94,8 @@ contract SymbioticVaultFactory is Initializable, OwnableUpgradeable {
         stakingMinivault = address(new StakingMinivault(
             address(0),                 // _symPodFactory (mock)
             address(0),                 // _auction (mock)
-            address(0)                  // _beaconChainAdmin (mock)
+            address(0),                 // _beaconChainAdmin (mock)
+            address(0)                  // _oracle (mock)
         ));
 
         // Deploy BurnerRouter

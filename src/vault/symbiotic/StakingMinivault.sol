@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import {ERC7535Upgradeable} from "../ERC7535/ERC7535Upgradeable.sol";
+import {ERC7535MultiRewardVault} from "../ERC7535MultiRewardVault.sol";
 import {IAuction} from "../../interfaces/IAuction.sol";
 import {ISymPod} from "obol-splits/interfaces/ISymPod.sol";
 import {FIFOLib} from "../../libraries/FIFOLib.sol";
@@ -27,7 +27,7 @@ interface ISymPodFactory {
  * @author Byzantine Finance
  * @notice ERC7535 vault for staking ETH through SymPod
  */
-contract StakingMinivault is ERC7535Upgradeable {
+contract StakingMinivault is ERC7535MultiRewardVault {
     using FIFOLib for FIFOLib.FIFO;
 
     /* =================== MODIFIERS =================== */
@@ -89,7 +89,8 @@ contract StakingMinivault is ERC7535Upgradeable {
     constructor(
         address _symPodFactory,
         address _auction,
-        address _beaconChainAdmin
+        address _beaconChainAdmin,
+        address _oracle
     ) {
         symPodFactory = ISymPodFactory(_symPodFactory);
         auction = IAuction(_auction);
@@ -99,19 +100,22 @@ contract StakingMinivault is ERC7535Upgradeable {
 
     function initialize(
         bool _whitelistedDeposit,
-        address _creator
+        address _creator,
+        address _oracle
     ) external initializer {
         __StakingMinivault_init(
             _whitelistedDeposit,
-            _creator
+            _creator,
+            _oracle
         );
     }
 
     function __StakingMinivault_init(
         bool _whitelistedDeposit,
-        address _creator
+        address _creator,
+        address _oracle
     ) internal onlyInitializing {
-        __ERC7535_init();
+        __ERC7535MultiRewardVault_init(_oracle);
         __StakingMinivault_init_unchained(
             _whitelistedDeposit,
             _creator
@@ -274,7 +278,7 @@ contract StakingMinivault is ERC7535Upgradeable {
 
     /* =================== INTERNAL FUNCTIONS =================== */
 
-    function _getETHBalance() internal view virtual returns (uint256) {
+    function _getETHBalance() internal view override returns (uint256) {
         return address(this).balance;
     }
 
