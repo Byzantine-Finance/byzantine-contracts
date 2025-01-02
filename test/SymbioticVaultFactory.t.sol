@@ -2,8 +2,8 @@
 pragma solidity ^0.8.20;
 
 import {Test, console} from "forge-std/Test.sol";
-import {IERC20Upgradeable} from "@openzeppelin-upgrades/contracts/token/ERC20/IERC20Upgradeable.sol";
-import {IERC7535Upgradeable} from "../src/vault/ERC7535/IERC7535Upgradeable.sol";
+import {IERC20} from "@openzeppelin/contracts/interfaces/IERC20.sol";
+import {IERC7535} from "../src/interfaces/IERC7535.sol";
 
 import {SymbioticVaultFactory} from "../src/core/symbiotic/SymbioticVaultFactory.sol";
 import {ISymbioticVaultFactory} from "../src/interfaces/ISymbioticVaultFactory.sol";

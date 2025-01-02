@@ -45,7 +45,7 @@ contract ByzFiNativeSymbioticVault is Initializable, OwnableUpgradeable, ERC7535
         address _stakingMinivault
     ) internal onlyInitializing {
         // Initialize parent contracts
-        __Ownable_init();
+        __Ownable_init(msg.sender);
         __ERC7535_init();
 
         // Initialize the contract
