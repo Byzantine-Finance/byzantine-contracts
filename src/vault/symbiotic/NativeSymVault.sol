@@ -3,10 +3,10 @@ pragma solidity ^0.8.20;
 
 import {Initializable} from "@openzeppelin-upgrades/contracts/proxy/utils/Initializable.sol";
 import {OwnableUpgradeable} from "@openzeppelin-upgrades/contracts/access/OwnableUpgradeable.sol";
-import "../ERC7535/ERC7535Upgradeable.sol";
 
-import {IVault} from "@symbioticfi/core/src/interfaces/vault/IVault.sol";
+import "../ERC7535/ERC7535Upgradeable.sol";
 import {SymPod} from "./SymPod.sol";
+import {IVault} from "@symbioticfi/core/src/interfaces/vault/IVault.sol";
 
 contract NativeSymVault is Initializable, OwnableUpgradeable, ERC7535Upgradeable {
 
@@ -92,13 +92,22 @@ contract NativeSymVault is Initializable, OwnableUpgradeable, ERC7535Upgradeable
     function deposit(uint256 assets, address receiver) public virtual override payable returns (uint256) {
         // Deposit ETH into the vault to receive NRVS
         uint256 nrvShares = super.deposit(assets, receiver);
-
-        // Send the ETH to the Staking Minivault to be staked on the beacon chain and mint the corresponding Staking vaultshares (SVS) 
-        uint256 svShares = SymPod(symPod).deposit{value: assets}(assets, receiver);
-
-        // // Deposit SVS into Symbiotic vault
-        // (uint256 depositedAmount, uint256 mintedShares) = vault.deposit(receiver, svShares);
         
+        // Send the ETH to the Staking Minivault to be staked on the beacon chain and mint the corresponding SymPod shares (SPS)
+        uint256 spShares = SymPod(symPod).deposit{value: assets}(assets, address(this));
+
+        // Emit only for testing purposes of SymbioticVaultFactoryTest 
+        emit SPSReceived(spShares);
+
+        // NativeSymVault approves Symbiotic vault to transfer SPS
+        SymPod(symPod).approve(address(vault), spShares);
+
+        // Deposit SPS into Symbiotic vault
+        (uint256 depositedAmount, uint256 mintedShares) = vault.deposit(address(this), spShares);
+        
+        // Emit only for testing purposes of SymbioticVaultFactoryTest 
+        emit SpsToSymbioticVault(mintedShares, depositedAmount);
+
         return nrvShares;
     }
 
@@ -120,5 +129,17 @@ contract NativeSymVault is Initializable, OwnableUpgradeable, ERC7535Upgradeable
 
         return assets;
     }
+
+    /**
+     * @notice Returns the total value of assets in the vault.
+     * @return The total value of assets in the vault.
+     */
+    function totalAssets() public view override returns (uint256) {
+        return SymPod(symPod).getTotalStaked() + address(this).balance;
+    }
+
+    // Event to emit svShares for testing purposes in SymbioticVaultFactoryTest
+    event SPSReceived(uint256 svShares);
+    event SpsToSymbioticVault(uint256 mintedShares, uint256 depositedAmount);
 
 }
