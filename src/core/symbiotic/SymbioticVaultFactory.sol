@@ -99,23 +99,21 @@ contract SymbioticVaultFactory is Initializable, OwnableUpgradeable {
         ISymbioticVaultFactory.SlasherParams memory slasherParams,
         ISymbioticVaultFactory.StakerRewardsParams memory stakerRewardsParams,
         bool isStandardVault
-    ) external returns (address vault, address delegator, address slasher, address defaultStakerRewards, address payable byzFiNativeSymbioticVault, address symPodAddress) {
+    ) external returns (address vault, address delegator, address slasher, address defaultStakerRewards, address payable byzFiNativeSymbioticVault, address symPod) {
         
         // Deploy ByzFiNativeSymbioticVault
         byzFiNativeSymbioticVault = payable(address(new ByzFiNativeSymbioticVault()));
-        
-        // Initialize SymPod
-        symPod = ISymPod(symPodFactory.createSymPod(
-            "SymPod Shares",
-            "SPS",
-            address(this),
-            address(this),
-            address(this),
-            address(this)
+
+        // Deploy SymPod
+        symPod = address(new SymPod(
+            address(0),         // symPodFactory (mock)
+            address(0),         // auction (mock)
+            address(0),         // beaconChainAdmin (mock)
+            address(0)          // oracle (mock)
         ));
 
         // Deploy BurnerRouter
-        address burnerRouter = _deployBurnerRouter(burnerRouterParams, byzFiNativeSymbioticVault, address(symPod));
+        address burnerRouter = _deployBurnerRouter(burnerRouterParams, byzFiNativeSymbioticVault, symPod);
 
         // If it is a standard vault, use the preset parameters for the vault configurator
         if (isStandardVault) { 
@@ -132,15 +130,15 @@ contract SymbioticVaultFactory is Initializable, OwnableUpgradeable {
         }
 
         // Deploy Vault
-        (vault, delegator, slasher) = _deployVault(configuratorParams, vaultParams, delegatorParams, slasherParams, burnerRouter, byzFiNativeSymbioticVault, symPodAddress);
+        (vault, delegator, slasher) = _deployVault(configuratorParams, vaultParams, delegatorParams, slasherParams, burnerRouter, byzFiNativeSymbioticVault, symPod);
 
         // Deploy DefaultStakerRewards
         defaultStakerRewards = _deployDefaultStakerRewards(stakerRewardsParams, vault, byzFiNativeSymbioticVault);
 
         // Initialize ByzFiNativeSymbioticVault and whitelist the symPod as a depositor
-        ByzFiNativeSymbioticVault(byzFiNativeSymbioticVault).initialize(byzFiNativeSymbioticVault, vault, symPodAddress);
+        ByzFiNativeSymbioticVault(byzFiNativeSymbioticVault).initialize(byzFiNativeSymbioticVault, vault, symPod);
 
-        return (vault, delegator, slasher, defaultStakerRewards, byzFiNativeSymbioticVault, symPodAddress);
+        return (vault, delegator, slasher, defaultStakerRewards, byzFiNativeSymbioticVault, symPod);
     }
 
     /* ===================== PRIVATE FUNCTIONS ===================== */
