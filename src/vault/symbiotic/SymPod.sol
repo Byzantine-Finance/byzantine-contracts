@@ -151,16 +151,6 @@ contract SymPod is ERC7535MultiRewardVault {
 
     /* =================== EXTERNAL FUNCTIONS =================== */
 
-
-    /**
-     * @notice Mints tokens to a specific address for testing purposes.
-     * @param to The address to receive the minted tokens.
-     * @param amount The amount of tokens to mint.
-     */
-    function mintForTesting(address to, uint256 amount) external {
-        _mint(to, amount);
-    }
-
     /**
      * @notice Deposit ETH into the vault
      * @param assets Amount of ETH to deposit
@@ -276,6 +266,13 @@ contract SymPod is ERC7535MultiRewardVault {
         return clusterIdsFIFO.getAllElements();
     }
 
+    /**
+     * @notice Returns the total amount of ETH staked.
+     */
+    function getTotalStaked() public view returns (uint256) {
+        return totalStaked;
+    }
+
     /* =================== INTERNAL FUNCTIONS =================== */
 
     function _getETHBalance() internal view override returns (uint256) {
@@ -292,4 +289,25 @@ contract SymPod is ERC7535MultiRewardVault {
             unchecked { ++i; }
         }
     }
+
+    /** 
+    * @dev Activate this function for testing in SymbioticVaultFactoryTest
+    * TODO: Modify and remove temporary code when auction.triggerAuction() is working
+    */
+    // function _triggerAuction() internal {
+    //     if(msg.value % VALIDATOR_DEPOSIT != 0) revert InvalidDeposit();
+    //     uint256 validatorCount = msg.value / VALIDATOR_DEPOSIT;
+    //     address deadAddress = 0x000000000000000000000000000000000000dEaD;
+
+    //     for (uint256 i = 0; i < validatorCount; ) {
+    //         // Temporary code for testing in SymbioticVaultFactoryTest
+    //         // Transfer ETH to the dead address to simulate the staked of the deposted ETH on the beacon chain and to get the correct totalAssets()
+    //         (bool success, ) = deadAddress.call{value: VALIDATOR_DEPOSIT}("");
+    //         require(success, "Transfer to dead address failed");
+
+    //         unchecked {
+    //             ++i;
+    //         }
+    //     }
+    // }
 }
