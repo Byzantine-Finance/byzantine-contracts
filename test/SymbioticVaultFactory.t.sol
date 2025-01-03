@@ -2,27 +2,25 @@
 pragma solidity ^0.8.20;
 
 import {Test, console} from "forge-std/Test.sol";
-import {IERC20} from "@openzeppelin/contracts/interfaces/IERC20.sol";
-import {IERC7535} from "../src/interfaces/IERC7535.sol";
 
-import {SymbioticVaultFactory} from "../src/core/symbiotic/SymbioticVaultFactory.sol";
-import {ISymbioticVaultFactory} from "../src/interfaces/ISymbioticVaultFactory.sol";
 import {IBurnerRouter} from "@symbioticfi/burners/src/interfaces/router/IBurnerRouter.sol";
-import {ByzFiNativeSymbioticVault} from "../src/vault/symbiotic/ByzFiNativeSymbioticVault.sol";
 import {IVault} from "@symbioticfi/core/src/interfaces/vault/IVault.sol";
-import {IVetoSlasher} from "@symbioticfi/core/src/interfaces/slasher/IVetoSlasher.sol";
 import {INetworkRestakeDelegator} from "@symbioticfi/core/src/interfaces/delegator/INetworkRestakeDelegator.sol";
 import {IFullRestakeDelegator} from "@symbioticfi/core/src/interfaces/delegator/IFullRestakeDelegator.sol";
-import {NetworkMiddlewareMock} from "./mocks/NetworkMiddlewareMock.sol";
+import {IVetoSlasher} from "@symbioticfi/core/src/interfaces/slasher/IVetoSlasher.sol";
 import {INetworkRegistry} from "@symbioticfi/core/src/interfaces/INetworkRegistry.sol";
 import {INetworkMiddlewareService} from "@symbioticfi/core/src/interfaces/service/INetworkMiddlewareService.sol";
 import {INetworkRestakeDelegator} from "@symbioticfi/core/src/interfaces/delegator/INetworkRestakeDelegator.sol";
-import {IVetoSlasher} from "@symbioticfi/core/src/interfaces/slasher/IVetoSlasher.sol";
 import {IOperatorRegistry} from "@symbioticfi/core/src/interfaces/IOperatorRegistry.sol";
 import {IRegistry} from "@symbioticfi/core/src/interfaces/common/IRegistry.sol";
-import {IVault} from "@symbioticfi/core/src/interfaces/vault/IVault.sol";
 import {IOptInService} from "@symbioticfi/core/src/interfaces/service/IOptInService.sol";
+import {ERC4626Math} from "@symbioticfi/core/src/contracts/libraries/ERC4626Math.sol";
+
+import {SymbioticVaultFactory} from "../src/core/symbiotic/SymbioticVaultFactory.sol";
+import {ISymbioticVaultFactory} from "../src/interfaces/ISymbioticVaultFactory.sol";
+import {NativeSymVault} from "../src/vault/symbiotic/NativeSymVault.sol";
 import {SymPod} from "../src/vault/symbiotic/SymPod.sol";
+import {NetworkMiddlewareMock} from "./mocks/NetworkMiddlewareMock.sol";
 
 contract SymbioticVaultFactoryTest is Test {
     uint256 holeskyFork;
@@ -106,7 +104,7 @@ contract SymbioticVaultFactoryTest is Test {
         ) = _createVaultParamsSet();
 
         // Call the createVault function to create an advanced vault
-        (address vault, address delegator, address slasher, address defaultStakerRewards, address payable byzFiNativeSymbioticVault, address symPod) = symbioticVaultFactory.createVault(
+        (address vault, address delegator, address slasher, address defaultStakerRewards, address payable nativeSymVault, address symPod) = symbioticVaultFactory.createVault(
             burnerRouterParams,
             configuratorParams,
             vaultParams,
@@ -121,23 +119,23 @@ contract SymbioticVaultFactoryTest is Test {
         assert(delegator != address(0));
         assert(slasher != address(0));
         assert(defaultStakerRewards != address(0));
-        assert(byzFiNativeSymbioticVault != address(0));
+        assert(nativeSymVault != address(0));
         console.log("vault", vault);
         console.log("delegator", delegator);
         console.log("slasher", slasher);
         console.log("defaultStakerRewards", defaultStakerRewards);
-        console.log("byzFiNativeSymbioticVault", byzFiNativeSymbioticVault);
+        console.log("nativeSymVault", nativeSymVault);
 
-        // Verifiy if the ByzFiNativeSymbioticVault is initialized with the correct vault address
-        address vaultAddr = address(ByzFiNativeSymbioticVault(byzFiNativeSymbioticVault).vault());
+        // Verifiy if the NativeSymVault is initialized with the correct vault address
+        address vaultAddr = address(NativeSymVault(nativeSymVault).vault());
         assertEq(vaultAddr, vault);
 
-        // Verify if the ByzFiNativeSymbioticVault is initialized with the correct staking minivault address
-        address stakingMinivaultAddr = ByzFiNativeSymbioticVault(byzFiNativeSymbioticVault).symPod();
+        // Verify if the NativeSymVault is initialized with the correct staking minivault address
+        address stakingMinivaultAddr = NativeSymVault(nativeSymVault).symPod();
         assertEq(stakingMinivaultAddr, symPod);
 
         // Verify if the symPod is whitelisted
-        assertEq(IVault(vault).isDepositorWhitelisted(byzFiNativeSymbioticVault), true);
+        assertEq(IVault(vault).isDepositorWhitelisted(nativeSymVault), true);
 
         // Verify if depositLimit is set to 1000 ether, meaning that an advanced vault is created
         uint256 limit = IVault(vault).depositLimit();
@@ -166,7 +164,7 @@ contract SymbioticVaultFactoryTest is Test {
         ) = _createVaultParamsSet();
 
         // Call the createVault function to create a standardized vault
-        (address vault, address delegator, address slasher, address defaultStakerRewards, address payable byzFiNativeSymbioticVault, address symPod) = symbioticVaultFactory.createVault(
+        (address vault, address delegator, address slasher, address defaultStakerRewards, address payable nativeSymVault, address symPod) = symbioticVaultFactory.createVault(
             burnerRouterParams,
             configuratorParams,
             vaultParams,
@@ -182,7 +180,7 @@ contract SymbioticVaultFactoryTest is Test {
         uint256 limit = IVault(vault).depositLimit();
         assertEq(limit, 0);
 
-        // Verify if operatorNetworkSharesSetRoleHolders is set to byzFiNativeSymbioticVault
+        // Verify if operatorNetworkSharesSetRoleHolders is set to nativeSymVault
         bytes32 role = INetworkRestakeDelegator(delegator).OPERATOR_NETWORK_SHARES_SET_ROLE();
         assertNotEq(role, 0);
 
@@ -204,7 +202,7 @@ contract SymbioticVaultFactoryTest is Test {
         ) = _createVaultParamsSet();
 
         // Call the createVault function to create a standardized vault
-        (address vault, address delegator, address slasher, address defaultStakerRewards, address payable byzFiNativeSymbioticVault, address symPod) = symbioticVaultFactory.createVault(
+        (address vault, address delegator, address slasher, address defaultStakerRewards, address payable nativeSymVault, address symPod) = symbioticVaultFactory.createVault(
             burnerRouterParams,
             configuratorParams,
             vaultParams,
@@ -253,12 +251,12 @@ contract SymbioticVaultFactoryTest is Test {
         assertEq(INetworkRestakeDelegator(delegator).maxNetworkLimit(concatenatedNetwork), 1000 ether);
 
         // Vault opts in to the network by setting non-zero limits
-        vm.prank(byzFiNativeSymbioticVault); // Only a NETWORK_LIMIT_SET_ROLE holder can call this function
+        vm.prank(nativeSymVault); // Only a NETWORK_LIMIT_SET_ROLE holder can call this function
         INetworkRestakeDelegator(delegator).setNetworkLimit(concatenatedNetwork, 900 ether);
         assertEq(INetworkRestakeDelegator(delegator).networkLimit(concatenatedNetwork), 900 ether);
 
         // Vault opts in to the operator by setting non-zero limits
-        vm.prank(byzFiNativeSymbioticVault);
+        vm.prank(nativeSymVault);
         INetworkRestakeDelegator(delegator).setOperatorNetworkShares(concatenatedNetwork, operator1, 100 ether);
         assertEq(INetworkRestakeDelegator(delegator).operatorNetworkShares(concatenatedNetwork, operator1), 100 ether);
     }
@@ -274,7 +272,7 @@ contract SymbioticVaultFactoryTest is Test {
             ISymbioticVaultFactory.StakerRewardsParams memory stakerRewardsParams
         ) = _createVaultParamsSet();
 
-        (address vault, address delegator, address slasher, address defaultStakerRewards, address payable byzFiNativeSymbioticVault, address symPod) = symbioticVaultFactory.createVault(
+        (address vault, address delegator, address slasher, address defaultStakerRewards, address payable nativeSymVault, address symPod) = symbioticVaultFactory.createVault(
             burnerRouterParams,
             configuratorParams,
             vaultParams,
@@ -285,55 +283,60 @@ contract SymbioticVaultFactoryTest is Test {
         );
 
         // Go through the entire onboarding process for the network, operator and vault
-        _onboardingProcess(vault, delegator, byzFiNativeSymbioticVault);
+        _onboardingProcess(vault, delegator, nativeSymVault);
 
-        // ============= For Testing purposes: Mint SymPodShares to byzFiNativeSymbioticVault to bypass the real process, to simulate: 
-        // -> deposit of ETH by Alice in ByzFiNativeSymbioticVault 
-        // -> deposit of ETH by ByzFiNativeSymbioticVault in SymPod 
-        // -> issuance of SymPodShares by SymPod to ByzFiNativeSymbioticVault
-        // -> deposit of SymPodShares by ByzFiNativeSymbioticVault in the SymbioticVault ==============
+        /* ===================== ALICE DEPOSITS 32 ETH INTO NativeSymVault ===================== */
 
-        // Mint SymPodShares to byzFiNativeSymbioticVault (no access control for testing purposes)
-        SymPod(payable(symPod)).mintForTesting(byzFiNativeSymbioticVault, 1000);
-        assertEq(SymPod(payable(symPod)).balanceOf(byzFiNativeSymbioticVault), 1000);
-
-        // ByzFiNativeSymbioticVault approves the vault to spend its SymPodShares
-        vm.prank(byzFiNativeSymbioticVault);
-        SymPod(payable(symPod)).approve(vault, 1000);
-        assertEq(SymPod(payable(symPod)).allowance(byzFiNativeSymbioticVault, vault), 1000);
-
-        // ByzFiNativeSymbioticVault deposits SymPodShares on behalf of Alice
-        vm.prank(byzFiNativeSymbioticVault);
-        IVault(vault).deposit(alice, 1000);
-        assertEq(SymPod(payable(symPod)).balanceOf(byzFiNativeSymbioticVault), 0);
-        assertEq(IVault(vault).activeBalanceOf(alice), 1000);
-        assertEq(IVault(vault).totalStake(), 1000);
-        assertEq(IVault(vault).activeShares(), 1000);
-
-        // Alice withdraws her SymPodShares (it will be claimable after the next epoch)
-        vm.warp(block.timestamp + 30 days);
-        uint256 epochAtWithdraw = IVault(vault).currentEpoch(); // epoch 1
-        vm.prank(alice); 
-        // TODO: Be careful, Alice can withdraw her SymPodShares directly from the SymbioticVault if SymPodShares are depoisted on her behalf
-        // SymPodShares should be minted to ByzFiNativeSymbioticVault? 
-        IVault(vault).withdraw(alice, 1000);
-        assertEq(IVault(vault).activeBalanceOf(alice), 0);
-        assertEq(IVault(vault).totalStake(), 1000);
-
-        // Vault epoch duration is 21 days, so we need to wait for 21 days
-        vm.warp(block.timestamp + 100 days);
+        // Expect the SPSReceived event to be emitted 
+        vm.expectEmit(true, true, true, true);
+        emit NativeSymVault.SPSReceived(32 ether);
+        vm.expectEmit(true, true, true, true);
+        emit NativeSymVault.SpsToSymbioticVault(32 ether, 32 ether);
         vm.prank(alice);
-        IVault(vault).claim(alice, epochAtWithdraw + 1); // Can be claimed at epochAtWithdraw + 1 epoch 
-        assertEq(IVault(vault).totalStake(), 0);
-        assertEq(IVault(vault).activeBalanceOf(alice), 0);
-        assertEq(SymPod(payable(symPod)).balanceOf(alice), 1000);
+        uint256 aliceNRVS = NativeSymVault(nativeSymVault).deposit{value: 32 ether}(32 ether, alice);
 
-        // TODO: Redo tests to interact correctly with ByzFiNativeSymbioticVault and SymPod
-        // vm.prank(alice);
-        // uint256 nrvShares = ByzFiNativeSymbioticVault(byzFiNativeSymbioticVault).deposit{value: 64 ether}(64 ether, alice);
-        // Verify if the nrvShares received are equal to the shares converted from the amount of ETH deposited in ByzFiNativeSymbioticVault
-        // assertEq(nrvShares, convertedNrvShares);
-        // console.log("nrvShares", nrvShares);
+        // Verify if the nrvShares received are equal to the shares converted from the amount of ETH deposited in NativeSymVault
+        assertEq(aliceNRVS, 32 ether);
+        // Verify if Alice has the NRVS 
+        assertEq(NativeSymVault(payable(nativeSymVault)).balanceOf(alice), aliceNRVS);
+        // Verify if NativeSymVault now has no SPS in its balance
+        assertEq(SymPod(payable(symPod)).balanceOf(nativeSymVault), 0);
+        // Verify if NativeSymVault holds the SPS in its balance
+        uint256 activeBalanceOfNativeSymVaultAfterAlice = IVault(vault).activeBalanceOf(nativeSymVault);
+        assertEq(activeBalanceOfNativeSymVaultAfterAlice, 32 ether);
+        // Verify the total stake and active shares in the symbiotic vault
+        uint256 activeStakeAfterAlice = IVault(vault).activeStake();
+        uint256 activeSharesAfterAlice = IVault(vault).activeShares();
+        assertEq(activeStakeAfterAlice, 32 ether);
+        assertEq(activeSharesAfterAlice, 32 ether);
+
+        /* ===================== BOB DEPOSITS 32 ETH INTO NativeSymVault ===================== */
+        // Calculate the expected shares for Bob from NativeSymVault
+        uint256 expectedBobNRVS = NativeSymVault(nativeSymVault).previewDeposit(32 ether);
+        // Calculate the expected shares for NativeSymVault from SymPod
+        uint256 expectedSPS = SymPod(payable(symPod)).previewDeposit(32 ether);
+        // Calculate the expected shares for NativeSymVault from Symbiotic vault
+        uint256 expectedSymbioticVaultShares = ERC4626Math.previewDeposit(expectedSPS, IVault(vault).activeShares(), IVault(vault).activeStake());
+
+        // Expect the SPSReceived event to be emitted 
+        vm.expectEmit(true, true, true, true);
+        emit NativeSymVault.SPSReceived(expectedSPS);
+        vm.expectEmit(true, true, true, true);
+        emit NativeSymVault.SpsToSymbioticVault(expectedSymbioticVaultShares, expectedSPS);
+        vm.prank(bob);
+        uint256 bobNRVS = NativeSymVault(nativeSymVault).deposit{value: 32 ether}(32 ether, bob);
+        // Verify if the nrvShares received are equal to the shares converted from the amount of ETH deposited in NativeSymVault
+        assertEq(bobNRVS, expectedBobNRVS);
+        // Verify if Bob has the NRVS 
+        assertEq(NativeSymVault(payable(nativeSymVault)).balanceOf(bob), bobNRVS);
+        // Verify if NativeSymVault now has no SPS in its balance
+        assertEq(SymPod(payable(symPod)).balanceOf(nativeSymVault), 0);
+        // Verify if NativeSymVault holds the SPS in its balance
+        assertEq(IVault(vault).activeBalanceOf(nativeSymVault), activeBalanceOfNativeSymVaultAfterAlice + expectedSPS);
+        // Verify the total stake and active shares in the symbiotic vault
+        assertEq(IVault(vault).activeStake(), activeStakeAfterAlice + expectedSPS);
+        assertEq(IVault(vault).activeShares(), activeSharesAfterAlice + expectedSymbioticVaultShares);
+
     }
 
     /* ===================== HELPER FUNCTIONS ===================== */
