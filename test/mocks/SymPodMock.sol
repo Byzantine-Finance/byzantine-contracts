@@ -3,7 +3,7 @@ pragma solidity ^0.8.20;
 
 import "../../src/vault/ERC7535/ERC7535Upgradeable.sol";
 
-contract StakingMinivaultMock is ERC7535Upgradeable {
+contract SymPodMock is ERC7535Upgradeable {
 
     /* ============== EXTERNAL FUNCTIONS ============== */
 

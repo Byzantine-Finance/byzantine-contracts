@@ -62,9 +62,23 @@ contract SymbioticVaultFactory is Initializable, OwnableUpgradeable {
     function initialize(
         address initialOwner
     ) external initializer {
-        _transferOwnership(initialOwner);
+        __SymbioticVaultFactory_init(initialOwner);
     }
 
+    function __SymbioticVaultFactory_init(
+        address initialOwner
+    ) internal onlyInitializing {
+        // Initialize parent contracts
+        __Ownable_init(initialOwner);
+
+        // Initialize the contract
+        __SymbioticVaultFactory_init_unchained();
+    }
+
+    function __SymbioticVaultFactory_init_unchained() internal onlyInitializing {
+    }
+
+        
     /* ===================== EXTERNAL FUNCTIONS ===================== */
 
     /**
@@ -92,10 +106,10 @@ contract SymbioticVaultFactory is Initializable, OwnableUpgradeable {
         
         // Deploy SymPod
         symPod = address(new SymPod(
-            address(0),                 // _symPodFactory (mock)
-            address(0),                 // _auction (mock)
-            address(0),                 // _beaconChainAdmin (mock)
-            address(0)                  // _oracle (mock)
+            address(0),         // symPodFactory (mock)
+            address(0),         // auction (mock)
+            address(0),         // beaconChainAdmin (mock)
+            address(0)          // oracle (mock)
         ));
 
         // Deploy BurnerRouter
@@ -246,7 +260,7 @@ contract SymbioticVaultFactory is Initializable, OwnableUpgradeable {
         address symPod
     ) private pure returns (bytes memory) {
         return abi.encode(IVault.InitParams({
-            collateral: symPod,
+            collateral: symPodAddress,
             burner: burnerRouter,
             epochDuration: vaultParams.epochDuration,
             depositWhitelist: true,
